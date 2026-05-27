@@ -26,7 +26,7 @@ export function useResourceEngine() {
           .from('user_profiles')
           .select('metal, crystal, metal_production_rate, crystal_production_rate')
           .eq('user_id', userId)
-          .single();
+          .limit(1);
 
         if (error) {
           console.warn('Fallback a columnas base de recursos:', error.message);
@@ -34,24 +34,26 @@ export function useResourceEngine() {
             .from('user_profiles')
             .select('metal, crystal')
             .eq('user_id', userId)
-            .single();
+            .limit(1);
 
           if (fallbackError) {
             console.error('Error al obtener recursos base:', fallbackError.message);
             return;
           }
-          if (fallback) {
-            setMetal(parseFloat(fallback.metal || 0));
-            setCrystal(parseFloat(fallback.crystal || 0));
+          if (fallback && fallback.length > 0) {
+            const fbData = fallback[0];
+            setMetal(parseFloat(fbData.metal || 0));
+            setCrystal(parseFloat(fbData.crystal || 0));
           }
           return;
         }
 
-        if (data) {
-          setMetal(parseFloat(data.metal || 0));
-          setCrystal(parseFloat(data.crystal || 0));
-          metalRateRef.current = parseFloat(data.metal_production_rate || 0);
-          crystalRateRef.current = parseFloat(data.crystal_production_rate || 0);
+        if (data && data.length > 0) {
+          const d = data[0];
+          setMetal(parseFloat(d.metal || 0));
+          setCrystal(parseFloat(d.crystal || 0));
+          metalRateRef.current = parseFloat(d.metal_production_rate || 0);
+          crystalRateRef.current = parseFloat(d.crystal_production_rate || 0);
         }
       } catch (err) {
         console.error('Error fetching initial resources:', err);

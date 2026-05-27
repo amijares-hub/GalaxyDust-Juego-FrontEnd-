@@ -16,6 +16,8 @@ import {
 import { Button } from "./ui/joly-button";
 import { fetchAllInventory, InventoryItem } from "../lib/inventoryService";
 import { FleetManager } from "./FleetManager";
+import { Scroller } from "./ui/Scroller";
+import { supabase } from "../lib/supabase";
 
 interface InventoryViewProps {
   playerGems: number;
@@ -51,6 +53,26 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [selectedChar, setSelectedChar] = useState<InventoryItem | null>(null);
   const [characters, setCharacters] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Novedades para Modal de Naves
+  const [showSubModal, setShowSubModal] = useState<"fleet" | "skills" | null>(null);
+  const [fleets, setFleets] = useState<any[]>([]);
+
+  // Efecto para limpiar modales secundarios al cerrar el principal
+  useEffect(() => {
+    if (!selectedChar) {
+      setShowSubModal(null);
+    }
+  }, [selectedChar]);
+
+  // Efecto para cargar flotas al abrir el panel 'fleet'
+  useEffect(() => {
+    if (showSubModal === "fleet") {
+      supabase.from("sasori_fleets").select("*").then(({ data }) => {
+        if (data) setFleets(data);
+      });
+    }
+  }, [showSubModal]);
 
   useEffect(() => {
     async function loadData() {
@@ -165,19 +187,41 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setSelectedChar(updated.find((c) => c.id === char.id) || null);
   };
 
-  const handleActivateCharacter = (char: InventoryItem, e: React.MouseEvent) => {
+  const handleCraftAsset = (char: InventoryItem, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (char.blueprints_owned < char.blueprints_required) {
-      triggerNotification("⚠️ PLANOS ESTRUCTURALES INCOMPLETOS", e);
+      triggerNotification("⚠️ PLANO ESTRUCTURAL NO DETECTADO", e);
       return;
     }
+    const cost = char.crafting_costs?.gd_coins || 0;
+    if (playerGold < cost && setPlayerGold) {
+      triggerNotification("⚠️ SALDO DE GD COINS INSUFICIENTE PARA FABRICACIÓN", e);
+      return;
+    }
+
+    // Simulamos la deducción visual de GD Coins
+    if (setPlayerGold) {
+      setPlayerGold(prev => parseFloat((prev - cost).toFixed(2)));
+    }
+
+    // Simulamos la quema del Blueprint y otorgamiento de la unidad
     const updated = characters.map((c) => {
-      if (c.id === char.id) return { ...c, unlocked: true, level: 1, stars: 1, blueprints_owned: c.blueprints_owned - c.blueprints_required, blueprints_required: 15 };
+      if (c.id === char.id) {
+        return { 
+          ...c, 
+          unlocked: true, 
+          quantity: c.quantity + 1, 
+          blueprints_owned: c.blueprints_owned - c.blueprints_required,
+          // Mantenemos 1 blueprint_required para la siguiente fabricación
+          blueprints_required: 1 
+        };
+      }
       return c;
     });
     setCharacters(updated);
     setPlayerPower((prev) => prev + 1200);
     playSfx("heavy_laser");
-    triggerNotification(`🔥 DESPLIEGUE COMPLETO: ${char.name.toUpperCase()} ENSAMBLADO EN EL HANGAR`, e);
+    triggerNotification(`🔥 ENSAMBLAJE COMPLETADO: +1 ${char.name.toUpperCase()} AÑADIDO AL HANGAR. RECURSOS DEDUCIDOS.`, e);
     setSelectedChar(updated.find((c) => c.id === char.id) || null);
   };
 
@@ -478,8 +522,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         )}
                       </div>
                       {char.unlocked && (
-                        <div className="absolute bottom-[-4px] left-[50%] translate-x-[-50%] w-7 h-7 rounded-full bg-[#1b506f] border border-sky-400 flex items-center justify-center text-white font-black text-[9.5px] z-20 shadow-[0_2px_4px_rgba(0,0,0,0.6)] font-mono leading-none">
-                          {char.level}
+                        <div className="absolute bottom-[-4px] left-[50%] translate-x-[-50%] px-2 py-0.5 rounded-full bg-[#1b506f] border border-sky-400 flex items-center justify-center text-white font-black text-[9.5px] z-20 shadow-[0_2px_4px_rgba(0,0,0,0.6)] font-mono leading-none whitespace-nowrap">
+                          x{char.quantity || 1}
                         </div>
                       )}
                     </div>
@@ -535,87 +579,352 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <button onClick={() => setSelectedChar(null)} className="w-7 h-7 rounded-full bg-cyan-950 border border-cyan-800 text-cyan-400 hover:text-white font-bold">✕</button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 relative z-10">
-                <div className="md:col-span-4 flex flex-col items-center gap-3 bg-black/40 border border-cyan-950 p-4 rounded-2xl text-center">
-                  <div className="relative w-20 h-20">
-                    <div className="w-full h-full rounded-full border-[3px] border-cyan-400 overflow-hidden shadow-[0_0_20px_rgba(34,211,238,0.3)]">
-                      <img src={selectedChar.avatar_url} alt={selectedChar.name} className="w-full h-full object-cover" />
+              {showSubModal === "fleet" ? (
+                <div className="relative z-10 space-y-4">
+                  <h4 className="text-[10px] text-cyan-400 font-mono tracking-widest uppercase border-b border-cyan-900/50 pb-2">Seleccionar Flota Operativa</h4>
+                  {fleets.length === 0 ? (
+                    <div className="text-[9px] text-zinc-500 font-mono uppercase py-8 text-center bg-black/40 rounded-xl border border-cyan-950">No hay flotas activas en este sector.</div>
+                  ) : (
+                    <Scroller overflow="x" withButtons className="pb-2" gap="gap-3">
+                      {fleets.map(f => (
+                        <div key={f.id} onClick={() => { triggerNotification(`🚢 ASIGNADO A FLOTA: ${f.name}`); setShowSubModal(null); }} className="min-w-[140px] bg-cyan-950/30 border border-cyan-900 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-cyan-900/50 hover:border-cyan-400 transition-all text-center">
+                          <Layers className="w-8 h-8 text-cyan-400 mb-2" />
+                          <div className="text-[10px] font-bold text-white uppercase">{f.name || 'Flota Alpha'}</div>
+                          <div className="text-[8px] text-cyan-500 font-mono mt-1">POW: {f.total_power_score}</div>
+                        </div>
+                      ))}
+                    </Scroller>
+                  )}
+                </div>
+              ) : showSubModal === "skills" ? (
+                <div className="relative z-10 space-y-4 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+                  <h4 className="text-[10px] text-cyan-400 font-mono tracking-widest uppercase border-b border-cyan-900/50 pb-2">Análisis de Capacidades Tácticas</h4>
+                  <div className="space-y-3">
+                    <div className="bg-red-950/20 border border-red-900/30 rounded-lg p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Zap className="w-4 h-4 text-red-400" />
+                        <span className="text-[9px] text-red-400 font-bold tracking-widest uppercase">Active Skills</span>
+                      </div>
+                      {selectedChar.skills?.active?.map((s, idx) => (
+                        <div key={idx} className="mb-2 last:mb-0">
+                          <div className="text-[10px] text-white font-bold uppercase">{s.name}</div>
+                          <div className="text-[9px] text-zinc-400 font-mono">{s.description}</div>
+                        </div>
+                      )) || <div className="text-[9px] text-zinc-600 font-mono">Sin capacidades activas registradas.</div>}
                     </div>
-                    {selectedChar.unlocked && (
-                      <div className="absolute bottom-[-4px] left-[50%] translate-x-[-50%] w-7 h-7 rounded-full bg-cyan-900 border border-cyan-400 flex items-center justify-center text-white font-mono font-black text-[9px] shadow-md">{selectedChar.level}</div>
+                    <div className="bg-cyan-950/20 border border-cyan-900/30 rounded-lg p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Shield className="w-4 h-4 text-cyan-400" />
+                        <span className="text-[9px] text-cyan-400 font-bold tracking-widest uppercase">Passive Skills</span>
+                      </div>
+                      {selectedChar.skills?.passive?.map((s, idx) => (
+                        <div key={idx} className="mb-2 last:mb-0">
+                          <div className="text-[10px] text-white font-bold uppercase">{s.name}</div>
+                          <div className="text-[9px] text-zinc-400 font-mono">{s.description}</div>
+                        </div>
+                      )) || <div className="text-[9px] text-zinc-600 font-mono">Sin ventajas pasivas.</div>}
+                    </div>
+                    <div className="bg-amber-950/20 border border-amber-900/30 rounded-lg p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                        <span className="text-[9px] text-amber-400 font-bold tracking-widest uppercase">Set Skills</span>
+                      </div>
+                      {selectedChar.skills?.set ? (
+                        <div>
+                          <div className="text-[10px] text-white font-bold uppercase">{selectedChar.skills.set.name}</div>
+                          <div className="text-[9px] text-zinc-400 font-mono">{selectedChar.skills.set.description}</div>
+                        </div>
+                      ) : <div className="text-[9px] text-zinc-600 font-mono">No pertenece a un set sinérgico.</div>}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 relative z-10">
+                  <div className="md:col-span-4 flex flex-col items-center gap-3 bg-black/40 border border-cyan-950 p-4 rounded-2xl text-center h-fit">
+                    <div className="relative w-20 h-20">
+                      <div className="w-full h-full rounded-full border-[3px] border-cyan-400 overflow-hidden shadow-[0_0_20px_rgba(34,211,238,0.3)]">
+                        <img src={selectedChar.avatar_url} alt={selectedChar.name} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="absolute bottom-[-4px] left-[50%] translate-x-[-50%] px-2 py-0.5 rounded-full bg-cyan-900 border border-cyan-400 flex items-center justify-center text-white font-mono font-black text-[9px] shadow-md whitespace-nowrap">
+                        x{selectedChar.quantity}
+                      </div>
+                    </div>
+                    <div className="flex gap-0.5 justify-center mt-1">
+                      {Array.from({ length: 7 }).map((_, idx) => (
+                        <Star key={idx} className={`w-[8px] h-[8px] ${idx < selectedChar.stars ? "text-amber-400 fill-amber-400" : "text-gray-700"}`} />
+                      ))}
+                    </div>
+                    <div className="font-mono text-[8px] text-zinc-400 space-y-0.5 w-full text-left uppercase mt-2">
+                      {selectedChar.category === "Badges" ? (
+                        <>
+                          <p>COLLECTION: <span className="text-cyan-300">NOVA</span></p>
+                          <p>RARITY: <span className="text-amber-400">EXCLUSIVE</span></p>
+                          <p>TYPE: <span className="text-purple-400">HYBRID</span></p>
+                        </>
+                      ) : (
+                        <>
+                          <p>FACTION: <span className="text-cyan-300">{selectedChar.faction}</span></p>
+                          <p>RARITY: <span className="text-amber-400">{selectedChar.rarity}</span></p>
+                          <p>CATEGORY: <span className="text-purple-400">{selectedChar.category}</span></p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-8 flex flex-col justify-start gap-4 max-h-[350px] overflow-y-auto pr-2 hide-scrollbar">
+                    {selectedChar.category === "Badges" ? (
+                      <div className="space-y-3 font-mono text-[9px] uppercase">
+                        <span className="text-[8px] font-mono tracking-widest text-[#a2d3fc] uppercase block">// METADATA FORMAT</span>
+                        <p className="text-[10px] font-sans text-zinc-400 leading-normal">{selectedChar.description}</p>
+                        <div className="grid grid-cols-2 gap-2 text-zinc-400 mt-2">
+                          <div className="bg-black/50 border border-cyan-950 p-2 rounded-lg">STACK: <span className="text-white">NOT STACKABLE</span></div>
+                          <div className="bg-black/50 border border-cyan-950 p-2 rounded-lg">DURATION: <span className="text-amber-400">PERMANENT</span></div>
+                          <div className="bg-black/50 border border-cyan-950 p-2 rounded-lg col-span-2">SLOTS: <span className="text-cyan-400">DOES NOT REQUIRE SLOT</span></div>
+                          <div className="bg-black/50 border border-cyan-950 p-2 rounded-lg col-span-2">SKILLS: <span className="text-purple-400">{selectedChar.skills?.passive?.[0]?.name || "N/A"}</span></div>
+                        </div>
+                      </div>
+                    ) : selectedChar.category === "Tools" ? (
+                      <div className="space-y-3 font-mono text-[9px] uppercase">
+                        <span className="text-[8px] font-mono tracking-widest text-[#a2d3fc] uppercase block">// TOOL PROFILE</span>
+                        <p className="text-[10px] font-sans text-zinc-400 leading-normal">{selectedChar.description}</p>
+                        <div className="grid grid-cols-2 gap-2 text-zinc-400 mt-2">
+                          <div className="bg-black/50 border border-cyan-950 p-2 rounded-lg">RESOURCE: <span className="text-emerald-400">MINERALS</span></div>
+                          <div className="bg-black/50 border border-cyan-950 p-2 rounded-lg">COLLECTION: <span className="text-white">MYTON</span></div>
+                          <div className="bg-black/50 border border-cyan-950 p-2 rounded-lg">EFFECTS: <span className="text-amber-400">PHYSICAL EXTRACTION</span></div>
+                          <div className="bg-black/50 border border-cyan-950 p-2 rounded-lg">DURATION: <span className="text-cyan-400">PERMANENT</span></div>
+                        </div>
+                      </div>
+                    ) : selectedChar.category === "Structures" || selectedChar.category === "Tecnology" ? (
+                      <div className="space-y-3 font-mono text-[9px] uppercase">
+                        <span className="text-[8px] font-mono tracking-widest text-[#a2d3fc] uppercase block">// {selectedChar.category === "Structures" ? "INFRASTRUCTURE" : "TECHNOLOGY"} PROFILE</span>
+                        <p className="text-[10px] font-sans text-zinc-400 leading-normal">{selectedChar.description || "Sin descripción disponible."}</p>
+                        
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          <div className="bg-black/50 border border-cyan-950 p-2 rounded-lg flex flex-col">
+                            <span className="text-zinc-500 text-[7.5px]">NIVEL ACTUAL</span>
+                            <span className="text-white font-black">LVL {selectedChar.level}</span>
+                          </div>
+                          <div className="bg-black/50 border border-cyan-950 p-2 rounded-lg flex flex-col">
+                            <span className="text-zinc-500 text-[7.5px]">CUMULATIVE SKILLS</span>
+                            <span className="text-cyan-400 font-black">{selectedChar.skills?.passive?.[0]?.name || "Ninguna"}</span>
+                          </div>
+                          <div className="bg-black/50 border border-cyan-950 p-2 rounded-lg flex flex-col col-span-2">
+                            <span className="text-zinc-500 text-[7.5px]">REQUISITOS TECNOLÓGICOS</span>
+                            <span className="text-purple-400 font-black">CENTRO DE INVESTIGACIÓN NV. {Math.max(1, selectedChar.level - 1)}</span>
+                          </div>
+                          <div className="bg-black/50 border border-cyan-950 p-2 rounded-lg flex flex-col col-span-2">
+                            <span className="text-zinc-500 text-[7.5px]">REQUISITOS DE INFRAESTRUCTURA</span>
+                            <span className="text-amber-400 font-black">PLANTA ENERGÉTICA NV. {selectedChar.level}</span>
+                          </div>
+                        </div>
+
+                        {/* Crafting Requirements Engine */}
+                        <div className="bg-black/80 border border-cyan-900/35 p-3 rounded-xl font-mono mt-2">
+                          <div className="text-[8px] text-cyan-500 mb-2 font-bold tracking-widest uppercase">Costos de Producción / Upgrade</div>
+                          <div className="grid grid-cols-3 gap-2 text-[8px] uppercase">
+                            <div className="flex flex-col bg-[#05080b] border border-cyan-900/40 p-1.5 rounded">
+                              <span className="text-zinc-500">Metal</span>
+                              <span className="text-zinc-300 font-bold">{selectedChar.crafting_costs?.metal?.toLocaleString() || 0}</span>
+                            </div>
+                            <div className="flex flex-col bg-[#05080b] border border-cyan-900/40 p-1.5 rounded">
+                              <span className="text-zinc-500">Cristal</span>
+                              <span className="text-zinc-300 font-bold">{selectedChar.crafting_costs?.crystal?.toLocaleString() || 0}</span>
+                            </div>
+                            <div className="flex flex-col bg-[#05080b] border border-cyan-900/40 p-1.5 rounded">
+                              <span className="text-zinc-500">Deuterio</span>
+                              <span className="text-sky-300 font-bold">{selectedChar.crafting_costs?.deuterium?.toLocaleString() || 0}</span>
+                            </div>
+                            <div className="flex flex-col bg-[#05080b] border border-cyan-900/40 p-1.5 rounded">
+                              <span className="text-zinc-500">Dark Matter</span>
+                              <span className="text-purple-400 font-bold">{selectedChar.crafting_costs?.dark_matter?.toLocaleString() || 0}</span>
+                            </div>
+                            <div className="flex flex-col bg-[#05080b] border border-cyan-900/40 p-1.5 rounded">
+                              <span className="text-zinc-500">Organium</span>
+                              <span className="text-emerald-400 font-bold">{selectedChar.crafting_costs?.organium?.toLocaleString() || 0}</span>
+                            </div>
+                            <div className="flex flex-col bg-[#05080b] border border-cyan-900/40 p-1.5 rounded">
+                              <span className="text-zinc-500">GD Coins</span>
+                              <span className="text-amber-400 font-bold">{selectedChar.crafting_costs?.gd_coins?.toLocaleString() || 0}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex justify-between items-center mt-3 border-t border-cyan-900/30 pt-2">
+                            <span className="text-[8px] text-zinc-400 uppercase">Planos disponibles: <strong className={selectedChar.blueprints_owned > 0 ? "text-cyan-400" : "text-red-400"}>{selectedChar.blueprints_owned}</strong> / {selectedChar.blueprints_required}</span>
+                            <button onClick={(e) => handleBuyBlueprints(selectedChar, e)} className="px-2 py-1 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/35 text-cyan-300 rounded text-[7.5px] font-bold uppercase tracking-wider cursor-pointer transition-all">
+                              Comprar Plano [85💎]
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-4">
+                          <span className="text-[8px] font-mono tracking-widest text-[#a2d3fc] uppercase block">// TACTICAL PROFILE</span>
+                          <p className="text-[10px] font-sans text-zinc-400 leading-normal mb-2 uppercase">{selectedChar.description || "No description available."}</p>
+                          
+                          {/* MATRIZ OFENSIVA */}
+                          <div className="bg-black/40 border border-red-900/40 p-2.5 rounded-xl">
+                            <span className="text-[8px] text-red-400 font-bold tracking-widest uppercase block mb-2 border-b border-red-900/30 pb-1">Matriz Ofensiva</span>
+                            <div className="grid grid-cols-2 gap-2 font-mono text-[9px]">
+                              <div className="bg-black/60 border border-red-950/50 p-2 rounded-lg flex flex-col">
+                                <span className="text-zinc-500 text-[7px] uppercase">Kinetic Attack</span>
+                                <span className="text-white font-black">{selectedChar.tactical_stats?.kinetic_attack || 0} DMG</span>
+                              </div>
+                              <div className="bg-black/60 border border-red-950/50 p-2 rounded-lg flex flex-col">
+                                <span className="text-zinc-500 text-[7px] uppercase">Laser Attack</span>
+                                <span className="text-white font-black">{selectedChar.tactical_stats?.laser_attack || 0} DMG</span>
+                              </div>
+                              <div className="bg-black/60 border border-red-950/50 p-2 rounded-lg flex flex-col">
+                                <span className="text-zinc-500 text-[7px] uppercase">Plasma Attack</span>
+                                <span className="text-white font-black">{selectedChar.tactical_stats?.plasma_attack || 0} DMG</span>
+                              </div>
+                              <div className="bg-black/60 border border-red-950/50 p-2 rounded-lg flex flex-col">
+                                <span className="text-zinc-500 text-[7px] uppercase">Ionic Attack</span>
+                                <span className="text-white font-black">{selectedChar.tactical_stats?.ionic_attack || 0} DMG</span>
+                              </div>
+                              <div className="bg-black/60 border border-red-950/50 p-2 rounded-lg flex flex-col col-span-2">
+                                <span className="text-zinc-500 text-[7px] uppercase">Graviton Attack</span>
+                                <span className="text-white font-black">{selectedChar.tactical_stats?.graviton_attack || 0} DMG</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* SISTEMA DE CINEMÁTICA Y VEHÍCULO */}
+                          <div className="bg-black/40 border border-amber-900/40 p-2.5 rounded-xl">
+                            <span className="text-[8px] text-amber-400 font-bold tracking-widest uppercase block mb-2 border-b border-amber-900/30 pb-1">Cinemática y Vehículo</span>
+                            <div className="grid grid-cols-3 gap-2 font-mono text-[9px]">
+                              <div className="bg-black/60 border border-amber-950/50 p-2 rounded-lg flex flex-col">
+                                <span className="text-zinc-500 text-[7px] uppercase">Travel Speed</span>
+                                <span className="text-white font-black">{selectedChar.tactical_stats?.travel_speed || 0}</span>
+                              </div>
+                              <div className="bg-black/60 border border-amber-950/50 p-2 rounded-lg flex flex-col">
+                                <span className="text-zinc-500 text-[7px] uppercase">Combat Speed</span>
+                                <span className="text-white font-black">{selectedChar.tactical_stats?.combat_speed || 0}</span>
+                              </div>
+                              <div className="bg-black/60 border border-amber-950/50 p-2 rounded-lg flex flex-col">
+                                <span className="text-zinc-500 text-[7px] uppercase">Speed Boost</span>
+                                <span className="text-white font-black">{selectedChar.tactical_stats?.speed_boost || 0}%</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* BLINDAJE Y MITIGACIÓN */}
+                          <div className="bg-black/40 border border-cyan-900/40 p-2.5 rounded-xl">
+                            <span className="text-[8px] text-cyan-400 font-bold tracking-widest uppercase block mb-2 border-b border-cyan-900/30 pb-1">Blindaje y Mitigación</span>
+                            <div className="grid grid-cols-2 gap-2 font-mono text-[9px]">
+                              <div className="bg-black/60 border border-cyan-950/50 p-2 rounded-lg flex flex-col">
+                                <span className="text-zinc-500 text-[7px] uppercase">Shield</span>
+                                <span className="text-purple-400 font-black">{selectedChar.tactical_stats?.shield || 0} SH</span>
+                              </div>
+                              <div className="bg-black/60 border border-cyan-950/50 p-2 rounded-lg flex flex-col">
+                                <span className="text-zinc-500 text-[7px] uppercase">Hit Points</span>
+                                <span className="text-white font-black">{selectedChar.tactical_stats?.hp || 0} HP</span>
+                              </div>
+                              <div className="bg-black/60 border border-cyan-950/50 p-2 rounded-lg flex flex-col">
+                                <span className="text-zinc-500 text-[7px] uppercase">Defense</span>
+                                <span className="text-cyan-400 font-black">{selectedChar.tactical_stats?.defense || 0} DEF</span>
+                              </div>
+                              <div className="bg-black/60 border border-cyan-950/50 p-2 rounded-lg flex flex-col">
+                                <span className="text-zinc-500 text-[7px] uppercase">Durability</span>
+                                <span className="text-emerald-400 font-black">{selectedChar.tactical_stats?.durability || 100}/100</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* MÓDULO DE LOGÍSTICA Y RENDIMIENTO */}
+                          <div className="bg-black/40 border border-emerald-900/40 p-2.5 rounded-xl">
+                            <span className="text-[8px] text-emerald-400 font-bold tracking-widest uppercase block mb-2 border-b border-emerald-900/30 pb-1">Logística y Rendimiento</span>
+                            <div className="grid grid-cols-3 gap-2 font-mono text-[9px]">
+                              <div className="bg-black/60 border border-emerald-950/50 p-2 rounded-lg flex flex-col">
+                                <span className="text-zinc-500 text-[7px] uppercase">Cargo Cap.</span>
+                                <span className="text-white font-black">{selectedChar.tactical_stats?.cargo_capacity || 0} m³</span>
+                              </div>
+                              <div className="bg-black/60 border border-emerald-950/50 p-2 rounded-lg flex flex-col">
+                                <span className="text-zinc-500 text-[7px] uppercase">Fleet Space</span>
+                                <span className="text-white font-black">{selectedChar.tactical_stats?.fleet_space || 0}</span>
+                              </div>
+                              <div className="bg-black/60 border border-emerald-950/50 p-2 rounded-lg flex flex-col">
+                                <span className="text-zinc-500 text-[7px] uppercase">Production</span>
+                                <span className="text-white font-black">{selectedChar.tactical_stats?.production || 0}/h</span>
+                              </div>
+                            </div>
+                          </div>
+
+                        </div>
+
+                        {/* Crafting Requirements Engine */}
+                        <div className="bg-black/80 border border-cyan-900/35 p-3 rounded-xl font-mono mt-2">
+                          <div className="text-[8px] text-cyan-500 mb-2 font-bold tracking-widest uppercase">Requerimientos de Fabricación (1 Plano = 1 Unidad)</div>
+                          <div className="grid grid-cols-3 gap-2 text-[8px] uppercase">
+                            <div className="flex flex-col bg-[#05080b] border border-cyan-900/40 p-1.5 rounded">
+                              <span className="text-zinc-500">Metal</span>
+                              <span className="text-zinc-300 font-bold">{selectedChar.crafting_costs?.metal?.toLocaleString() || 0}</span>
+                            </div>
+                            <div className="flex flex-col bg-[#05080b] border border-cyan-900/40 p-1.5 rounded">
+                              <span className="text-zinc-500">Cristal</span>
+                              <span className="text-zinc-300 font-bold">{selectedChar.crafting_costs?.crystal?.toLocaleString() || 0}</span>
+                            </div>
+                            <div className="flex flex-col bg-[#05080b] border border-cyan-900/40 p-1.5 rounded">
+                              <span className="text-zinc-500">Deuterio</span>
+                              <span className="text-sky-300 font-bold">{selectedChar.crafting_costs?.deuterium?.toLocaleString() || 0}</span>
+                            </div>
+                            <div className="flex flex-col bg-[#05080b] border border-cyan-900/40 p-1.5 rounded">
+                              <span className="text-zinc-500">Dark Matter</span>
+                              <span className="text-purple-400 font-bold">{selectedChar.crafting_costs?.dark_matter?.toLocaleString() || 0}</span>
+                            </div>
+                            <div className="flex flex-col bg-[#05080b] border border-cyan-900/40 p-1.5 rounded">
+                              <span className="text-zinc-500">Organium</span>
+                              <span className="text-emerald-400 font-bold">{selectedChar.crafting_costs?.organium?.toLocaleString() || 0}</span>
+                            </div>
+                            <div className="flex flex-col bg-[#05080b] border border-cyan-900/40 p-1.5 rounded">
+                              <span className="text-zinc-500">GD Coins</span>
+                              <span className="text-amber-400 font-bold">{selectedChar.crafting_costs?.gd_coins?.toLocaleString() || 0}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex justify-between items-center mt-3 border-t border-cyan-900/30 pt-2">
+                            <span className="text-[8px] text-zinc-400 uppercase">Planos disponibles: <strong className={selectedChar.blueprints_owned > 0 ? "text-cyan-400" : "text-red-400"}>{selectedChar.blueprints_owned}</strong> / {selectedChar.blueprints_required}</span>
+                            <button onClick={(e) => handleBuyBlueprints(selectedChar, e)} className="px-2 py-1 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/35 text-cyan-300 rounded text-[7.5px] font-bold uppercase tracking-wider cursor-pointer transition-all">
+                              Comprar Plano [85💎]
+                            </button>
+                          </div>
+                        </div>
+                      </>
                     )}
                   </div>
-                  <div className="flex gap-0.5 justify-center mt-1">
-                    {Array.from({ length: 7 }).map((_, idx) => (
-                      <Star key={idx} className={`w-[8px] h-[8px] ${idx < selectedChar.stars ? "text-amber-400 fill-amber-400" : "text-gray-700"}`} />
-                    ))}
-                  </div>
-                  <div className="font-mono text-[8px] text-zinc-400 space-y-0.5 w-full text-left">
-                    <p>FACTION: <span className="text-cyan-300">{selectedChar.faction}</span></p>
-                    <p>RARITY: <span className="text-amber-400">{selectedChar.rarity}</span></p>
-                    <p>CATEGORY: <span className="text-purple-400">{selectedChar.category}</span></p>
-                  </div>
                 </div>
+              )}
 
-                <div className="md:col-span-8 flex flex-col justify-between gap-3">
-                  <div className="space-y-2">
-                    <span className="text-[8px] font-mono tracking-widest text-[#a2d3fc] uppercase block">// TACTICAL PROFILE</span>
-                    <p className="text-[10px] font-sans text-zinc-400 leading-normal mb-2 max-h-16 overflow-y-auto uppercase">{selectedChar.description || "No description available."}</p>
-
-                    <div className="grid grid-cols-2 gap-2 font-mono text-[9px]">
-                      <div className="bg-black/50 border border-cyan-950 p-2 rounded-lg flex flex-col">
-                        <span className="text-zinc-500 text-[7.5px]">INTEGRIDAD ESTRUCTURAL</span>
-                        <span className="text-white font-black">{selectedChar.unlocked ? selectedChar.hp : "???"} HP</span>
-                      </div>
-                      <div className="bg-black/50 border border-cyan-950 p-2 rounded-lg flex flex-col">
-                        <span className="text-zinc-500 text-[7.5px]">POTENCIA DE SHIELD</span>
-                        <span className="text-purple-400 font-black">{selectedChar.unlocked ? selectedChar.stamina : "???"} SH</span>
-                      </div>
-                      <div className="bg-black/50 border border-cyan-950 p-2 rounded-lg flex flex-col">
-                        <span className="text-zinc-500 text-[7.5px]">PROPULSIÓN IMPULSE</span>
-                        <span className="text-amber-400 font-black">{selectedChar.unlocked ? selectedChar.speed : "???"} VEL</span>
-                      </div>
-                      <div className="bg-black/50 border border-cyan-950 p-2 rounded-lg flex flex-col">
-                        <span className="text-zinc-500 text-[7.5px]">ABSORCIÓN DE DEFENSA</span>
-                        <span className="text-cyan-400 font-black">{selectedChar.unlocked ? selectedChar.defense : "???"} DEF</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-black/80 border border-cyan-900/35 p-2.5 rounded-xl font-mono">
-                    <div className="flex justify-between text-[8px] mb-1">
-                      <span>BLUEPRINTS DISPONIBLES</span>
-                      <span>{selectedChar.blueprints_owned}/{selectedChar.blueprints_required}</span>
-                    </div>
-                    <div className="h-2 w-full bg-neutral-900 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-cyan-600 to-sky-400" style={{ width: `${Math.min(100, (selectedChar.blueprints_owned / selectedChar.blueprints_required) * 100)}%` }} />
-                    </div>
-                    <div className="flex justify-between items-center mt-3">
-                      <button onClick={(e) => handleBuyBlueprints(selectedChar, e)} className="px-2.5 py-1 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/35 text-cyan-300 rounded-md text-[8px] font-bold uppercase tracking-wider cursor-pointer transition-all">
-                        Obtener Planos [85💎]
+              {/* Botonera Footer */}
+              <div className="border-t border-cyan-950/80 pt-4 mt-5 flex justify-between gap-2.5 relative z-10">
+                <div className="flex gap-2">
+                  {selectedChar.category === "Spaceships" && showSubModal === null && (
+                    <>
+                      <button onClick={() => setShowSubModal("fleet")} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-cyan-900/50 text-cyan-400 rounded-xl text-[9px] font-mono font-black uppercase tracking-wider transition-all cursor-pointer">
+                        [Añadir a Flota]
                       </button>
-                      {!selectedChar.unlocked && (
-                        <button disabled={selectedChar.blueprints_owned < selectedChar.blueprints_required} onClick={(e) => handleActivateCharacter(selectedChar, e)}
-                          className={`px-3 py-1 text-white rounded-md text-[8.5px] font-black uppercase tracking-wider transition-all cursor-pointer ${selectedChar.blueprints_owned < selectedChar.blueprints_required ? "bg-zinc-800 opacity-30 cursor-not-allowed" : "bg-red-600 shadow-[0_0_10px_rgba(239,68,68,0.5)]"}`}
-                        >FABRICAR COMPONENTE</button>
-                      )}
-                      {selectedChar.unlocked && selectedChar.stars < 7 && (
-                        <button disabled={selectedChar.blueprints_owned < selectedChar.blueprints_required} onClick={(e) => handlePromoteStars(selectedChar, e)}
-                          className={`px-3 py-1 rounded-md text-[8.5px] font-black uppercase tracking-wider transition-all cursor-pointer ${selectedChar.blueprints_owned < selectedChar.blueprints_required ? "bg-zinc-800 opacity-30 cursor-not-allowed" : "bg-amber-500 text-neutral-900 shadow-[0_0_10px_rgba(245,158,11,0.5)]"}`}
-                        >ASCENDER RANGO</button>
-                      )}
-                    </div>
-                  </div>
+                      <button onClick={() => setShowSubModal("skills")} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-cyan-900/50 text-cyan-400 rounded-xl text-[9px] font-mono font-black uppercase tracking-wider transition-all cursor-pointer">
+                        [Skills]
+                      </button>
+                    </>
+                  )}
+                  {showSubModal !== null && (
+                    <button onClick={() => setShowSubModal(null)} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-cyan-900/50 text-cyan-400 rounded-xl text-[9px] font-mono font-black uppercase tracking-wider transition-all cursor-pointer">
+                      [Atrás]
+                    </button>
+                  )}
                 </div>
-              </div>
-
-              <div className="border-t border-cyan-950/80 pt-4 mt-5 flex justify-end gap-2.5 relative z-10">
-                <Button variant="secondary" size="sm" onClick={() => setSelectedChar(null)} className="text-[9px] font-mono font-bold">CERRAR EXPEDIENTE</Button>
-                {selectedChar.unlocked && (
-                  <button onClick={(e) => handleUpgradeLevel(selectedChar, e)} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[9px] font-mono font-black uppercase tracking-wider shadow-lg hover:scale-105 transition-transform">
-                    Optimizar Core [-{selectedChar.level * 450} GD Coin]
-                  </button>
-                )}
+                
+                <div className="flex gap-2 ml-auto">
+                  <Button variant="secondary" size="sm" onClick={() => setSelectedChar(null)} className="text-[9px] font-mono font-bold uppercase">
+                    [CERRAR]
+                  </Button>
+                  {showSubModal === null && (selectedChar.category === "Spaceships" || selectedChar.category === "Structures" || selectedChar.category === "Tecnology") && (
+                    <button disabled={selectedChar.blueprints_owned < selectedChar.blueprints_required} onClick={(e) => handleCraftAsset(selectedChar, e)} className={`px-4 py-2 rounded-xl text-[9px] font-mono font-black uppercase tracking-wider transition-all shadow-lg ${selectedChar.blueprints_owned < selectedChar.blueprints_required ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 text-white cursor-pointer hover:scale-105'}`}>
+                      [CRAFT]
+                    </button>
+                  )}
+                </div>
               </div>
             </motion.div>
           </div>

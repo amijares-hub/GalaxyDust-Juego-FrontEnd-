@@ -75,12 +75,12 @@ export function useExpeditionEngine(userId: string | undefined) {
             duration_hours: durationHours,
             fleet_id: fleetId,
             fleet_name: fleetName,
-            ship_type: fleetName, // fallback compat
             risk_factor: effectiveRisk,
             status: 'LAUNCHED',
             launch_time: launchTime.toISOString(),
             estimated_return_time: returnTime.toISOString(),
             is_adrift: isAdrift,
+            galaxy_cluster: sectorName.split(' / ')[0],
             reward_est: { ship_power: 150 }
           }
         ])
