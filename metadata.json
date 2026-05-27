@@ -1,0 +1,6 @@
+{
+  "name": "GalaxyDust Portal",
+  "description": "El portal de acceso y centro de mando premium para GalaxyDust, con una interfaz de alta tecnología minimalista y de alta gama.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
