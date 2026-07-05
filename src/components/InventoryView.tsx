@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/joly-button";
 import { fetchAllInventory, InventoryItem } from "../lib/inventoryService";
+import { inventoryService } from "../services/inventoryService";
+import { validateCanModification, validateTechnologyEquip, FleetAsset } from "../utils/expeditionValidator";
 import { FleetManager } from "./FleetManager";
 import { Scroller } from "./ui/Scroller";
 import { supabase } from "../lib/supabase";
@@ -53,6 +55,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [selectedChar, setSelectedChar] = useState<InventoryItem | null>(null);
   const [characters, setCharacters] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCrafting, setIsCrafting] = useState(false);
+  const [craftError, setCraftError] = useState<string | null>(null);
+  const [activeFlightsCount, setActiveFlightsCount] = useState(0);
 
   // Novedades para Modal de Naves
   const [showSubModal, setShowSubModal] = useState<"fleet" | "skills" | null>(null);
@@ -87,6 +92,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       }
     }
     loadData();
+  }, []);
+
+  useEffect(() => {
+    async function fetchFlightsCount() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { count } = await supabase
+        .from('active_expeditions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'LAUNCHED');
+      setActiveFlightsCount(count || 0);
+    }
+    fetchFlightsCount();
   }, []);
 
   const playSfx = (soundName: string) => {
@@ -187,42 +206,53 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setSelectedChar(updated.find((c) => c.id === char.id) || null);
   };
 
-  const handleCraftAsset = (char: InventoryItem, e: React.MouseEvent) => {
+  const handleCraftAsset = async (char: InventoryItem, e: React.MouseEvent) => {
     e.stopPropagation();
+    setCraftError(null);
+
     if (char.blueprints_owned < char.blueprints_required) {
       triggerNotification("⚠️ PLANO ESTRUCTURAL NO DETECTADO", e);
-      return;
-    }
-    const cost = char.crafting_costs?.gd_coins || 0;
-    if (playerGold < cost && setPlayerGold) {
-      triggerNotification("⚠️ SALDO DE GD COINS INSUFICIENTE PARA FABRICACIÓN", e);
+      setCraftError("Planos insuficientes para iniciar la fabricación.");
       return;
     }
 
-    // Simulamos la deducción visual de GD Coins
-    if (setPlayerGold) {
-      setPlayerGold(prev => parseFloat((prev - cost).toFixed(2)));
-    }
+    setIsCrafting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Sesión caducada.");
 
-    // Simulamos la quema del Blueprint y otorgamiento de la unidad
-    const updated = characters.map((c) => {
-      if (c.id === char.id) {
-        return { 
-          ...c, 
-          unlocked: true, 
-          quantity: c.quantity + 1, 
-          blueprints_owned: c.blueprints_owned - c.blueprints_required,
-          // Mantenemos 1 blueprint_required para la siguiente fabricación
-          blueprints_required: 1 
-        };
+      await inventoryService.craftAsset(
+        user.id,
+        char.crafting_costs || {},
+        { id: char.id, name: char.name, category: char.category, rarity: char.rarity }
+      );
+
+      // Éxito: actualizar UI
+      const gdCoinCost = char.crafting_costs?.gd_coins || 0;
+      if (setPlayerGold && gdCoinCost > 0) {
+        setPlayerGold(prev => parseFloat((prev - gdCoinCost).toFixed(2)));
       }
-      return c;
-    });
-    setCharacters(updated);
-    setPlayerPower((prev) => prev + 1200);
-    playSfx("heavy_laser");
-    triggerNotification(`🔥 ENSAMBLAJE COMPLETADO: +1 ${char.name.toUpperCase()} AÑADIDO AL HANGAR. RECURSOS DEDUCIDOS.`, e);
-    setSelectedChar(updated.find((c) => c.id === char.id) || null);
+      const updated = characters.map((c) => {
+        if (c.id === char.id) {
+          return { ...c, unlocked: true, quantity: c.quantity + 1, blueprints_owned: c.blueprints_owned - c.blueprints_required, blueprints_required: 1 };
+        }
+        return c;
+      });
+      setCharacters(updated);
+      setPlayerPower((prev) => prev + 1200);
+      playSfx("heavy_laser");
+      triggerNotification(`🔥 ENSAMBLAJE COMPLETADO: +1 ${char.name.toUpperCase()} AÑADIDO AL HANGAR. RECURSOS DEDUCIDOS.`, e);
+      setSelectedChar(updated.find((c) => c.id === char.id) || null);
+
+    } catch (err: any) {
+      const msg = err?.message?.includes('insufficient')
+        ? '⚠️ MATERIALES INSUFICIENTES EN TU REFINERÍA GALÁCTICA'
+        : `⚠️ FALLO DE TRANSACCIÓN: ${err?.message || 'Error desconocido'}`;
+      setCraftError(msg);
+      triggerNotification(msg, e);
+    } finally {
+      setIsCrafting(false);
+    }
   };
 
   const handlePromoteStars = (char: InventoryItem, e: React.MouseEvent) => {
@@ -919,11 +949,44 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <Button variant="secondary" size="sm" onClick={() => setSelectedChar(null)} className="text-[9px] font-mono font-bold uppercase">
                     [CERRAR]
                   </Button>
-                  {showSubModal === null && (selectedChar.category === "Spaceships" || selectedChar.category === "Structures" || selectedChar.category === "Tecnology") && (
-                    <button disabled={selectedChar.blueprints_owned < selectedChar.blueprints_required} onClick={(e) => handleCraftAsset(selectedChar, e)} className={`px-4 py-2 rounded-xl text-[9px] font-mono font-black uppercase tracking-wider transition-all shadow-lg ${selectedChar.blueprints_owned < selectedChar.blueprints_required ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 text-white cursor-pointer hover:scale-105'}`}>
-                      [CRAFT]
-                    </button>
-                  )}
+                  {showSubModal === null && (selectedChar.category === "Spaceships" || selectedChar.category === "Structures" || selectedChar.category === "Tecnology") && (() => {
+                    const isFlightLocked = !validateCanModification(activeFlightsCount) && (selectedChar.category === 'Tecnology' || selectedChar.category === 'Structures');
+                    const isTechDuplicate = selectedChar.category === 'Tecnology'
+                      ? !validateTechnologyEquip(
+                          characters
+                            .filter(c => c.category === 'Tecnology' && c.unlocked && c.id !== selectedChar.id)
+                            .map(c => ({ id: c.id, name: c.name, type: 'tech' as const, is_nft: false, hp: 0, max_hp: 1, tech_type: c.faction } as FleetAsset)),
+                          { id: selectedChar.id, name: selectedChar.name, type: 'tech' as const, is_nft: false, hp: 0, max_hp: 1, tech_type: selectedChar.faction } as FleetAsset
+                        )
+                      : false;
+                    const blockReason = isFlightLocked
+                      ? '\ud83d\udeab Edici\u00f3n bloqueada: hay expediciones activas en vuelo.'
+                      : isTechDuplicate
+                      ? '\ud83d\udeab Ya tienes una tecnolog\u00eda de este tipo activa.'
+                      : null;
+                    const isBlocked = selectedChar.blueprints_owned < selectedChar.blueprints_required || isCrafting || isFlightLocked || isTechDuplicate;
+                    return (
+                      <div className="flex flex-col items-end gap-1">
+                        {blockReason && (
+                          <span className="text-[7.5px] font-mono text-orange-400 uppercase tracking-wider max-w-[220px] text-right">{blockReason}</span>
+                        )}
+                        {!blockReason && craftError && (
+                          <span className="text-[7.5px] font-mono text-red-400 uppercase tracking-wider animate-pulse max-w-[200px] text-right">{craftError}</span>
+                        )}
+                        <button
+                          disabled={isBlocked}
+                          onClick={(e) => handleCraftAsset(selectedChar, e)}
+                          className={`px-4 py-2 rounded-xl text-[9px] font-mono font-black uppercase tracking-wider transition-all shadow-lg flex items-center gap-1.5 ${
+                            isBlocked && !isCrafting ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                            : isCrafting ? 'bg-red-800 text-red-300 cursor-wait animate-pulse'
+                            : 'bg-red-600 hover:bg-red-700 text-white cursor-pointer hover:scale-105'
+                          }`}
+                        >
+                          {isCrafting ? <><span className="w-2.5 h-2.5 rounded-full border-2 border-red-300 border-t-transparent animate-spin" />[ENSAMBLANDO...]</> : '[CRAFT]'}
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </motion.div>

@@ -1,8 +1,8 @@
 import React from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthView } from './components/AuthView';
-import { Homepage } from './components/Homepage';
-import { ResourceHUD } from './components/ResourceHUD';
+import { Homepage } from './pages/Homepage';
+
 import { RefreshCw } from 'lucide-react';
 
 function AppContent() {
@@ -35,7 +35,7 @@ function AppContent() {
 
   return (
     <>
-      <ResourceHUD />
+
       <Homepage user={userProfile} onLogout={logout} />
     </>
   );
