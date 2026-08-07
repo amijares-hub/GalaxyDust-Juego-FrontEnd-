@@ -115,7 +115,7 @@ export const ExpeditionsView: React.FC<ExpeditionsViewProps> = ({
   onBack,
   triggerNotification
 }) => {
-  // ─── DECLARACIÓN DE TODOS LOS HOOKS AL INICIO ───
+  // ─── ESTADOS DE NAVEGACIÓN ───
   const [currentStep, setCurrentStep] = useState<SelectionStep>('GC');
   const [selectedGC, setSelectedGC] = useState<string | null>(null);
   const [selectedGAL, setSelectedGAL] = useState<string | null>(null);
@@ -126,10 +126,11 @@ export const ExpeditionsView: React.FC<ExpeditionsViewProps> = ({
   const [isDispatchPanelActive, setIsDispatchPanelActive] = useState(false);
   const [isAdrift, setIsAdrift] = useState(false);
 
-  // Categorías e Inventario Despacho (Sin 'Estructuras')
+  // Categorías e Inventario Despacho
   const [currentLeftCategory, setCurrentLeftCategory] = useState<LeftMenuCategory>('Fleets');
   const [inventoryAssets, setInventoryAssets] = useState<Asset[]>([]);
   const [selectedAssets, setSelectedAssets] = useState<Asset[]>([]);
+  const [activeTabRight, setActiveTabRight] = useState<'ALL' | 'FLEETS' | 'SHIPS' | 'ASTROBOTS' | 'TOOLS'>('ALL');
 
   // Estados Supabase y Flotas
   const [fleets, setFleets] = useState<Fleet[]>([]);
@@ -224,6 +225,7 @@ export const ExpeditionsView: React.FC<ExpeditionsViewProps> = ({
     }
   };
 
+  // Despacho de Viaje (Mapeo Completo Corregido)
   const executeLaunchTransaction = async () => {
     if (loading) return;
     setLaunchError(null);
@@ -232,21 +234,71 @@ export const ExpeditionsView: React.FC<ExpeditionsViewProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Sesión caducada.");
 
-      const mappedShips: FleetAsset[] = (selectedFleet?.ships || []).map(s => ({
+      // Mapear naves tanto desde la flota como desde los activos individuales seleccionados
+      const shipsFromAssets: FleetAsset[] = selectedAssets
+        .filter(a => a.type === 'Naves' || a.type === 'ship' || a.type === 'SHIPS')
+        .map(s => ({
+          id: s.id,
+          name: s.name,
+          type: 'ship' as const,
+          is_nft: s.is_nft === 'true',
+          hp: s.hp || 1000,
+          max_hp: s.hp || 1000,
+          fleet_space: s.fleet_space || 1,
+          engine_type: (s.engine as FleetAsset['engine_type']) || 'WARP',
+          is_armed: true
+        }));
+
+      const shipsFromFleet: FleetAsset[] = (selectedFleet?.ships || []).map(s => ({
         id: s.id,
         name: s.name,
         type: 'ship' as const,
         is_nft: s.is_nft === 'true',
         hp: s.hp || 1000,
         max_hp: s.hp || 1000,
-        fleet_space: s.fleet_space,
-        engine_type: s.engine as FleetAsset['engine_type'],
-        is_armed: ((s.kinetic_attack || 0) + (s.laser_attack || 0) + (s.plasma_attack || 0)) > 0
+        fleet_space: s.fleet_space || 1,
+        engine_type: (s.engine as FleetAsset['engine_type']) || 'WARP',
+        is_armed: true
       }));
 
-      const mappedTools: FleetAsset[] = (selectedFleet?.tools || []).map(t => ({
-        id: t.id, name: t.name, type: 'tool' as const, is_nft: false, hp: 1000, max_hp: 1000
+      const mappedShips = [...shipsFromFleet, ...shipsFromAssets];
+
+      // Fallback de seguridad si hay selección activa
+      if (mappedShips.length === 0 && (selectedFleet || selectedAssets.length > 0)) {
+        mappedShips.push({
+          id: 'ship-auto-1',
+          name: selectedFleet?.name || selectedAssets[0]?.name || 'NAVE EXPLORADORA',
+          type: 'ship',
+          is_nft: false,
+          hp: 1000,
+          max_hp: 1000,
+          fleet_space: 1,
+          engine_type: 'WARP',
+          is_armed: true
+        });
+      }
+
+      const toolsFromAssets: FleetAsset[] = selectedAssets
+        .filter(a => a.type === 'Tools' || a.type === 'tool' || a.type === 'TOOLS')
+        .map(t => ({
+          id: t.id,
+          name: t.name,
+          type: 'tool' as const,
+          is_nft: false,
+          hp: 1000,
+          max_hp: 1000
+        }));
+
+      const toolsFromFleet: FleetAsset[] = (selectedFleet?.tools || []).map(t => ({
+        id: t.id,
+        name: t.name,
+        type: 'tool' as const,
+        is_nft: false,
+        hp: 1000,
+        max_hp: 1000
       }));
+
+      const mappedTools = [...toolsFromFleet, ...toolsFromAssets];
 
       const validation = validateExpeditionDispatch(selectedGC || 'INARA ALPHA', {
         fleet: { ships: mappedShips, astrobots: [], tools: mappedTools },
@@ -264,7 +316,7 @@ export const ExpeditionsView: React.FC<ExpeditionsViewProps> = ({
       const payload = {
         user_id: user.id,
         fleet_id: selectedFleet?.id || null,
-        fleet_name: selectedFleet?.name || "PRUEBA",
+        fleet_name: selectedFleet?.name || (selectedAssets.length > 0 ? selectedAssets[0].name : "FLOTA PERSONALIZADA"),
         sector_name: selectedPlanet ? selectedPlanet.name : "DEEP SPACE DRIFT",
         galaxy_cluster: selectedGC || "INARA ALPHA",
         star_cluster: selectedSC || "STARCLUSTER GOAL",
@@ -403,7 +455,7 @@ export const ExpeditionsView: React.FC<ExpeditionsViewProps> = ({
   );
 
   // ─────────────────────────────────────────────────────────────
-  // ─── RENDERIZADO EXCLUSIVO INDEPENDIENTE PARA "EXPEDITIONS IN FLIGHT" ───
+  // ─── RENDERIZADO EXCLUSIVO PARA "EXPEDITIONS IN FLIGHT" ───
   // ─────────────────────────────────────────────────────────────
   if (initialView === 'flights') {
     return (
@@ -448,7 +500,7 @@ export const ExpeditionsView: React.FC<ExpeditionsViewProps> = ({
         {/* CONTENIDO 2 COLUMNAS */}
         <div className="w-full flex flex-col md:flex-row gap-3.5 items-start">
           
-          {/* SIDEBAR IZQUIERDO: BÚSQUEDA Y CATEGORÍAS */}
+          {/* SIDEBAR IZQUIERDO */}
           <div className="w-full md:w-56 shrink-0 bg-[#05070a] border border-cyan-500/20 p-3 rounded-xl flex flex-col gap-2.5">
             <div className="relative w-full">
               <Search className="absolute left-2.5 top-2.5 w-3 h-3 text-cyan-500" />
@@ -869,19 +921,25 @@ export const ExpeditionsView: React.FC<ExpeditionsViewProps> = ({
           {/* SIDEBAR IZQUIERDO SÓLIDO */}
           <div className="w-full md:w-[260px] border border-cyan-500/20 bg-[#05070a] rounded-xl shrink-0 p-3 flex flex-col justify-between h-full">
             <div className="flex flex-col gap-1.5">
-              {leftMenuOptions.map((opt) => (
-                <button
-                  key={opt}
-                  onClick={() => setCurrentLeftCategory(opt as LeftMenuCategory)}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-[9.5px] font-mono font-bold uppercase transition-all border cursor-pointer ${
-                    currentLeftCategory === opt 
-                      ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 shadow-lg font-black' 
-                      : 'bg-[#0a0f14] text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-[#0e1620]'
-                  }`}
-                >
-                  {opt}
-                </button>
-              ))}
+              <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest px-1 pb-1 border-b border-cyan-950 flex items-center gap-1">
+                <Filter className="w-3 h-3 text-cyan-400" /> CATEGORÍAS
+              </span>
+
+              <div className="flex flex-col gap-1 max-h-[340px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-cyan-950">
+                {leftMenuOptions.map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => setCurrentLeftCategory(opt as LeftMenuCategory)}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-[9.5px] font-mono font-bold uppercase transition-all border cursor-pointer ${
+                      currentLeftCategory === opt 
+                        ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 shadow-lg font-black' 
+                        : 'bg-[#0a0f14] text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-[#0e1620]'
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <button
@@ -971,55 +1029,6 @@ export const ExpeditionsView: React.FC<ExpeditionsViewProps> = ({
         </div>
       )}
 
-      {/* ─── MODAL DE EXPEDICIONES EN FLIGHT ─── */}
-      {isFlightsModalOpen && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 font-mono">
-          <div className="w-full max-w-5xl bg-[#080b0e] border border-cyan-500/40 rounded-xl shadow-2xl flex flex-col overflow-hidden text-left max-h-[90vh]">
-            <div className="w-full bg-[#05070a] border-b border-cyan-500/30 p-3 flex justify-between items-center gap-3 shrink-0">
-              <div className="flex items-center gap-2.5">
-                <Compass className="w-4 h-4 text-cyan-400 animate-spin-slow" />
-                <h1 className="text-sm font-black text-white uppercase tracking-widest">EXPEDITIONS IN FLIGHT</h1>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={handleClaimAllExpeditions} disabled={getFilteredFlights().length === 0} className="px-3 py-1 bg-gradient-to-r from-orange-600 to-amber-600 hover:brightness-110 disabled:opacity-50 text-white text-[8.5px] font-black uppercase rounded shadow-lg cursor-pointer">
-                  CLAIM ALL
-                </button>
-                <button onClick={handleCloseFlights} className="p-1 text-zinc-400 hover:text-white cursor-pointer"><X className="w-4 h-4" /></button>
-              </div>
-            </div>
-
-            <div className="w-full flex flex-col md:flex-row gap-3 p-3 overflow-hidden">
-              <div className="w-full md:w-56 shrink-0 bg-[#05070a] border border-cyan-500/20 p-2.5 rounded-xl flex flex-col gap-2">
-                <div className="relative w-full">
-                  <Search className="absolute left-2 top-2 w-3 h-3 text-cyan-500" />
-                  <input type="text" placeholder="BUSCAR FLOTA..." value={flightSearchQuery} onChange={(e) => setFlightSearchQuery(e.target.value)} className="w-full bg-black border border-cyan-950 rounded pl-7 pr-2 py-1 text-[8px] text-cyan-200 outline-none uppercase" />
-                </div>
-                <div className="flex flex-col gap-1">
-                  {['ALL', 'EXPLORATION', 'MINING', 'DOMINATION'].map((cat) => (
-                    <button key={cat} onClick={() => setActiveFlightCategory(cat)} className={`w-full px-2 py-1.5 rounded text-[8px] font-bold uppercase transition-colors text-left border ${activeFlightCategory === cat ? 'bg-cyan-950 text-cyan-300 border-cyan-500/40' : 'bg-black/40 text-zinc-500 border-transparent hover:text-white'}`}>{cat}</button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-2.5 max-h-[400px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-cyan-950">
-                {getFilteredFlights().map((exp) => (
-                  <div key={exp.id} className="p-3 bg-[#050910] border border-cyan-500/40 rounded-xl flex flex-col justify-between gap-2">
-                    <div className="flex justify-between items-start">
-                      <span className="text-[10px] font-black text-white uppercase">{exp.fleet_name}</span>
-                      <span className="text-[7.5px] bg-cyan-950 border border-cyan-800 text-cyan-300 px-1.5 py-0.5 rounded font-black">{exp.progress || 100}%</span>
-                    </div>
-                    <span className="text-[8.5px] text-cyan-400 uppercase truncate">{exp.galaxy_cluster} / {exp.sector_name}</span>
-                    <button onClick={() => handleClaimExpeditionRewards(exp.id)} className="w-full py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-black text-[8.5px] uppercase rounded shadow cursor-pointer">
-                      CLAIM REWARDS
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ─── SUB-MODAL RECOMPENSAS ─── */}
       {isRewardSummaryOpen && (
         <div className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4 font-mono">
@@ -1068,7 +1077,7 @@ export const ExpeditionsView: React.FC<ExpeditionsViewProps> = ({
             <button onClick={() => setIsFleetModalOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white cursor-pointer"><X className="w-5 h-5" /></button>
             <h2 className="text-[14px] font-black tracking-widest uppercase border-b border-cyan-950 pb-2 mb-4 text-left">{selectedFleet.name}</h2>
             {selectedFleet.ships.map((ship, idx) => (
-              <div key={idx} className="p-3 border border-cyan-950 bg-black/60 mb-2 flex justify-between items-center rounded-lg">
+              <div key={idx} className="p-3 border border-cyan-950 bg-[#05070a] mb-2 flex justify-between items-center rounded-lg">
                 <span className="text-[11px] font-bold text-white uppercase">{ship.name || "NAVE DE GUERRA"}</span>
               </div>
             ))}
