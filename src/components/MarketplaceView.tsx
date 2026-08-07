@@ -1,833 +1,821 @@
-import React, { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Plus, 
-  Sparkles, 
-  Clock, 
-  ShieldCheck, 
-  Lock, 
-  ShoppingBag, 
-  Coins, 
-  Heart, 
-  ChevronRight, 
-  ChevronLeft, 
-  Info,
-  Check,
-  AlertCircle,
-  TrendingUp,
-  CreditCard,
-  Gift,
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  ShoppingBag,
+  Gavel,
+  Tag,
+  PlusCircle,
+  Search,
+  Filter,
+  ChevronLeft,
+  Clock,
   Shield,
   Zap,
-  Flame,
-  Globe
-} from "lucide-react";
-import { Button } from "./ui/joly-button";
+  CheckCircle2,
+  Lock,
+  Unlock,
+  Layers,
+  Cpu,
+  Rocket,
+  Bot,
+  ArrowUpDown,
+  X,
+  AlertTriangle,
+  Award
+} from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
-interface BundleItem {
-  name: string;
-  quantity: number;
-  icon: string;
-  color: string;
-  subText?: string;
-}
-
-interface MarketplaceBundle {
-  id: string;
-  title: string;
-  badgePct: string;
-  ribbonText: string;
-  ribbonColor: string;
-  gemsReward: number;
-  giftValueGems: number;
-  items: BundleItem[];
-  cooldownTime: string; // e.g., "12:21:25"
-  cooldownDays?: number;
-  storageLeft: number;
-  price: string; // e.g., "15,000 GD COIN"
-  priceGd?: number; // if paid in GD Coin
-  isPurchased?: boolean;
-}
+const GD_COIN_ASSET = "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/GD%20Coin.png";
 
 interface MarketplaceViewProps {
-  playerGems: number;
-  setPlayerGems: React.Dispatch<React.SetStateAction<number>>;
-  playerPower: number;
-  setPlayerPower: React.Dispatch<React.SetStateAction<number>>;
-  playerGold: number;
-  setPlayerGold: React.Dispatch<React.SetStateAction<number>>;
-  playerWood: number;
-  setPlayerWood: React.Dispatch<React.SetStateAction<number>>;
-  playerFood: number;
-  setPlayerFood: React.Dispatch<React.SetStateAction<number>>;
-  playerStone: number;
-  setPlayerStone: React.Dispatch<React.SetStateAction<number>>;
-  playerOre: number;
-  setPlayerOre: React.Dispatch<React.SetStateAction<number>>;
+  playerGems?: number;
+  setPlayerGems?: (v: any) => void;
+  playerPower?: number;
+  setPlayerPower?: (v: any) => void;
+  playerGold?: number;
+  setPlayerGold?: (v: any) => void;
+  playerWood?: number;
+  setPlayerWood?: (v: any) => void;
+  playerFood?: number;
+  setPlayerFood?: (v: any) => void;
+  playerStone?: number;
+  setPlayerStone?: (v: any) => void;
+  playerOre?: number;
+  setPlayerOre?: (v: any) => void;
   onBack: () => void;
-  triggerNotification: (text: string, e: any) => void;
+  triggerNotification?: (text: string, e?: any) => void;
 }
 
-const CATEGORIES = [
-  { id: "heartwarming", label: "Gift of Heartwarming", icon: Heart, badge: "HOT" },
-  { id: "recommended", label: "Recommended Immortals", icon: Globe, badge: "NEW" },
-  { id: "dragon", label: "Dragon Knight", icon: Flame },
-  { id: "special", label: "Special Bundles", icon: Sparkles, highlighted: true },
-  { id: "limited", label: "Limited to One Purchase", icon: Lock },
-  { id: "cultivate", label: "Cultivate Immortals", icon: Zap }
-];
+type MarketTab = 'MARKET' | 'AUCTIONS' | 'SELL_ITEM' | 'MY_LISTINGS';
+type AssetCategory = 'ALL' | 'SHIPS' | 'TECH' | 'BLUEPRINTS' | 'RESOURCES' | 'ASTROBOTS';
+type RarityFilter = 'ALL' | 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY';
+type PriceSortOption = 'NONE' | 'LOW_TO_HIGH' | 'HIGH_TO_LOW';
+
+interface MarketListing {
+  id: string;
+  seller_id: string;
+  inventory_item_id: string;
+  title: string;
+  category: 'SHIPS' | 'TECH' | 'BLUEPRINTS' | 'RESOURCES' | 'ASTROBOTS';
+  rarity: 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY';
+  description: string;
+  price: number;
+  currency: 'GD';
+  is_auction: boolean;
+  current_bid?: number;
+  ends_at?: string;
+  image_url: string;
+  created_at: string;
+}
+
+interface MyInventoryItem {
+  id: string;
+  title: string;
+  category: 'SHIPS' | 'TECH' | 'BLUEPRINTS' | 'RESOURCES' | 'ASTROBOTS';
+  rarity: 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY';
+  description: string;
+  image_url: string;
+  is_locked: boolean;
+  amount?: number;
+}
 
 export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
-  playerGems,
-  setPlayerGems,
-  playerPower,
-  setPlayerPower,
-  playerGold,
+  playerGold = 0,
   setPlayerGold,
-  playerWood,
-  setPlayerWood,
-  playerFood,
-  setPlayerFood,
-  playerStone,
-  setPlayerStone,
-  playerOre,
-  setPlayerOre,
   onBack,
   triggerNotification
 }) => {
-  const [activeCategory, setActiveCategory] = useState<string>("special");
-  const [isProcessing, setIsProcessing] = useState<string | null>(null);
-  const [successBundle, setSuccessBundle] = useState<MarketplaceBundle | null>(null);
-  
-  const carouselRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
-  const startX = useRef(0);
-  const scrollLeft = useRef(0);
+  const [activeTab, setActiveTab] = useState<MarketTab>('MARKET');
+  const [selectedCategory, setSelectedCategory] = useState<AssetCategory>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Live Timer states
-  const [timeLeftSecs, setTimeLeftSecs] = useState(44485); // roughly 12:21:25
+  // Filtros de navegación
+  const [rarityFilter, setRarityFilter] = useState<RarityFilter>('ALL');
+  const [priceSort, setPriceSort] = useState<PriceSortOption>('NONE');
 
-  // Localized bundles state to persist purchase count limits
-  const [bundles, setBundles] = useState<Record<string, MarketplaceBundle[]>>({
-    special: [
-      {
-        id: "daily-surprise-1",
-        title: "Daily Surprise",
-        badgePct: "800%",
-        ribbonText: "Daily Surprise",
-        ribbonColor: "bg-[#1034A6]/90 text-white", // Royal Blue Ribbon
-        gemsReward: 100,
-        giftValueGems: 800,
-        storageLeft: 1,
-        price: "1,500 GD COIN",
-        priceGd: 1500,
-        cooldownTime: "12:21:25",
-        items: [
-          { name: "Philosopher's Stone", quantity: 1, icon: "🔴", color: "from-rose-500 to-red-600", subText: "Inmortal Catalyst" },
-          { name: "Major SP Recovery", quantity: 1, icon: "🧪", color: "from-yellow-400 to-amber-500", subText: "100 SP Points" },
-          { name: "Major AP Recovery", quantity: 1, icon: "🧴", color: "from-purple-500 to-pink-500", subText: "1,000 AP Points" },
-          { name: "VIP Points (X100)", quantity: 1, icon: "🎫", color: "from-emerald-400 to-teal-500", subText: "100 VIP exp" }
-        ]
-      },
-      {
-        id: "monthly-sale",
-        title: "Monthly Sale",
-        badgePct: "791%",
-        ribbonText: "Monthly Sale",
-        ribbonColor: "bg-[#8B0000]/90 text-white", // Dark Red Crimson
-        gemsReward: 1100,
-        giftValueGems: 9000,
-        storageLeft: 1,
-        price: "15,000 GD COIN",
-        priceGd: 15000,
-        cooldownTime: "12:21:25",
-        cooldownDays: 9,
-        items: [
-          { name: "Freely Campaign Chest", quantity: 1, icon: "📦", color: "from-amber-500 to-yellow-600", subText: "Advanced Blueprint" },
-          { name: "Random Teleport", quantity: 3, icon: "🌀", color: "from-sky-400 to-blue-500", subText: "Coordenadas Q." },
-          { name: "8h Speedup Boost", quantity: 1, icon: "⏱️", color: "from-indigo-500 to-violet-600", subText: "8 Horas" },
-          { name: "20m Speedup Boost", quantity: 15, icon: "⚡", color: "from-orange-400 to-amber-500", subText: "20m x 15 Unidades" }
-        ]
-      },
-      {
-        id: "daily-surprise-2",
-        title: "Daily Surprise",
-        badgePct: "650%",
-        ribbonText: "Daily Surprise",
-        ribbonColor: "bg-[#4B0082]/90 text-white", // Violet/Purple Ribbon
-        gemsReward: 60,
-        giftValueGems: 400,
-        storageLeft: 2,
-        price: "600 GD COIN",
-        priceGd: 600,
-        cooldownTime: "12:21:25",
-        items: [
-          { name: "Heart of Norheim", quantity: 1, icon: "❤️", color: "from-rose-500 to-pink-600", subText: "Garantía de Aliento" },
-          { name: "Medium Resource Chest", quantity: 1, icon: "🧰", color: "from-amber-600 to-yellow-700", subText: "Contiene Madera y Mineral" }
-        ]
-      }
-    ],
-    heartwarming: [
-      {
-        id: "heart-warm-1",
-        title: "Empathy Pulse",
-        badgePct: "950%",
-        ribbonText: "Limited Pulse",
-        ribbonColor: "bg-[#D53F8C]/90 text-white",
-        gemsReward: 500,
-        giftValueGems: 4800,
-        storageLeft: 1,
-        price: "7,500 GD COIN",
-        priceGd: 7500,
-        cooldownTime: "15:10:02",
-        items: [
-          { name: "Eternal Sparkle", quantity: 2, icon: "✨", color: "from-pink-400 to-fuchsia-500" },
-          { name: "Hyper Drive Fuel", quantity: 5, icon: "☄️", color: "from-yellow-400 to-orange-500" }
-        ]
-      }
-    ],
-    recommended: [
-      {
-        id: "immortal-recruit",
-        title: "Chrono Caesar Pack",
-        badgePct: "1200%",
-        ribbonText: "Special Recruitment",
-        ribbonColor: "bg-[#B7791F]/90 text-white",
-        gemsReward: 2500,
-        giftValueGems: 30000,
-        storageLeft: 1,
-        price: "35,000 GD COIN",
-        priceGd: 35000,
-        cooldownTime: "23:59:59",
-        items: [
-          { name: "Ancient Relic Map", quantity: 5, icon: "🗺️", color: "from-amber-600 to-yellow-800" },
-          { name: "Chrono Core", quantity: 1, icon: "🌀", color: "from-cyan-400 to-blue-600" }
-        ]
-      }
-    ],
-    dragon: [
-      {
-        id: "dragon-breath",
-        title: "Dragon Breath",
-        badgePct: "500%",
-        ribbonText: "Draconic Core",
-        ribbonColor: "bg-red-600 text-white",
-        gemsReward: 300,
-        giftValueGems: 1500,
-        storageLeft: 3,
-        price: "4,500 GD COIN",
-        priceGd: 4500,
-        cooldownTime: "04:30:10",
-        items: [
-          { name: "Fire Shard", quantity: 12, icon: "🔥", color: "from-red-500 to-orange-600" },
-          { name: "Scale Extract", quantity: 1, icon: "🐲", color: "from-emerald-500 to-teal-600" }
-        ]
-      }
-    ],
-    limited: [
-      {
-        id: "one-time-hyper",
-        title: "Cosmic Foundation",
-        badgePct: "2000%",
-        ribbonText: "Once Per Account",
-        ribbonColor: "bg-amber-500 text-black font-extrabold",
-        gemsReward: 5000,
-        giftValueGems: 100000,
-        storageLeft: 1,
-        price: "75,000 GD COIN",
-        priceGd: 75000,
-        cooldownTime: "INFINITE",
-        items: [
-          { name: "Singularity Reactor", quantity: 1, icon: "⚛️", color: "from-violet-600 to-indigo-800" },
-          { name: "Grand Master Medal", quantity: 3, icon: "🎖️", color: "from-amber-400 to-yellow-600" }
-        ]
-      }
-    ],
-    cultivate: [
-      {
-        id: "cultivate-immortals-boost",
-        title: "Ascension Codex",
-        badgePct: "450%",
-        ribbonText: "Weekly Powerup",
-        ribbonColor: "bg-[#319795]/90 text-white",
-        gemsReward: 350,
-        giftValueGems: 1500,
-        storageLeft: 5,
-        price: "4,500 GD COIN",
-        priceGd: 4500,
-        cooldownTime: "48:00:00",
-        items: [
-          { name: "Tome of Epiphany", quantity: 4, icon: "📖", color: "from-teal-400 to-cyan-500" },
-          { name: "Aura Condenser", quantity: 2, icon: "🌌", color: "from-fuchsia-500 to-purple-700" }
-        ]
-      }
-    ]
-  });
+  // Estado del usuario
+  const [currentUserId, setCurrentUserId] = useState<string>('');
 
-  // Countdown timer clock and carousel auto-scroll
+  // Inventario propio para venta
+  const [myInventory, setMyInventory] = useState<MyInventoryItem[]>([
+    {
+      id: 'INV-01',
+      title: 'FRAGATA SASORI MK-III',
+      category: 'SHIPS',
+      rarity: 'LEGENDARY',
+      description: 'Nave de combate pesada equipada con cañones de pulso gravitacional.',
+      image_url: 'https://images.unsplash.com/photo-1541185933-ef5d8ed016c2?w=200',
+      is_locked: false
+    },
+    {
+      id: 'INV-02',
+      title: 'ESCUDO IMPERIAL CINETICO V2',
+      category: 'TECH',
+      rarity: 'RARE',
+      description: 'Matriz de escudos absorbentes para amortiguar impactos de proyectiles.',
+      image_url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=200',
+      is_locked: false
+    },
+    {
+      id: 'INV-03',
+      title: 'PLANO DESTROYER OMEGA',
+      category: 'BLUEPRINTS',
+      rarity: 'EPIC',
+      description: 'Plano de fabricación para nave destructora de clase estelar.',
+      image_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200',
+      is_locked: false
+    },
+    {
+      id: 'INV-04',
+      title: 'ASTROBOT EXTRACCIÓN ALPHA',
+      category: 'ASTROBOTS',
+      rarity: 'RARE',
+      description: 'Unidad robótica autónoma optimizada para recolección de Xenoplasma.',
+      image_url: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=200',
+      is_locked: false
+    },
+    {
+      id: 'INV-05',
+      title: 'PACK 25,000 CRISTALES DE VACÍO',
+      category: 'RESOURCES',
+      rarity: 'COMMON',
+      description: 'Silo comprimido de minerales cristalinos para tecnología de salto.',
+      image_url: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=200',
+      is_locked: false,
+      amount: 25000
+    }
+  ]);
+
+  // Ofertas Globales del Mercado
+  const [marketListings, setMarketListings] = useState<MarketListing[]>([
+    {
+      id: 'LST-01',
+      seller_id: 'usr-kronos',
+      inventory_item_id: 'INV-EXT-01',
+      title: 'BLUEPRINT CHRONO-IMPERATOR MK-IV',
+      category: 'BLUEPRINTS',
+      rarity: 'LEGENDARY',
+      description: 'Plano de ensamblaje para nave insignia de largo alcance. Requisito de hangar nivel 5.',
+      price: 25000,
+      currency: 'GD',
+      is_auction: false,
+      image_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200',
+      created_at: 'Hace 1 hora'
+    },
+    {
+      id: 'LST-02',
+      seller_id: 'usr-vanguard',
+      inventory_item_id: 'INV-EXT-02',
+      title: 'FRAGATA DESTROYER HALLOWEEN EDITION',
+      category: 'SHIPS',
+      rarity: 'EPIC',
+      description: 'Nave fragata equipada con cañones de plasma y escudos hiperespaciales reforzados.',
+      price: 15000,
+      currency: 'GD',
+      is_auction: false,
+      image_url: 'https://images.unsplash.com/photo-1541185933-ef5d8ed016c2?w=200',
+      created_at: 'Hace 3 horas'
+    },
+    {
+      id: 'LST-03',
+      seller_id: 'usr-aether',
+      inventory_item_id: 'INV-EXT-03',
+      title: 'NÚCLEO INFINITO NIVEL 4 (TECNOLOGÍA)',
+      category: 'TECH',
+      rarity: 'RARE',
+      description: 'Módulo de energía cuántica para acelerar la minería en un +25%.',
+      price: 3500,
+      currency: 'GD',
+      is_auction: true,
+      current_bid: 4200,
+      ends_at: '02h 14m',
+      image_url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=200',
+      created_at: 'Hace 5 horas'
+    }
+  ]);
+
+  // Modal de Venta
+  const [selectedItemToList, setSelectedItemToList] = useState<MyInventoryItem | null>(null);
+  const [sellPrice, setSellPrice] = useState<number>(1000);
+  const [sellIsAuction, setSellIsAuction] = useState<boolean>(false);
+  const [auctionDuration, setAuctionDuration] = useState<'12h' | '24h' | '48h'>('24h');
+  const [sellDescription, setSellDescription] = useState<string>('');
+
   useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeftSecs(prev => (prev > 0 ? prev - 1 : 44485));
-    }, 1000);
-    
-    // Auto scroll logic
-    const scrollInterval = setInterval(() => {
-      if (carouselRef.current && !isDragging.current) {
-        carouselRef.current.scrollLeft += 1.5;
-        // Reset if reached the end smoothly
-        if (carouselRef.current.scrollLeft >= (carouselRef.current.scrollWidth - carouselRef.current.clientWidth - 2)) {
-          carouselRef.current.scrollLeft = 0;
-        }
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) {
+        setCurrentUserId(data.user.id);
       }
-    }, 30); // 30ms ~33fps smooth scroll
-
-    return () => {
-      clearInterval(timer);
-      clearInterval(scrollInterval);
-    };
+    });
   }, []);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    isDragging.current = true;
-    startX.current = e.pageX - (carouselRef.current?.offsetLeft || 0);
-    scrollLeft.current = carouselRef.current?.scrollLeft || 0;
-  };
-  const handleMouseLeave = () => { isDragging.current = false; };
-  const handleMouseUp = () => { isDragging.current = false; };
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging.current || !carouselRef.current) return;
+  // Confirmar Publicación
+  const handleConfirmPublish = (e: React.FormEvent) => {
     e.preventDefault();
-    const x = e.pageX - carouselRef.current.offsetLeft;
-    const walk = (x - startX.current) * 2; // scroll speed multiplier
-    carouselRef.current.scrollLeft = scrollLeft.current - walk;
-  };
+    if (!selectedItemToList) return;
 
-  const formatTime = (secs: number, days?: number) => {
-    const h = Math.floor(secs / 3600);
-    const m = Math.floor((secs % 3600) / 60);
-    const s = secs % 60;
-    const pad = (num: number) => num.toString().padStart(2, "0");
-    if (days) {
-      return `${days}d ${pad(h)}:${pad(m)}:${pad(s)}`;
-    }
-    return `${pad(h)}:${pad(m)}:${pad(s)}`;
-  };
-
-  // Audiotone synthesizer for modern, atmospheric SFX feedbacks
-  const playSfxTone = (type: "click" | "purchase" | "loading" | "error") => {
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gainNode = ctx.createGain();
-
-      if (type === "purchase") {
-        // High-end sci-fi digital receipt sound sweep
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(261.63, ctx.currentTime); // C4
-        osc.frequency.exponentialRampToValueAtTime(523.25, ctx.currentTime + 0.1); // C5
-        osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.2); // G5
-        osc.frequency.exponentialRampToValueAtTime(1200.00, ctx.currentTime + 0.35); // Super sweep
-        
-        gainNode.gain.setValueAtTime(0.01, ctx.currentTime);
-        gainNode.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 0.05);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
-      } else if (type === "loading") {
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(440, ctx.currentTime);
-        osc.frequency.linearRampToValueAtTime(330, ctx.currentTime + 0.15);
-        gainNode.gain.setValueAtTime(0.05, ctx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-      } else if (type === "error") {
-        osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(150, ctx.currentTime);
-        osc.frequency.linearRampToValueAtTime(100, ctx.currentTime + 0.25);
-        gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-      } else {
-        // Subtle modern high-contrast click
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(720, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(250, ctx.currentTime + 0.07);
-        gainNode.gain.setValueAtTime(0.06, ctx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.07);
-      }
-
-      osc.connect(gainNode);
-      gainNode.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.5);
-    } catch (err) {
-      console.warn("Blocked audio payload until gesture.", err);
-    }
-  };
-
-  const handlePurchase = (bundle: MarketplaceBundle, e: React.MouseEvent) => {
-    e.stopPropagation();
-    playSfxTone("click");
-
-    if (bundle.isPurchased || bundle.storageLeft <= 0) {
-      playSfxTone("error");
-      triggerNotification("⚠️ ESTE PAQUETE AGOTADO O LÍMITE ALCANZADO", e);
+    if (sellPrice <= 0) {
+      if (triggerNotification) triggerNotification("⚠️ INGRESA UN PRECIO O PUJA VÁLIDA");
       return;
     }
 
-    // GD Coin check
-    if (bundle.priceGd) {
-      // playerGold is in Millions. So playerGold = 1.5 means 1,500,000.
-      // GD Coin prices are in integers (e.g. 15000), so we check against playerGold * 1,000,000.
-      const gdCoinOwned = playerGold * 1000000;
-      if (gdCoinOwned < bundle.priceGd) {
-        playSfxTone("error");
-        triggerNotification("⚠️ GD COINS INSUFICIENTES", e);
-        return;
-      }
-    }
+    const listingId = `LST-${Date.now()}`;
+    const newListing: MarketListing = {
+      id: listingId,
+      seller_id: currentUserId || 'usr-my-user',
+      inventory_item_id: selectedItemToList.id,
+      title: selectedItemToList.title,
+      category: selectedItemToList.category,
+      rarity: selectedItemToList.rarity,
+      description: sellDescription.trim() || selectedItemToList.description,
+      price: sellPrice,
+      currency: 'GD',
+      is_auction: sellIsAuction,
+      current_bid: sellIsAuction ? sellPrice : undefined,
+      ends_at: sellIsAuction ? (auctionDuration === '12h' ? '12h 00m' : auctionDuration === '24h' ? '24h 00m' : '48h 00m') : undefined,
+      image_url: selectedItemToList.image_url,
+      created_at: 'Hace un momento'
+    };
 
-    // Trigger loading spinner
-    setIsProcessing(bundle.id);
-    playSfxTone("loading");
+    setMarketListings((prev) => [newListing, ...prev]);
 
-    setTimeout(() => {
-      // Complete transaction
-      setBundles(prev => {
-        const catBundles = prev[activeCategory].map(b => {
-          if (b.id === bundle.id) {
-            const nextStorage = b.storageLeft - 1;
-            return {
-              ...b,
-              storageLeft: nextStorage,
-              isPurchased: nextStorage <= 0 ? true : false
-            };
-          }
-          return b;
-        });
-        return { ...prev, [activeCategory]: catBundles };
-      });
+    setMyInventory((prev) =>
+      prev.map((item) => (item.id === selectedItemToList.id ? { ...item, is_locked: true } : item))
+    );
 
-      // Update actual resources based on rewards
-      let gemsGained = bundle.gemsReward;
-      
-      if (bundle.priceGd) {
-        // Reducción de GD Coins, sumamos recompensas
-        setPlayerGold(prev => parseFloat((prev - (bundle.priceGd! / 1000000)).toFixed(4)));
-        setPlayerGems(prev => prev + gemsGained);
-      } else {
-        setPlayerGems(prev => prev + gemsGained);
-      }
+    setSelectedItemToList(null);
+    setSellPrice(1000);
+    setSellDescription('');
 
-      // Claim pack items (add values to our real state dashboard)
-      bundle.items.forEach(itm => {
-        if (itm.name.includes("Heart")) {
-          // Boost player power
-          setPlayerPower(prev => prev + 12000);
-        } else if (itm.name.includes("Stone")) {
-          setPlayerStone(prev => parseFloat((prev + 1.5).toFixed(1)));
-        } else if (itm.name.includes("AP Recovery") || itm.name.includes("Speedup")) {
-          // Increase player power due to faster operations
-          setPlayerPower(prev => prev + 3500);
-        } else if (itm.name.includes("Resource Chest") || itm.name.includes("Resource")) {
-          // Add lots of wood, food & ore
-          setPlayerWood(prev => prev + 150);
-          setPlayerFood(prev => parseFloat((prev + 10.5).toFixed(1)));
-          setPlayerOre(prev => parseFloat((prev + 5.2).toFixed(1)));
-        }
-      });
-
-      // Award premium aesthetic bonus
-      setPlayerGold(prev => parseFloat((prev + 0.55).toFixed(2)));
-
-      setIsProcessing(null);
-      setSuccessBundle(bundle);
-      playSfxTone("purchase");
-
-      triggerNotification(`🎉 ADQUISICIÓN ÉXITO: ${bundle.title.toUpperCase()} ADQUIRIDO`, e);
-    }, 1200);
-  };
-
-  const getCategoryThemeColor = (catId: string) => {
-    switch (catId) {
-      case "special": return "border-[#E53E3E]/30 shadow-red-500/10 text-red-400";
-      case "heartwarming": return "border-pink-500/30 shadow-pink-500/10 text-pink-400";
-      case "recommended": return "border-amber-400/30 shadow-amber-400/10 text-amber-400";
-      case "dragon": return "border-red-500/30 shadow-orange-500/10 text-orange-400";
-      case "limited": return "border-blue-500/30 shadow-blue-500/10 text-blue-400";
-      default: return "border-zinc-700/30 text-zinc-400";
+    if (triggerNotification) {
+      triggerNotification(
+        `🔒 ACTIVO BLOQUEADO Y PUBLICADO EN MERCADO COMO ${sellIsAuction ? 'SUBASTA' : 'VENTA DIRECTA'}`
+      );
     }
   };
 
-  const displayBundles = bundles[activeCategory] || [];
+  // Cancelar Publicación Propia
+  const handleCancelListing = (listing: MarketListing) => {
+    setMarketListings((prev) => prev.filter((l) => l.id !== listing.id));
+
+    setMyInventory((prev) =>
+      prev.map((item) => (item.id === listing.inventory_item_id ? { ...item, is_locked: false } : item))
+    );
+
+    if (triggerNotification) {
+      triggerNotification("🔓 ACTIVO RETIRADO DEL MERCADO Y DESBLOQUEADO EN TU INVENTARIO");
+    }
+  };
+
+  // Comprar Oferta Directa
+  const handleBuyDirect = (item: MarketListing) => {
+    if (playerGold < item.price) {
+      if (triggerNotification) triggerNotification("⚠️ FONDOS INSUFICIENTES PARA ESTA COMPRA");
+      return;
+    }
+
+    if (setPlayerGold) {
+      setPlayerGold((prev: number) => prev - item.price);
+    }
+
+    setMarketListings((prev) => prev.filter((l) => l.id !== item.id));
+    setMyInventory((prev) => prev.filter((inv) => inv.id !== item.inventory_item_id));
+
+    if (triggerNotification) {
+      triggerNotification(`🎉 TRANSACCIÓN EXITOSA: Adquiriste "${item.title}"`);
+    }
+  };
+
+  // Pujar en Subasta
+  const handleBidAuction = (item: MarketListing) => {
+    const minBid = (item.current_bid || item.price) + 250;
+
+    if (playerGold < minBid) {
+      if (triggerNotification) triggerNotification("⚠️ FONDOS INSUFICIENTES PARA REALIZAR ESTA PUJA");
+      return;
+    }
+
+    setMarketListings((prev) =>
+      prev.map((l) => (l.id === item.id ? { ...l, current_bid: minBid } : l))
+    );
+
+    if (triggerNotification) {
+      triggerNotification(`⚖️ PUJA REGISTRADA: Ofreciste ${minBid.toLocaleString()} en "${item.title}"`);
+    }
+  };
+
+  // Filtrado y Ordenación de Publicaciones
+  const getFilteredAndSortedListings = () => {
+    let result = marketListings.filter((item) => {
+      if (activeTab === 'MARKET' && item.is_auction) return false;
+      if (activeTab === 'AUCTIONS' && !item.is_auction) return false;
+      if (activeTab === 'MY_LISTINGS' && item.seller_id !== (currentUserId || 'usr-my-user')) return false;
+
+      if (selectedCategory !== 'ALL' && item.category !== selectedCategory) return false;
+      if (rarityFilter !== 'ALL' && item.rarity !== rarityFilter) return false;
+
+      if (searchQuery.trim() !== '') {
+        const q = searchQuery.toLowerCase();
+        return item.title.toLowerCase().includes(q);
+      }
+
+      return true;
+    });
+
+    if (priceSort === 'LOW_TO_HIGH') {
+      result.sort((a, b) => (a.is_auction ? (a.current_bid || a.price) : a.price) - (b.is_auction ? (b.current_bid || b.price) : b.price));
+    } else if (priceSort === 'HIGH_TO_LOW') {
+      result.sort((a, b) => (b.is_auction ? (b.current_bid || b.price) : b.price) - (a.is_auction ? (a.current_bid || a.price) : a.price));
+    }
+
+    return result;
+  };
+
+  // Filtrado de Mi Inventario
+  const getFilteredMyInventory = () => {
+    return myInventory.filter((item) => {
+      if (selectedCategory !== 'ALL' && item.category !== selectedCategory) return false;
+      if (rarityFilter !== 'ALL' && item.rarity !== rarityFilter) return false;
+
+      if (searchQuery.trim() !== '') {
+        const q = searchQuery.toLowerCase();
+        return item.title.toLowerCase().includes(q);
+      }
+
+      return true;
+    });
+  };
+
+  const filteredListings = getFilteredAndSortedListings();
+  const filteredMyInventory = getFilteredMyInventory();
 
   return (
-    <div className="w-full flex flex-col select-none text-white font-sans max-h-[85vh] overflow-y-auto pr-1">
+    <div className="w-full max-w-7xl mx-auto bg-[#080b0e] border border-cyan-500/30 p-5 rounded-2xl shadow-2xl relative overflow-hidden font-mono text-left select-none flex flex-col gap-4">
       
-      {/* HEADER SECTION IN BLOCK - GAMIFIED STORE TOP BAR */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-white/5 pb-4 mb-5 gap-3">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-gradient-to-br from-red-600 to-rose-700 text-white shadow-lg shadow-red-600/20">
-            <ShoppingBag className="w-5 h-5 animate-pulse" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[7.5px] font-mono bg-[#E53E3E]/10 border border-[#E53E3E]/20 text-[#E53E3E] px-1.5 py-0.5 rounded font-black tracking-widest uppercase">
-                MÓDULO COLOIDAL DE COMERCIO
-              </span>
-              <span className="text-[7.5px] font-mono text-[#A0A2A5]/50">• SECTOR IMPERIAL SECURE</span>
-            </div>
-            <h2 className="text-base font-black tracking-widest text-white uppercase mt-0.5">
-              ADQUISICIÓN DE CARGA Y BUNDLES
-            </h2>
+      {/* ─── ENCABEZADO SUPERIOR SÓLIDO Y COMPACTO ─── */}
+      <div className="w-full bg-[#05070a] border border-cyan-500/30 p-3.5 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={onBack}
+            className="p-1.5 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 rounded-lg transition-colors cursor-pointer"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <div className="text-left">
+            <h1 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+              <ShoppingBag className="w-4 h-4 text-cyan-400 animate-pulse" />
+              MARKETPLACE
+            </h1>
           </div>
         </div>
 
-        {/* Current Balance matching the top bar looks */}
-        <div className="flex items-center gap-2">
-          
-          <div className="flex items-center gap-1.5 bg-black/50 border border-white/5 px-3 py-1.5 rounded-xl text-xs font-mono">
-            <Coins className="w-3.5 h-3.5 text-yellow-300" />
-            <span className="text-yellow-300 font-bold text-[10px]">{playerGold}M</span>
-          </div>
-
-
-
-          <Button 
-            variant="secondary" 
-            size="sm" 
-            onClick={onBack}
-            className="text-[8px] font-mono tracking-widest border border-white/10 text-white/70 hover:text-[#E53E3E] hover:border-[#E53E3E]/30 px-2 py-1.5"
-          >
-            VOLVER
-          </Button>
-
+        {/* Pestañas Principales del Mercado */}
+        <div className="flex items-center gap-1 bg-black/60 p-1 border border-cyan-950 rounded-lg overflow-x-auto">
+          {[
+            { id: 'MARKET', label: 'COMPRAR', icon: ShoppingBag },
+            { id: 'AUCTIONS', label: 'SUBASTAS EN VIVO', icon: Gavel },
+            { id: 'SELL_ITEM', label: 'PUBLICAR / VENDER', icon: PlusCircle },
+            { id: 'MY_LISTINGS', label: 'MIS PUBLICACIONES', icon: Tag }
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id as MarketTab);
+                  setSelectedCategory('ALL');
+                }}
+                className={`px-3 py-1.5 text-[8.5px] font-bold uppercase rounded-lg transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border ${
+                  isActive
+                    ? 'bg-cyan-950 text-cyan-300 border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.2)] font-black'
+                    : 'text-zinc-500 border-transparent hover:text-zinc-300'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* TWO COLUMN GRID FOR VIEW: LEFT SIDEBAR TAB SELECTION, RIGHT DETAIL GRID CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+      {/* ─── FILTROS SUPERIORES DE RAREZA, ORDEN DE PRECIO Y BÚSQUEDA ─── */}
+      <div className="w-full bg-[#05070a] border border-cyan-500/20 p-3 rounded-xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
         
-        {/* LEFT COMPONENT - MULTI-SELECTION SIDEBAR (SPAN 3) */}
-        <div className="md:col-span-3 flex flex-col space-y-2.5 bg-[#0c0d10]/95 border border-white/5 p-3.5 rounded-2xl backdrop-blur-md">
-          <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest font-black px-2 pb-1.5 border-b border-white/5">
-            SECTORES DE TIENDA
+        {/* Filtro por Rareza */}
+        <div className="flex flex-wrap items-center gap-1 text-[8px] font-bold uppercase">
+          {[
+            { id: 'ALL', label: 'TODAS' },
+            { id: 'COMMON', label: 'COMÚN' },
+            { id: 'RARE', label: 'RARA' },
+            { id: 'EPIC', label: 'ÉPICA' },
+            { id: 'LEGENDARY', label: 'LEGENDARIA' }
+          ].map((rar) => (
+            <button
+              key={rar.id}
+              onClick={() => setRarityFilter(rar.id as RarityFilter)}
+              className={`px-2 py-1 rounded transition-colors cursor-pointer border ${
+                rarityFilter === rar.id
+                  ? 'bg-cyan-950 text-cyan-300 border-cyan-500/40 font-black'
+                  : 'bg-black/40 text-zinc-500 border-transparent hover:text-zinc-300'
+              }`}
+            >
+              {rar.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Buscador u Ordenación */}
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+          {activeTab !== 'SELL_ITEM' && (
+            <div className="flex items-center gap-1 bg-black p-0.5 border border-cyan-950 rounded text-[8px]">
+              <ArrowUpDown className="w-3 h-3 text-amber-400 ml-1" />
+              <span className="text-zinc-500 pl-1 font-bold">PRECIO</span>
+              <img src={GD_COIN_ASSET} alt="GD Coin" className="w-3 h-3 object-contain" />
+              <span className="text-zinc-500 pr-1 font-bold">:</span>
+              {[
+                { id: 'NONE', label: 'DEF' },
+                { id: 'LOW_TO_HIGH', label: 'MENOR A MAYOR ↑' },
+                { id: 'HIGH_TO_LOW', label: 'MAYOR A MENOR ↓' }
+              ].map((sortOpt) => (
+                <button
+                  key={sortOpt.id}
+                  onClick={() => setPriceSort(sortOpt.id as PriceSortOption)}
+                  className={`px-2 py-0.5 rounded font-bold uppercase transition-colors ${
+                    priceSort === sortOpt.id ? 'bg-amber-950 text-amber-300 border border-amber-500/40' : 'text-zinc-500 hover:text-white'
+                  }`}
+                >
+                  {sortOpt.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="relative flex-1 md:w-52">
+            <Search className="absolute left-2.5 top-2 w-3 h-3 text-cyan-500" />
+            <input
+              type="text"
+              placeholder={activeTab === 'SELL_ITEM' ? "BUSCAR EN MI INVENTARIO..." : "BUSCAR ACTIVO..."}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-black border border-cyan-950 rounded pl-7 pr-2.5 py-1 text-[8px] text-cyan-200 placeholder-zinc-600 outline-none uppercase font-mono focus:border-cyan-500 transition-colors"
+            />
           </div>
-          <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none select-none">
-            {CATEGORIES.map((cat) => {
+        </div>
+
+      </div>
+
+      {/* ─── ESTRUCTURA EN 2 COLUMNAS (SIDEBAR DE CATEGORÍAS + GRID PRINCIPAL) ─── */}
+      <div className="w-full flex flex-col md:flex-row gap-3.5 items-start">
+        
+        {/* ─── SIDEBAR IZQUIERDO: CATEGORÍAS ─── */}
+        <div className="w-full md:w-52 shrink-0 bg-[#05070a] border border-cyan-500/20 p-3 rounded-xl flex flex-col gap-2">
+          <div className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5 px-1 border-b border-cyan-950 pb-2">
+            <Filter className="w-3.5 h-3.5 text-cyan-400" />
+            <span>CATEGORÍAS</span>
+          </div>
+
+          <div className="flex flex-col gap-1 max-h-[380px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-cyan-950">
+            {[
+              { id: 'ALL', label: 'TODOS', icon: ShoppingBag },
+              { id: 'SHIPS', label: 'NAVES', icon: Rocket },
+              { id: 'TECH', label: 'TECNOLOGÍA', icon: Cpu },
+              { id: 'BLUEPRINTS', label: 'BLUEPRINTS', icon: Tag },
+              { id: 'RESOURCES', label: 'RECURSOS', icon: Layers },
+              { id: 'ASTROBOTS', label: 'ASTROBOTS', icon: Bot }
+            ].map((cat) => {
+              const isSelected = selectedCategory === cat.id;
               const IconComp = cat.icon;
-              const isActive = activeCategory === cat.id;
+
+              const count = activeTab === 'SELL_ITEM'
+                ? myInventory.filter(i => cat.id === 'ALL' || i.category === cat.id).length
+                : marketListings.filter(l => {
+                    if (activeTab === 'MARKET' && l.is_auction) return false;
+                    if (activeTab === 'AUCTIONS' && !l.is_auction) return false;
+                    if (activeTab === 'MY_LISTINGS' && l.seller_id !== (currentUserId || 'usr-my-user')) return false;
+                    return cat.id === 'ALL' || l.category === cat.id;
+                  }).length;
+
               return (
                 <button
                   key={cat.id}
-                  onClick={() => {
-                    playSfxTone("click");
-                    setActiveCategory(cat.id);
-                  }}
-                  className={`relative flex items-center justify-between md:w-full px-3 py-2.5 rounded-xl text-left font-mono transition-all border shrink-0 cursor-pointer ${
-                    isActive
-                      ? "bg-[#14151a] border-amber-400 text-amber-400 font-bold shadow-md shadow-amber-400/5 scale-[1.01]"
-                      : cat.highlighted
-                      ? "bg-red-950/20 border-red-500/20 text-[#E53E3E] hover:bg-neutral-900/40 hover:border-red-500/30"
-                      : "bg-[#08090b] border-white/5 text-neutral-400 hover:border-white/10 hover:text-white"
+                  onClick={() => setSelectedCategory(cat.id as AssetCategory)}
+                  className={`w-full px-2.5 py-2 rounded-lg text-[8px] font-mono font-bold uppercase transition-all cursor-pointer flex items-center justify-between border ${
+                    isSelected
+                      ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 shadow-[0_0_8px_rgba(6,182,212,0.2)] font-black'
+                      : 'bg-[#0a0f14] text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-[#0e1620]'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <IconComp className={`w-3.5 h-3.5 ${isActive ? "text-amber-400" : cat.highlighted ? "text-red-500 animate-pulse" : "text-neutral-500"}`} />
-                    <span className="text-[9.5px] tracking-wide uppercase">{cat.label}</span>
+                  <div className="flex items-center gap-1.5 truncate">
+                    <IconComp className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                    <span className="truncate">{cat.label}</span>
                   </div>
-
-                  {/* Red/Orange bullet badging mimicking side tab stats */}
-                  {cat.badge && (
-                    <span className="hidden md:inline-block text-[6.5px] font-mono px-1 py-0.2 rounded bg-[#E53E3E]/20 text-[#E53E3E] border border-red-500/30 font-black animate-pulse">
-                      {cat.badge}
-                    </span>
-                  )}
+                  <span className={`text-[7.5px] px-1.5 py-0.2 rounded font-black ${
+                    isSelected ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-black text-zinc-500'
+                  }`}>
+                    {count}
+                  </span>
                 </button>
               );
             })}
           </div>
-
-          <div className="hidden md:flex flex-col p-2.5 rounded-xl bg-neutral-900/40 border border-white/5 text-[8px] font-mono leading-relaxed text-zinc-500 uppercase">
-            <div className="flex items-center gap-1.5 text-zinc-400 mb-1 font-bold">
-              <Info className="w-3 h-3 text-[#E53E3E]" />
-              SOPORTE DE SUMINISTROS
-            </div>
-            Los paquetes adquiridos se procesan a través del núcleo coloidal de Sasorilabs.io. Los cristales y minerales se acreditan de inmediato a tus contadores.
-          </div>
         </div>
 
-        {/* RIGHT COMPONENT - DETAILED CARD GRID (SPAN 9) */}
-        <div className="md:col-span-9">
-          
-          <div 
-            className="flex overflow-x-auto gap-5 pb-4 hide-scrollbar snap-x snap-mandatory cursor-grab active:cursor-grabbing w-full"
-            style={{ msOverflowStyle: "none", scrollbarWidth: "none" }}
-            ref={carouselRef}
-            onMouseDown={handleMouseDown}
-            onMouseLeave={handleMouseLeave}
-            onMouseUp={handleMouseUp}
-            onMouseMove={handleMouseMove}
-          >
-            
-            {displayBundles.map((bundle) => {
-              const isP = bundle.isPurchased || bundle.storageLeft <= 0;
-              const hasGemsPrice = bundle.priceGd ? false : false; // Using GD coin for all 
-              
-              return (
+        {/* ─── LADO DERECHO: VISTA A (COMPRAR / SUBASTAS / MIS PUBLICACIONES) O VISTA B (MI INVENTARIO) ─── */}
+        {activeTab !== 'SELL_ITEM' ? (
+          /* VISTA A: PUBLICACIONES EN EL MERCADO */
+          <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5 max-h-[440px] overflow-y-auto pr-1.5 scrollbar-thin scrollbar-thumb-cyan-950">
+            {filteredListings.length === 0 ? (
+              <div className="col-span-full p-12 text-center text-zinc-500 text-[10px] uppercase tracking-widest bg-[#05070a] border border-cyan-500/10 rounded-xl">
+                NO HAY PUBLICACIONES QUE COINCIDAN CON TUS FILTROS
+              </div>
+            ) : (
+              filteredListings.map((item) => (
                 <div
-                  key={bundle.id}
-                  className="relative snap-center shrink-0 w-[300px] sm:w-[340px] rounded-2xl bg-gradient-to-b from-[#181a20]/95 to-[#0b0c0e]/95 border border-white/10 overflow-hidden flex flex-col justify-between shadow-2xl transition-all hover:scale-[1.015] hover:border-white/20 select-none group min-h-[480px]"
+                  key={item.id}
+                  className="bg-[#050910] border border-cyan-500/30 hover:border-cyan-400 p-3.5 rounded-xl shadow-xl flex flex-col justify-between gap-3 transition-all relative group"
                 >
-                  
-                  {/* Decorative glowing backdrops behind matching Ribbon theme */}
-                  <div className="absolute top-0 inset-x-0 h-44 bg-gradient-to-b from-red-600/[0.03] to-transparent pointer-events-none" />
-                  
-                  {/* Outer Ornate Double Border Corner layout */}
-                  <div className="absolute inset-1 border border-white/[0.02] pointer-events-none rounded-xl" />
-                  <div className="absolute top-2 left-2 w-2.5 h-2.5 border-t border-l border-white/15 pointer-events-none" />
-                  <div className="absolute top-2 right-2 w-2.5 h-2.5 border-t border-r border-white/15 pointer-events-none" />
-                  <div className="absolute bottom-2 left-2 w-2.5 h-2.5 border-b border-l border-white/15 pointer-events-none" />
-                  <div className="absolute bottom-2 right-2 w-2.5 h-2.5 border-b border-r border-white/15 pointer-events-none" />
+                  {/* Rareza */}
+                  <div className="flex justify-end items-center border-b border-cyan-950 pb-2">
+                    <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase border ${
+                      item.rarity === 'LEGENDARY' ? 'bg-amber-950 text-amber-400 border-amber-800' :
+                      item.rarity === 'EPIC' ? 'bg-purple-950 text-purple-300 border-purple-800' :
+                      item.rarity === 'RARE' ? 'bg-cyan-950 text-cyan-300 border-cyan-800' :
+                      'bg-zinc-800 text-zinc-300 border-zinc-700'
+                    }`}>
+                      {item.rarity}
+                    </span>
+                  </div>
 
-                  {/* UPPER BUST / BACKGROUND ICON ARTWORK PANEL (Bursting light, chests, shield) */}
-                  <div className="relative h-32 w-full flex items-center justify-center bg-[#070809]/40 border-b border-white/[0.04]">
-                    
-                    {/* Radial gold gradient bloom representing chest contents */}
-                    <div className="absolute w-24 h-24 rounded-full bg-amber-400/[0.04] blur-xl animate-pulse" />
-                    
-                    <div className="flex flex-col items-center justify-center space-y-1 z-10 text-center">
-                      {bundle.id === "monthly-sale" ? (
-                        <div className="relative w-16 h-16 flex items-center justify-center">
-                          <span className="absolute inset-0 bg-amber-500/10 rounded-full animate-ping duration-[3s]" />
-                          <div className="p-3 bg-gradient-to-br from-yellow-400 to-amber-600 rounded-2xl shadow-xl shadow-amber-500/15 border border-yellow-300/30">
-                            <Gift className="w-7 h-7 text-yellow-50" />
-                          </div>
-                        </div>
-                      ) : bundle.id.includes("surprise") ? (
-                        <div className="relative w-16 h-16 flex items-center justify-center">
-                          <span className="absolute inset-0 bg-red-500/10 rounded-full animate-pulse" />
-                          <div className="p-3 bg-gradient-to-br from-[#E53E3E] to-rose-700 rounded-2xl shadow-xl shadow-red-500/15 border border-red-400/30">
-                            <Shield className="w-7 h-7 text-red-50" />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-3 bg-gradient-to-br from-indigo-500 to-sky-600 rounded-2xl shadow-xl border border-sky-400/30">
-                          <Sparkles className="w-7 h-7 text-sky-50" />
-                        </div>
-                      )}
+                  {/* Info del Activo */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-14 h-14 bg-black border border-cyan-950 rounded-lg p-1 shrink-0 flex items-center justify-center overflow-hidden">
+                      <img src={item.image_url} alt={item.title} className="w-full h-full object-contain brightness-90 group-hover:scale-110 transition-transform" />
+                    </div>
 
-                      {/* Small text description inside artworks */}
-                      <span className="text-[7.5px] font-mono tracking-widest text-[#A0A2A5]/70 uppercase block mt-1.5 bg-[#08090c]/80 px-2 py-0.5 rounded border border-white/5">
-                        {bundle.ribbonText}
+                    <div className="flex flex-col text-left flex-1">
+                      <h3 className="text-[10px] font-black text-white uppercase tracking-wider line-clamp-1">{item.title}</h3>
+                      <p className="text-[8px] text-zinc-400 font-sans normal-case line-clamp-2 mt-0.5">{item.description}</p>
+                    </div>
+                  </div>
+
+                  {/* Bloque de Precio con Ícono de GD Coin */}
+                  <div className="bg-[#020305] border border-cyan-950 p-2 rounded-lg flex justify-between items-center text-[9px]">
+                    <div className="flex flex-col text-left">
+                      <span className="text-[7.5px] text-zinc-500 uppercase">
+                        {item.is_auction ? 'PUJA ACTUAL' : 'PRECIO DIRECTO'}
                       </span>
+                      <div className="flex items-center gap-1 font-black text-amber-400 text-sm">
+                        <span>{(item.is_auction ? (item.current_bid || item.price) : item.price).toLocaleString()}</span>
+                        <img src={GD_COIN_ASSET} alt="GD Coin" className="w-3.5 h-3.5 object-contain" />
+                      </div>
                     </div>
 
-                    {/* SCALLOPED EMBLEM PERCENTAGE BADGE - Exact replica of the "800%", "791%" badge on right */}
-                    <div className="absolute top-2.5 right-2.5 z-20 w-11 h-11 flex items-center justify-center">
-                      <svg className="absolute inset-0 w-full h-full rotate-45" viewBox="0 0 100 100">
-                        {/* Beautiful scalloped edge generator */}
-                        <path 
-                          d="M50 0 C54 10 64 10 68 0 C72 10 82 10 86 0 C90 10 100 10 100 22 C90 26 90 36 100 40 C90 44 90 54 100 58 C90 62 90 72 100 76 C90 80 90 90 86 100 C82 90 72 90 68 100 C64 90 54 90 50 100 C46 90 36 90 32 100 C28 90 18 90 14 100 C10 90 0 90 0 76 C10 72 10 62 0 58 C10 54 10 44 0 40 C10 36 10 26 0 22 C0 10 10 10 14 0 C18 10 28 10 32 0 C36 10 46 10 50 0 Z"
-                          fill={bundle.id === "monthly-sale" ? "#E53E3E" : "#3182CE"}
-                          className="opacity-90 shadow-md"
-                        />
-                      </svg>
-                      {/* Badge value overlay centered */}
-                      <div className="z-10 flex flex-col items-center justify-center -rotate-1 select-none pointer-events-none">
-                        <span className="text-[10px] font-black text-white leading-none drop-shadow-[0_1.5px_2px_rgba(0,0,0,0.8)]">
-                          {bundle.badgePct}
+                    {item.is_auction && (
+                      <div className="flex flex-col text-right text-[7.5px] text-zinc-400">
+                        <span className="text-purple-400 font-bold flex items-center gap-1 justify-end">
+                          <Clock className="w-3 h-3" /> {item.ends_at}
                         </span>
-                        <span className="text-[5.5px] font-mono uppercase text-white font-extrabold block leading-none scale-90">
-                          MÁS
-                        </span>
+                        <span className="text-emerald-400 font-bold">PUJA ACTIVA</span>
                       </div>
-                    </div>
-
-                    {/* Share icon matching orange top crest */}
-                    <div className="absolute top-2.5 left-2.5 z-10 w-5 h-5 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 hover:bg-amber-500/20 transition-all cursor-pointer" title="Compartir Oferta">
-                      <span className="text-[9px] font-black leading-none">⚙️</span>
-                    </div>
-
+                    )}
                   </div>
 
-                  {/* INNER CONTAINER / BLUE TRANSITION HEADER (Receive 100 Gems) */}
-                  <div className={`px-4 py-2 text-center select-none ${
-                    bundle.id === "monthly-sale" 
-                      ? "bg-rose-950/20 border-y border-red-500/15" 
-                      : "bg-[#1A202C]/40 border-y border-white/[0.03]"
-                  }`}>
-                    
-                    <div className="flex items-center justify-center gap-1 text-white">
-                      <span className="text-[10.5px] font-mono uppercase font-black tracking-wider text-slate-100">
-                        RECIBE {bundle.gemsReward.toLocaleString()} BONUS
-                      </span>
-                      <Coins className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
-                    </div>
-
-                    <div className="text-[8.5px] font-mono font-black text-amber-400 tracking-wider uppercase drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)] mt-0.5">
-                      Y REGALOS POR VALOR DE {bundle.giftValueGems.toLocaleString()} GD COIN
-                    </div>
-
-                  </div>
-
-                  {/* VALUE TABLE / DETAILED LISTING FRAME WITH VINTAGE CREAM BACKGROUND LOOK */}
-                  <div className="p-3 flex-1 flex flex-col justify-between">
-                    
-                    <div className="space-y-1.5 bg-[#eae2d3]/[0.1] border border-stone-800/40 p-2.5 rounded-xl text-[8.5px] font-mono leading-none flex flex-col justify-center min-h-[145px]">
-                      {bundle.items.map((itm, index) => (
-                        <div 
-                          key={index}
-                          className="flex items-center justify-between border-b border-white/[0.03] pb-1.5 last:border-0 last:pb-0"
-                        >
-                          <div className="flex items-center gap-1.5">
-                            {/* Inner circle visual bullet */}
-                            <div className={`w-6 h-6 rounded-lg bg-gradient-to-br ${itm.color} shadow-md flex items-center justify-center text-[10px]`}>
-                              {itm.icon}
-                            </div>
-                            <div>
-                              <span className="text-[#eeeeee] font-black tracking-normal uppercase block text-[8px] sm:text-[8.5px]">
-                                {itm.name}
-                              </span>
-                              {itm.subText && (
-                                <span className="text-[6.5px] text-zinc-500 font-medium block uppercase tracking-wider scale-95 origin-left">
-                                  {itm.subText}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Circle badge display count x1 x3 etc */}
-                          <div className="w-5 h-5 rounded-full bg-neutral-900 border border-white/5 flex items-center justify-center font-black text-[9px] text-[#E53E3E]">
-                            {itm.quantity}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* BUNDLE FOOTER META DETAILS (Timer count and remaining stock limits) */}
-                    <div className="mt-3.5 pt-2.5 border-t border-white/[0.04] space-y-2 select-none">
-                      
-                      <div className="flex items-center justify-between text-[7px] sm:text-[7.5px] font-mono text-[#A0A2A5]/70 uppercase">
-                        
-                        {/* Cooldown state */}
-                        <div className="flex items-center gap-1 tracking-wider">
-                          <Clock className="w-3 h-3 text-[#E53E3E] animate-pulse" />
-                          <span>EXPIRA: {formatTime(timeLeftSecs, bundle.cooldownDays)}</span>
-                        </div>
-
-                        {/* Inventory stock count limits */}
-                        <div className="tracking-widest font-bold">
-                          LIM. CUPO: <span className="text-[#E53E3E] font-black">{bundle.storageLeft} DISP.</span>
-                        </div>
-
-                      </div>
-
-                      {/* CTA BUY TRIGGERS AND INTERACTIVE TRANSACTION STREAMS */}
-                      <div className="relative">
-                        {isP ? (
-                          <div className="w-full py-2.5 rounded-xl bg-neutral-900 border border-white/5 text-center text-zinc-600 font-mono font-black text-[9px] tracking-widest uppercase cursor-not-allowed">
-                            ADQUIRIDO / AGOTADO ❌
-                          </div>
-                        ) : isProcessing === bundle.id ? (
-                          <div className="w-full py-2.5 rounded-xl bg-[#E53E3E]/20 border border-[#E53E3E]/40 text-center text-[#E53E3E] font-mono font-black text-[9px] tracking-widest uppercase flex items-center justify-center gap-2">
-                            <span className="w-3.5 h-3.5 border-2 border-[#E53E3E] border-t-transparent rounded-full animate-spin" />
-                            PROCESANDO CARGA...
-                          </div>
-                        ) : (
-                          <button
-                            onClick={(e) => handlePurchase(bundle, e)}
-                            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-500 hover:from-yellow-500 hover:to-amber-500 text-stone-950 font-serif font-black text-center text-[10px] sm:text-[10.5px] uppercase tracking-[0.15em] transition-all cursor-pointer shadow-lg shadow-amber-400/10 active:scale-[0.985] flex items-center justify-center gap-1.5 border border-amber-300/40"
-                          >
-                            <span>ADQUIRIR // {bundle.price}</span>
-                          </button>
-                        )}
-                      </div>
-
-                    </div>
-
-                  </div>
+                  {/* Botón de Acción Directa con Ícono de GD Coin */}
+                  {activeTab === 'MY_LISTINGS' ? (
+                    <button
+                      onClick={() => handleCancelListing(item)}
+                      className="w-full py-1.5 bg-red-950/60 hover:bg-red-900 border border-red-500/40 text-red-300 font-black text-[8.5px] uppercase rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      <Unlock className="w-3 h-3" /> RETIRAR Y DESBLOQUEAR
+                    </button>
+                  ) : item.is_auction ? (
+                    <button
+                      onClick={() => handleBidAuction(item)}
+                      className="w-full py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white font-black text-[8.5px] uppercase rounded-lg shadow-[0_0_10px_rgba(147,51,234,0.3)] transition-all cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      <Gavel className="w-3.5 h-3.5" />
+                      <span>PUJAR (+250</span>
+                      <img src={GD_COIN_ASSET} alt="GD Coin" className="w-3 h-3 object-contain" />
+                      <span>)</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleBuyDirect(item)}
+                      className="w-full py-1.5 bg-gradient-to-r from-cyan-600 to-teal-600 hover:brightness-110 text-white font-black text-[8.5px] uppercase rounded-lg shadow-[0_0_10px_rgba(6,182,212,0.3)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <ShoppingBag className="w-3.5 h-3.5" /> COMPRAR AHORA
+                    </button>
+                  )}
 
                 </div>
-              );
-            })}
-
+              ))
+            )}
           </div>
+        ) : (
+          /* VISTA B: MI INVENTARIO DISPONIBLE PARA PUBLICAR / VENDER */
+          <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5 max-h-[440px] overflow-y-auto pr-1.5 scrollbar-thin scrollbar-thumb-cyan-950">
+            {filteredMyInventory.length === 0 ? (
+              <div className="col-span-full p-12 text-center text-zinc-500 text-[10px] uppercase tracking-widest bg-[#05070a] border border-cyan-500/10 rounded-xl">
+                NO TIENES ACTIVOS EN ESTA CATEGORÍA DE TU INVENTARIO
+              </div>
+            ) : (
+              filteredMyInventory.map((item) => (
+                <div
+                  key={item.id}
+                  className={`p-3.5 rounded-xl border flex flex-col justify-between gap-3 transition-all relative group min-h-[140px] ${
+                    item.is_locked
+                      ? 'bg-black/60 border-zinc-800 opacity-60'
+                      : 'bg-[#050910] border-cyan-500/30 hover:border-cyan-400 shadow-xl'
+                  }`}
+                >
+                  {/* Rareza y Estado de Bloqueo */}
+                  <div className="flex justify-between items-center border-b border-cyan-950 pb-2">
+                    {item.is_locked ? (
+                      <span className="px-2 py-0.5 rounded text-[7px] font-black uppercase bg-red-950/80 text-red-400 border border-red-800 flex items-center gap-1">
+                        <Lock className="w-3 h-3 text-red-400" /> BLOQUEADO (EN MERCADO)
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[7px] font-black uppercase bg-emerald-950/80 text-emerald-400 border border-emerald-800 flex items-center gap-1">
+                        <Unlock className="w-3 h-3 text-emerald-400" /> DISPONIBLE
+                      </span>
+                    )}
 
-        </div>
+                    <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase border ${
+                      item.rarity === 'LEGENDARY' ? 'bg-amber-950 text-amber-400 border-amber-800' :
+                      item.rarity === 'EPIC' ? 'bg-purple-950 text-purple-300 border-purple-800' :
+                      item.rarity === 'RARE' ? 'bg-cyan-950 text-cyan-300 border-cyan-800' :
+                      'bg-zinc-800 text-zinc-300 border-zinc-700'
+                    }`}>
+                      {item.rarity}
+                    </span>
+                  </div>
+
+                  {/* Imagen e Info */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-14 h-14 bg-black border border-cyan-950 rounded-lg p-1 shrink-0 flex items-center justify-center overflow-hidden">
+                      <img src={item.image_url} alt={item.title} className="w-full h-full object-contain brightness-90 group-hover:scale-110 transition-transform" />
+                    </div>
+
+                    <div className="flex flex-col text-left flex-1">
+                      <h3 className="text-[10px] font-black text-white uppercase tracking-wider line-clamp-1">{item.title}</h3>
+                      <p className="text-[8px] text-zinc-400 font-sans normal-case line-clamp-2 mt-0.5">{item.description}</p>
+                    </div>
+                  </div>
+
+                  {/* Botón de Publicación / Subasta */}
+                  {item.is_locked ? (
+                    <div className="bg-black/80 border border-zinc-800 p-2 rounded-lg text-center text-[8px] text-zinc-500 font-bold uppercase">
+                      PUBLICACIÓN ACTIVA EN EL MERCADO
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setSelectedItemToList(item);
+                        setSellPrice(1000);
+                        setSellIsAuction(false);
+                      }}
+                      className="w-full py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-black text-[8.5px] uppercase rounded-lg shadow-[0_0_10px_rgba(16,185,129,0.3)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" /> VENDER / SUBASTAR
+                    </button>
+                  )}
+
+                </div>
+              ))
+            )}
+          </div>
+        )}
 
       </div>
 
-      {/* DETAILED DIALOG MODAL SIMULATING SECURE CREDIT TRANSACTION OR RECEIPT POPUP */}
+      {/* ─── MODAL TÁCTICO DE CONFIGURACIÓN DE VENTA / SUBASTA ─── */}
       <AnimatePresence>
-        {successBundle && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 select-none"
-          >
+        {selectedItemToList && (
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4 font-mono">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-gradient-to-b from-[#161a20] to-[#0c0d0f] border border-amber-400/50 p-6 rounded-2xl max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(245,158,11,0.15)]"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-lg bg-[#080b0e] border border-cyan-500/40 rounded-2xl shadow-2xl p-5 flex flex-col gap-4 text-left relative"
             >
-              
-              <div className="absolute top-2 right-2">
+              {/* Encabezado Modal */}
+              <div className="flex justify-between items-center border-b border-cyan-950 pb-3">
+                <div className="flex items-center gap-2">
+                  <PlusCircle className="w-4 h-4 text-cyan-400" />
+                  <h3 className="text-xs font-black text-white uppercase tracking-widest">
+                    CONFIGURAR COMERCIALIZACIÓN
+                  </h3>
+                </div>
                 <button
-                  onClick={() => {
-                    playSfxTone("click");
-                    setSuccessBundle(null);
-                  }}
-                  className="w-6 h-6 rounded-full bg-white/5 border border-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-500 hover:text-white transition-all text-xs"
+                  onClick={() => setSelectedItemToList(null)}
+                  className="p-1 text-zinc-400 hover:text-white cursor-pointer"
                 >
-                  ✕
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="w-12 h-12 rounded-full bg-amber-500/10 border-2 border-amber-400 flex items-center justify-center text-amber-400 mx-auto animate-bounce mb-3">
-                <Sparkles className="w-6 h-6" />
+              {/* Activo Seleccionado */}
+              <div className="p-3 bg-black/80 border border-cyan-950 rounded-xl flex items-center gap-3">
+                <img src={selectedItemToList.image_url} alt={selectedItemToList.title} className="w-12 h-12 object-contain" />
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-white uppercase">{selectedItemToList.title}</span>
+                  <span className="text-[8px] text-cyan-400 uppercase">CATEGORÍA: {selectedItemToList.category} | RAREZA: {selectedItemToList.rarity}</span>
+                </div>
               </div>
 
-              <span className="text-[7.5px] font-mono text-amber-400 uppercase tracking-widest font-black block">
-                CARGA AUTORIZADA EXCELENTE
-              </span>
-              <h3 className="text-sm font-black text-white uppercase tracking-widest mt-0.5">
-                ¡SUMINISTROS ENTREGADOS!
-              </h3>
-              
-              <p className="text-[9.5px] font-mono text-neutral-400 uppercase leading-relaxed mt-2 p-1.5 border border-white/5 bg-black/20 rounded">
-                El lote <span className="text-white font-bold">{successBundle.title}</span> se ha fusionado con las reservas generales de tu estación matriz.
-              </p>
-
-              <div className="my-4 space-y-1 text-left bg-[#eae2d3]/[0.1] p-3 rounded-lg text-[8px] font-mono border border-stone-800">
-                <div className="text-neutral-400 tracking-wider">RECURSOS ADQUIRIDOS:</div>
-                <div className="text-yellow-400 font-bold flex items-center gap-1">
-                  • +{successBundle.gemsReward} GD COIN BONUS 🪙
-                </div>
-                {successBundle.items.map((itm, i) => (
-                  <div key={i} className="text-neutral-300 font-medium pl-1.5">
-                    • +{itm.quantity} {itm.name} {itm.icon}
+              {/* Formulario */}
+              <form onSubmit={handleConfirmPublish} className="flex flex-col gap-3 text-[9px]">
+                
+                {/* Selección Modo de Venta */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-zinc-400 font-bold uppercase">MODO DE COMERCIALIZACIÓN</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSellIsAuction(false)}
+                      className={`py-2 rounded-lg font-bold border uppercase transition-colors cursor-pointer ${
+                        !sellIsAuction ? 'bg-cyan-950 text-cyan-300 border-cyan-500/50' : 'bg-black text-zinc-500 border-cyan-950'
+                      }`}
+                    >
+                      VENTA DIRECTA
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSellIsAuction(true)}
+                      className={`py-2 rounded-lg font-bold border uppercase transition-colors cursor-pointer ${
+                        sellIsAuction ? 'bg-purple-950 text-purple-300 border-purple-500/50' : 'bg-black text-zinc-500 border-cyan-950'
+                      }`}
+                    >
+                      SUBASTA PÚBLICA
+                    </button>
                   </div>
-                ))}
-                <div className="text-yellow-400 font-bold">
-                  • Multiplicadores de Oro de Combate activados ✨
                 </div>
-              </div>
 
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => {
-                  playSfxTone("click");
-                  setSuccessBundle(null);
-                }}
-                className="w-full text-[8px] font-mono tracking-widest bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg uppercase py-2"
-              >
-                CONFIRMAR RECOLECCIÓN
-              </Button>
+                {/* Precio o Puja Inicial con icono de GD Coin */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-1 text-zinc-400 font-bold uppercase">
+                    <span>{sellIsAuction ? 'PUJA INICIAL EN' : 'PRECIO VENTA DIRECTA EN'}</span>
+                    <img src={GD_COIN_ASSET} alt="GD Coin" className="w-3.5 h-3.5 object-contain" />
+                  </div>
+                  <input
+                    type="number"
+                    value={sellPrice}
+                    onChange={(e) => setSellPrice(Number(e.target.value))}
+                    className="bg-black border border-cyan-950 focus:border-cyan-500 rounded-lg p-2 text-amber-400 font-black outline-none"
+                  />
+                </div>
 
+                {/* Duración si es Subasta */}
+                {sellIsAuction && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-zinc-400 font-bold uppercase">DURACIÓN DE LA SUBASTA</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['12h', '24h', '48h'] as const).map((dur) => (
+                        <button
+                          key={dur}
+                          type="button"
+                          onClick={() => setAuctionDuration(dur)}
+                          className={`py-1.5 rounded font-bold border uppercase transition-colors cursor-pointer ${
+                            auctionDuration === dur ? 'bg-purple-900 text-purple-200 border-purple-400' : 'bg-black text-zinc-500 border-cyan-950'
+                          }`}
+                        >
+                          {dur}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Descripción */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-zinc-400 font-bold uppercase">DESCRIPCIÓN DE OFERTA</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Detalla las especificaciones tácticas de tu oferta..."
+                    value={sellDescription}
+                    onChange={(e) => setSellDescription(e.target.value)}
+                    className="bg-black border border-cyan-950 focus:border-cyan-500 rounded-lg p-2 text-cyan-200 outline-none font-sans text-[9px]"
+                  />
+                </div>
+
+                {/* Aviso de Bloqueo */}
+                <div className="p-2 bg-amber-950/30 border border-amber-500/40 rounded-lg flex items-center gap-2 text-amber-300 text-[8px]">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>El activo quedará bloqueado en tu inventario hasta que se complete o se cancele la transacción.</span>
+                </div>
+
+                {/* Botón de Confirmación */}
+                <button
+                  type="submit"
+                  className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-black text-[9.5px] uppercase rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all cursor-pointer flex items-center justify-center gap-2 mt-1"
+                >
+                  <Lock className="w-3.5 h-3.5" /> CONFIRMAR Y BLOQUEAR ACTIVO
+                </button>
+              </form>
             </motion.div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
 

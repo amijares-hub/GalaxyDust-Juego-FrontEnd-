@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 export type ScreenState =
   | 'menu'
@@ -19,10 +20,6 @@ export type AuthState =
   | 'verifying_2fa'
   | 'connected'
   | 'error';
-
-import { supabase } from '../lib/supabase';
-
-
 
 export interface UserProfile {
   email: string;
@@ -61,8 +58,55 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [tempEmail, setTempEmail] = useState<string>('');
 
-  // Guardado temporal de sesión Supabase durante transiciones multifase
-  const [pendingSession, setPendingSession] = useState<any>(null);
+  // 🛰️ CENTINELA DE SESIÓN: Evita la expulsión automática al recargar la página (F5)
+  useEffect(() => {
+    let isMounted = true;
+
+    const hydrateActiveSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session && session.user && isMounted) {
+        // Extraemos el perfil real de la base de datos central
+        const { data: dbProfile } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+
+        if (!isMounted) return;
+
+        setUser({
+          email: session.user.email || '',
+          name: dbProfile?.username || session.user.email?.split('@')[0].toUpperCase() || 'PILOTO',
+          provider: (session.user.app_metadata.provider || 'password') as any,
+          registrationDate: dbProfile?.created_at ? new Date(dbProfile.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          mfaEnabled: dbProfile?.mfa_enabled ?? false,
+          verified: true,
+          avatarUrl: dbProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${session.user.email}`,
+          assignedToken: 'GD-SEC-' + session.user.id.slice(0, 8).toUpperCase(),
+        });
+
+        setScreenState('homepage');
+        setState('connected');
+      }
+    };
+
+    hydrateActiveSession();
+
+    // Escucha en tiempo real si la sesión expira o el token cambia globalmente
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' && isMounted) {
+        setUser(null);
+        setScreenState('menu');
+        setState('idle');
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const setScreen = useCallback((newScreen: ScreenState) => {
     setScreenState(newScreen);
@@ -71,7 +115,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     setSuccessMessage(null);
   }, []);
 
-  // 1. INICIAR SESIÓN REAL EN SUPABASE
+  // 1. INICIAR SESIÓN ASÍNCRONA CON SUPABASE AUTH
   const submitLogin = useCallback(async (email: string, password: string, rememberMe: boolean) => {
     setState('authenticating');
     setErrorMessage(null);
@@ -79,46 +123,63 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
       if (error) throw error;
 
       setTempEmail(email);
-      setPendingSession(data.session);
 
-      // Si tu Supabase tiene MFA activo, saltamos a la pantalla. Si no, consultamos perfil directo.
-      setScreenState('two_factor');
-      setState('idle');
-      setSuccessMessage('CREDENCIALES CORRECTAS • COMPIILANDO VERIFICACIÓN DE PERFIL COHORT');
+      // Consultamos el perfil para verificar si el usuario tiene habilitado el MFA de juego
+      const { data: dbProfile } = await supabase
+        .from('user_profiles')
+        .select('mfa_enabled')
+        .eq('user_id', data.user.id)
+        .maybeSingle();
+
+      // Si requiere MFA saltamos a la terminal OTP; si no, inyectamos perfil de inmediato
+      if (dbProfile?.mfa_enabled) {
+        setScreenState('two_factor');
+        setState('idle');
+        setSuccessMessage('CREDENCIALES CORRECTAS • COMPILANDO VERIFICACIÓN MULTIFACTOR');
+      } else {
+        const loadedProfile: UserProfile = {
+          email: data.user.email || '',
+          name: dbProfile?.username || data.user.email?.split('@')[0].toUpperCase() || 'PILOTO',
+          provider: 'password',
+          registrationDate: new Date().toISOString().split('T')[0],
+          mfaEnabled: false,
+          verified: true,
+          avatarUrl: `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${data.user.email}`,
+          assignedToken: 'GD-SEC-' + data.user.id.slice(0, 8).toUpperCase(),
+        };
+        setUser(loadedProfile);
+        setScreenState('homepage');
+        setState('connected');
+      }
       return true;
     } catch (err: any) {
       setState('error');
-      setErrorMessage(err.message || 'CONEXIÓN RECHAZADA • CRIPTOGRAFÍA DE FIRMA INVÁLIDA');
+      setErrorMessage(err.message || 'CONEXIÓN RECHAZADA • LOGÍSTICA DE FIRMA INVÁLIDA');
       return false;
     }
   }, []);
 
-  // 2. REGISTRO DE CUENTAS EN MOTOR DE PERSISTENCIA
+  // 2. REGISTRO NOMINAL DE NUEVOS PILOTOS
   const submitRegister = useCallback(async (email: string, password: string) => {
     setState('registering');
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
-      // Registrar en Supabase Auth (Dispara automáticamente el trigger SQL de perfil que creamos)
       const { data, error } = await supabase.auth.signUp({ email, password });
-
       if (error) throw error;
 
-      setTempEmail(email);
-
-      // Si Supabase requiere confirmar email antes de entrar:
       if (data.user && data.user.identities?.length === 0) {
-        throw new Error('Este correo ya se encuentra registrado en los servidores centrales.');
+        throw new Error('Esta firma digital ya se encuentra registrada en los servidores centrales.');
       }
 
+      setTempEmail(email);
       setScreenState('email_verification');
       setState('idle');
-      setSuccessMessage('CUENTA REGISTRADA • ENLACE DE CONFIRMACIÓN REMITIDO A LA BANDEJA');
+      setSuccessMessage('REGISTRO COMPLETADO • ENLACE REMITIDO A SU BANDEJA DE ENTRADA');
       return true;
     } catch (err: any) {
       setState('error');
@@ -127,7 +188,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     }
   }, []);
 
-  // 3. APERTURA DE OAUTH SOCIAL HANDSHAKE
+  // 3. NEGOCIACIÓN OAUTH SOCIAL SINGLE-SIGN-ON
   const triggerSocialLogin = useCallback(async (provider: 'google' | 'github' | 'facebook') => {
     setState('authenticating');
     setErrorMessage(null);
@@ -138,31 +199,26 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
         provider,
         options: { redirectTo: window.location.origin }
       });
-
       if (error) throw error;
       return true;
     } catch (err: any) {
       setState('error');
-      setErrorMessage('FALLO EN LA NEGOCIACIÓN OAUTH CON EL PROVEEDOR EXTERNO');
+      setErrorMessage('FALLO EN LA NEGOCIACIÓN CON EL PROVEEDOR SOCIAL EXTERNO');
       return false;
     }
   }, []);
 
-  // 4. VERIFICACIÓN DE PIN DE CORREO ELECTRÓNICO (Para simulación local controlada)
+  // 4. VERIFICACIÓN SMTP DE EMAIL (MODO SIMULADO PARA ENTORNO DE DESARROLLO)
   const verifyEmailCode = useCallback(async (code: string) => {
     setState('verifying_email');
     setErrorMessage(null);
-    setSuccessMessage(null);
-
     try {
-      // Mantenemos validación ágil de desarrollo para no trabar el flujo visual sin tokens SMTP
       if (code !== '123456' && code.length !== 6) {
-        throw new Error('Código de verificación incorrecto. Utilice "123456" para staging.');
+        throw new Error('Código incorrecto. Utilice el bypass de desarrollo "123456".');
       }
-
       setSuccessMessage('DIRECCIÓN DE CORREO VALIDADA CON ÉXITO');
       setState('idle');
-      setScreenState('two_factor');
+      setScreenState('login');
       return true;
     } catch (err: any) {
       setState('error');
@@ -171,34 +227,25 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     }
   }, []);
 
-  // 5. LOGIN EXITOSO Y EXTRACCIÓN DE PERFIL RELACIONAL (`user_profiles`)
+  // 5. RESOLUCIÓN DE SEGUNDO FACTOR (OTP)
   const verifyTwoFA = useCallback(async (code: string) => {
     setState('verifying_2fa');
     setErrorMessage(null);
-    setSuccessMessage(null);
 
     try {
       if (code !== '123456' && code.length !== 6) {
-        throw new Error('Token OTP rechazado por el Kernel de seguridad.');
+        throw new Error('Token OTP rechazado por el Kernel de seguridad militar.');
       }
 
-      // Obtener el ID de usuario actual autenticado
       const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error('No se detectó sesión activa en el cliente.');
 
-      if (!authUser) throw new Error('No se detectó una sesión activa en el cliente.');
-
-      // CONSULTA CRÍTICA: Extraer el perfil desde la tabla SQL que poblamos anteriormente
-      const { data: dbProfile, error: profileError } = await supabase
+      const { data: dbProfile } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('user_id', authUser.id)
         .maybeSingle();
 
-      if (profileError) {
-        console.warn('Advertencia: Error al sincronizar el perfil maestro de datos.', profileError);
-      }
-
-      // Mapear los datos de Postgres al tipado estricto que exige tu interfaz de React (con fallback por si falta tabla)
       const loadedProfile: UserProfile = {
         email: authUser.email || '',
         name: dbProfile?.username || authUser.email?.split('@')[0].toUpperCase() || 'PILOTO',
@@ -213,30 +260,26 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
       setUser(loadedProfile);
       setScreenState('homepage');
       setState('connected');
-      setSuccessMessage('ACCESO CONCEDIDO • PERFIL MAESTRO INYECTADO CORRECTAMENTE');
+      setSuccessMessage('ACCESO CONCEDIDO • PERFIL MAESTRO INYECTADO COHORT');
       return true;
     } catch (err: any) {
       setState('error');
-      setErrorMessage(err.message || 'FALLO AL RECOMPONER EL HANDSHAKE DE SESIÓN');
+      setErrorMessage(err.message || 'FALLO AL RECOMPONER EL HANDSHAKE DE REFRESCO');
       return false;
     }
   }, []);
 
-  // 6. DISPARAR RECUPERACIÓN DE CLAVES CIFRADAS
+  // 6. SOLICITAR REGENERACIÓN DE CREDENCIALES
   const submitResetPassword = useCallback(async (email: string) => {
     setState('resetting');
     setErrorMessage(null);
-    setSuccessMessage(null);
-
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin,
       });
-
       if (error) throw error;
-
       setState('idle');
-      setSuccessMessage(`TRANSMISIÓN EMITIDA • VERIFIQUE LA BANDEJA DE ${email.toUpperCase()}`);
+      setSuccessMessage(`TRANSMISIÓN EMITIDA • REVISE LA BANDEJA DE ${email.toUpperCase()}`);
       setScreenState('login');
       return true;
     } catch (err: any) {
@@ -246,11 +289,10 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     }
   }, []);
 
-  // 7. DESTRUIR COOKIES Y DESCONECTAR TOKEN DE FIRMA
+  // 7. CLAUSURA DE SESIÓN Y DESTRUCCIÓN DE TOKENS
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
-    setPendingSession(null);
     setTempEmail('');
     setScreenState('menu');
     setState('idle');

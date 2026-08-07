@@ -1,140 +1,82 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 
-// Interfaces estrictas para tipado militar de la flota
 export interface Expedition {
   id: string;
-  user_id?: string;
-  sector_name: string;
-  duration_hours: number;
-  fleet_id?: string | null;
-  fleet_name?: string | null;
-  ship_type?: string;
-  risk_factor: number;
-  status: 'LAUNCHED' | 'SUCCESS' | 'FAILED';
-  launch_time: string;
-  estimated_return_time: string;
-  is_adrift?: boolean;
-  reward_est: any;
+  phase: 'traveling' | 'active' | 'returning' | 'finished';
+  target_cluster: string;
+  timeLeft: number; // Expresado en segundos para las barras de progreso de Tailwind
 }
 
-export function useExpeditionEngine(userId: string | undefined) {
-  const [activeFlights, setActiveFlights] = useState<Expedition[]>([]);
-  const [isLaunching, setIsLaunching] = useState<boolean>(false);
-  const [isClaiming, setIsClaiming] = useState<string | null>(null);
-
-  // 1. CARGA DE TELEMETRÍA: Obtener vuelos activos en órbita
-  const fetchActiveFlights = async () => {
-    if (!userId) return;
-
-    const { data, error } = await supabase
-      .from('active_expeditions')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('status', 'LAUNCHED')
-      .order('estimated_return_time', { ascending: true });
-
-    if (!error && data) {
-      setActiveFlights(data as Expedition[]);
-    } else if (error) {
-      console.error('Error cargando telemetría de expediciones:', error.message);
-    }
-  };
+export function useExpeditionEngine() {
+  const { user } = useAuth();
+  const [activeExpeditions, setActiveExpeditions] = useState<Expedition[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchActiveFlights();
-  }, [userId]);
+    if (!user?.id) return;
+    let isMounted = true;
+    let channel: any;
 
-  // 2. DISPARADOR DE DESPEGUE: Inserción atómica con soporte de flotas y modo a la deriva
-  const launchExpedition = async (
-    sectorName: string,
-    durationHours: number,
-    fleetName: string,
-    riskFactor: number,
-    isAdrift: boolean = false,
-    fleetId: string | null = null
-  ) => {
-    if (!userId || isLaunching) return { success: false, error: 'Acción bloqueada o usuario no autenticado.' };
-
-    setIsLaunching(true);
-
-    const launchTime = new Date();
-    const returnTime = new Date();
-    returnTime.setHours(launchTime.getHours() + durationHours);
-
-    // Factor de riesgo: A la deriva duplica el riesgo base
-    const effectiveRisk = isAdrift ? Math.min(0.99, riskFactor * 2) : riskFactor;
-
-    try {
+    const loadExpeditions = async () => {
       const { data, error } = await supabase
-        .from('active_expeditions')
-        .insert([
-          {
-            user_id: userId,
-            sector_name: sectorName,
-            duration_hours: durationHours,
-            fleet_id: fleetId,
-            fleet_name: fleetName,
-            risk_factor: effectiveRisk,
-            status: 'LAUNCHED',
-            launch_time: launchTime.toISOString(),
-            estimated_return_time: returnTime.toISOString(),
-            is_adrift: isAdrift,
-            galaxy_cluster: sectorName.split(' / ')[0],
-            reward_est: { ship_power: 150 }
-          }
-        ])
-        .select();
+        .from('user_expeditions')
+        .select('*')
+        .in('phase', ['traveling', 'active', 'returning']);
 
-      if (error) throw error;
-
-      if (data) {
-        setActiveFlights((prev) => [...prev, data[0] as Expedition]);
+      if (error) {
+        console.error("Fallo al escanear radar estelar:", error.message);
+        return;
       }
 
-      return { success: true };
-    } catch (err: any) {
-      console.error('Error en despegue de hangar:', err.message);
-      return { success: false, error: err.message };
-    } finally {
-      setIsLaunching(false);
-    }
-  };
+      if (data && isMounted) {
+        const mapped: Expedition[] = data.map(exp => {
+          const targetDate = exp.phase === 'traveling' ? new Date(exp.arrival_time) : new Date(exp.return_time);
+          const diffSeconds = Math.max(0, Math.floor((targetDate.getTime() - Date.now()) / 1000));
+          return {
+            id: exp.id,
+            phase: exp.phase,
+            target_cluster: exp.target_cluster,
+            timeLeft: diffSeconds
+          };
+        });
+        setActiveExpeditions(mapped);
+        setLoading(false);
+      }
+    };
 
-  // 3. RECOLECTOR DE BOTÍN: Handshake con la función RPC de Supabase
-  const claimExpeditionLoot = async (expeditionId: string) => {
-    if (isClaiming) return { success: false, error: 'Procesando otra extracción.' };
+    loadExpeditions();
 
-    setIsClaiming(expeditionId);
+    // 🛰️ Escucha Realtime: Si el Backoffice o la API alteran la fase o inyectan eventos, refrescamos el HUD
+    channel = supabase
+      .channel(`star_radar_changes_${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_expeditions', filter: `user_id=eq.${user.id}` }, () => {
+        loadExpeditions();
+      })
+      .subscribe();
 
-    try {
-      const { data, error } = await supabase.rpc('resolve_expedition_loot', {
-        p_expedition_id: expeditionId
-      });
+    return () => {
+      isMounted = false;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
-      if (error) throw error;
+  // ⏱️ RELOJ DE TICK CONTINUO: Descuenta segundos en el cliente para animar las barras en tiempo real
+  useEffect(() => {
+    if (activeExpeditions.length === 0) return;
 
-      setActiveFlights((prev) => prev.filter((f) => f.id !== expeditionId));
+    const timer = setInterval(() => {
+      setActiveExpeditions(prev =>
+        prev.map(exp => ({
+          ...exp,
+          timeLeft: Math.max(0, exp.timeLeft - 1)
+        })).filter(exp => exp.timeLeft > 0) // Si llega a 0, el Realtime de Supabase se encargará de re-hidratar la nueva fase
+      );
+    }, 1000);
 
-      return {
-        success: true,
-        status: data.status,
-        rewards: data.rewards
-      };
-    } catch (err: any) {
-      console.error('Fallo en la resolución del botín:', err.message);
-      return { success: false, error: err.message };
-    } finally {
-      setIsClaiming(null);
-    }
-  };
+    return () => clearInterval(timer);
+  }, [activeExpeditions.length]);
 
-  return {
-    activeFlights,
-    isLaunching,
-    isClaiming,
-    launchExpedition,
-    claimExpeditionLoot,
-    refreshFlights: fetchActiveFlights
-  };
+  return { activeExpeditions, loading };
 }

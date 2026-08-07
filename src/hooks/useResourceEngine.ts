@@ -1,122 +1,111 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
-export function useResourceEngine() {
+export interface Expedition {
+  id: string;
+  fleet_name: string;
+  sector_name: string;
+  galaxy_cluster: string;
+  star_cluster?: string;
+  status: 'LAUNCHED' | 'SUCCESS' | 'FAILED' | 'CLAIMED';
+  timeLeft: number; // Expresado en segundos para las barras de progreso
+  progress: number; // Porcentaje de progreso (0 a 100)
+  is_adrift?: boolean;
+  estimated_return_time: string;
+}
+
+export function useExpeditionEngine() {
   const { user } = useAuth();
-  const userId = user?.id;
+  const [activeExpeditions, setActiveExpeditions] = useState<Expedition[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [metal, setMetal] = useState<number>(0);
-  const [crystal, setCrystal] = useState<number>(0);
-
-  // Refs para guardar las tasas de producción sin provocar re-renders del intervalo
-  const metalRateRef = useRef<number>(0);
-  const crystalRateRef = useRef<number>(0);
-
-  // ─── SUSCRIPCIÓN WEBSOCKET + CARGA INICIAL (RE-ALINEADO COMPLETO A 'user_id') ───
   useEffect(() => {
-    if (!userId) return;
-
+    if (!user?.id) return;
+    let isMounted = true;
     let channel: any;
 
-    const fetchInitialData = async () => {
-      try {
-        // AJUSTE CRÍTICO: Buscamos por '.eq('user_id', userId)' para respetar la estructura de tu DB
-        const { data, error } = await supabase
-          .from('user_profiles')
-          .select('metal, crystal, metal_production_rate, crystal_production_rate')
-          .eq('user_id', userId)
-          .limit(1);
+    const loadExpeditions = async () => {
+      const { data, error } = await supabase
+        .from('active_expeditions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'LAUNCHED');
 
-        if (error) {
-          console.warn('Fallback a columnas base de recursos:', error.message);
-          const { data: fallback, error: fallbackError } = await supabase
-            .from('user_profiles')
-            .select('metal, crystal')
-            .eq('user_id', userId)
-            .limit(1);
+      if (error) {
+        console.error("🚨 [GALAXYDUST KERNEL]: Fallo al escanear radar estelar:", error.message);
+        return;
+      }
 
-          if (fallbackError) {
-            console.error('Error al obtener recursos base:', fallbackError.message);
-            return;
-          }
-          if (fallback && fallback.length > 0) {
-            const fbData = fallback[0];
-            setMetal(parseFloat(fbData.metal || 0));
-            setCrystal(parseFloat(fbData.crystal || 0));
-          }
-          return;
-        }
+      if (data && isMounted) {
+        const mapped: Expedition[] = data.map(exp => {
+          const returnDate = new Date(exp.estimated_return_time);
+          const launchDate = new Date(exp.launch_time);
+          const now = Date.now();
 
-        if (data && data.length > 0) {
-          const d = data[0];
-          setMetal(parseFloat(d.metal || 0));
-          setCrystal(parseFloat(d.crystal || 0));
-          metalRateRef.current = parseFloat(d.metal_production_rate || 0);
-          crystalRateRef.current = parseFloat(d.crystal_production_rate || 0);
-        }
-      } catch (err) {
-        console.error('Error fetching initial resources:', err);
+          const totalSeconds = Math.max(1, Math.floor((returnDate.getTime() - launchDate.getTime()) / 1000));
+          const diffSeconds = Math.max(0, Math.floor((returnDate.getTime() - now) / 1000));
+          const elapsedSeconds = totalSeconds - diffSeconds;
+
+          const calculatedProgress = Math.min(100, Math.max(0, (elapsedSeconds / totalSeconds) * 100));
+
+          return {
+            id: exp.id,
+            fleet_name: exp.fleet_name || "Flota Sin Nombre",
+            sector_name: exp.sector_name || "Espacio Profundo",
+            galaxy_cluster: exp.galaxy_cluster || "Cúmulo Desconocido",
+            star_cluster: exp.star_cluster,
+            status: exp.status,
+            timeLeft: diffSeconds,
+            progress: parseFloat(calculatedProgress.toFixed(1)),
+            is_adrift: exp.is_adrift,
+            estimated_return_time: exp.estimated_return_time
+          };
+        });
+
+        setActiveExpeditions(mapped);
+        setLoading(false);
       }
     };
 
-    fetchInitialData();
+    loadExpeditions();
 
-    // Suscripción en tiempo real — AJUSTE CRÍTICO: Filtro mapeado a 'user_id=eq.'
+    // 🛰️ Escucha Realtime: Refresca el radar en caliente cuando se inserta o cambia una expedición
     channel = supabase
-      .channel(`resource_engine_channel_${userId}`)
+      .channel(`expeditions_engine_${user.id}`)
       .on(
         'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'user_profiles',
-          filter: `user_id=eq.${userId}`
-        },
-        (payload: any) => {
-          if (payload.new) {
-            if (payload.new.metal !== undefined) {
-              setMetal(parseFloat(payload.new.metal || 0));
-            }
-            if (payload.new.crystal !== undefined) {
-              setCrystal(parseFloat(payload.new.crystal || 0));
-            }
-            if (payload.new.metal_production_rate !== undefined) {
-              metalRateRef.current = parseFloat(payload.new.metal_production_rate || 0);
-            }
-            if (payload.new.crystal_production_rate !== undefined) {
-              crystalRateRef.current = parseFloat(payload.new.crystal_production_rate || 0);
-            }
-          }
+        { event: '*', schema: 'public', table: 'active_expeditions', filter: `user_id=eq.${user.id}` },
+        () => {
+          loadExpeditions();
         }
       )
       .subscribe();
 
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
+      isMounted = false;
+      if (channel) supabase.removeChannel(channel);
     };
-  }, [userId]);
+  }, [user?.id]);
 
-  // ─── SIMULACIÓN LOCAL DE PRODUCCIÓN PASIVA (1 tick/segundo) ─────────────
+  // ⏱️ RELOJ DE TICK CONTINUO: Descuenta segundos en el cliente y calcula el % de progreso
   useEffect(() => {
-    if (!userId) return;
+    if (activeExpeditions.length === 0) return;
 
-    const interval = setInterval(() => {
-      const metalPerTick = metalRateRef.current / 3600;
-      const crystalPerTick = crystalRateRef.current / 3600;
-
-      if (metalPerTick > 0) {
-        setMetal((prev) => prev + metalPerTick);
-      }
-      if (crystalPerTick > 0) {
-        setCrystal((prev) => prev + crystalPerTick);
-      }
+    const timer = setInterval(() => {
+      setActiveExpeditions(prev =>
+        prev.map(exp => {
+          const nextTimeLeft = Math.max(0, exp.timeLeft - 1);
+          return {
+            ...exp,
+            timeLeft: nextTimeLeft
+          };
+        })
+      );
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, [userId]);
+    return () => clearInterval(timer);
+  }, [activeExpeditions.length]);
 
-  return { metal, crystal };
+  return { activeExpeditions, loading };
 }

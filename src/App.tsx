@@ -1,44 +1,42 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthView } from './components/AuthView';
 import { Homepage } from './pages/Homepage';
-
 import { RefreshCw } from 'lucide-react';
 
 function AppContent() {
-  const { user, loading, logout } = useAuth();
-  
-  if (loading) {
+  const { user, screen, logout } = useAuth();
+  const [initializing, setInitializing] = useState(true);
+
+  // 🛡️ LOCK DE HIDRATACIÓN: Sostiene tu pantalla de carga original mientras el Kernel valida el token
+  useEffect(() => {
+    // Le damos un margen de cortesía de 650ms al handshake asíncrono de Supabase
+    const timer = setTimeout(() => {
+      setInitializing(false);
+    }, 650);
+
+    return () => clearTimeout(timer);
+  }, [user, screen]);
+
+  // 🔄 PANTALLA NATIVA DE CARGA RESTAURADA
+  if (initializing) {
     return (
       <div className="w-screen h-screen bg-[#0C0D0E] flex flex-col items-center justify-center text-cyan-500 font-mono space-y-4">
         <RefreshCw className="w-8 h-8 animate-spin" />
-        <div className="text-[10px] tracking-[0.3em] uppercase animate-pulse">Sincronizando Estado...</div>
+        <div className="text-[10px] tracking-[0.3em] uppercase animate-pulse">
+          Sincronizando Estado...
+        </div>
       </div>
     );
   }
 
-  if (!user) {
-    return <AuthView />;
+  // 🛰️ Si el piloto ya está autenticado y su pantalla asignada es la consola, abrimos compuertas
+  if (user && screen === 'homepage') {
+    return <Homepage user={user} onLogout={logout} />;
   }
 
-  // Adapt user object to UserProfile expected by Homepage
-  const userProfile = {
-    email: user.email || '',
-    name: user.email?.split('@')[0].toUpperCase() || 'COMANDANTE',
-    provider: (user.app_metadata.provider || 'password') as any,
-    registrationDate: user.created_at ? new Date(user.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-    mfaEnabled: true,
-    verified: true,
-    avatarUrl: `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${user.email}`,
-    assignedToken: 'GD-SEC-' + user.id.slice(0, 8).toUpperCase(),
-  };
-
-  return (
-    <>
-
-      <Homepage user={userProfile} onLogout={logout} />
-    </>
-  );
+  // 🔐 Para cualquier otra fase intermedia (Login, Registro, Segundo Factor OTP), mantenemos la terminal
+  return <AuthView />;
 }
 
 export default function App() {

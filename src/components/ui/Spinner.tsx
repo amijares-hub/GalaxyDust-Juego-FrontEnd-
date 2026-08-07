@@ -1,7 +1,21 @@
 import React from 'react';
 
-export const Spinner: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) => {
+interface SpinnerProps {
+  className?: string;
+  colorClass?: string;
+}
+
+export const Spinner: React.FC<SpinnerProps> = ({
+  className = "w-4 h-4",
+  colorClass = "border-t-cyan-500 border-b-cyan-500"
+}) => {
   return (
-    <div className={`animate-spin rounded-full border-t-2 border-b-2 border-cyan-500 ${className}`}></div>
+    <div
+      role="status"
+      aria-live="polite"
+      className={`animate-spin rounded-full border-2 border-transparent ${colorClass} ${className}`}
+    >
+      <span className="sr-only">Procesando telemetría...</span>
+    </div>
   );
 };

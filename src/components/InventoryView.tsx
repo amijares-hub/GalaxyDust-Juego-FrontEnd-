@@ -20,7 +20,7 @@ import { validateCanModification, validateTechnologyEquip, FleetAsset } from "..
 import { FleetManager } from "./FleetManager";
 import { Scroller } from "./ui/Scroller";
 import { supabase } from "../lib/supabase";
-
+import { miningService } from '../services/miningService';
 interface InventoryViewProps {
   playerGems: number;
   setPlayerGems: React.Dispatch<React.SetStateAction<number>>;
@@ -69,6 +69,21 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       setShowSubModal(null);
     }
   }, [selectedChar]);
+
+  const handleUnequipTech = async (techId: string) => {
+    // 1. Validar expediciones de minería en curso
+    const isMining = await miningService.hasActiveMiningExpeditions();
+
+    if (isMining) {
+      if (triggerNotification) {
+        triggerNotification("⚠️ PROHIBIDO: No puedes desactivar ni reemplazar tecnologías mientras existan expediciones de minería en curso.");
+      }
+      return;
+    }
+
+    // 2. Proceder con el desequipamiento si no hay minería activa...
+    // (Lógica regular de inventario)
+  };
 
   // Efecto para cargar flotas al abrir el panel 'fleet'
   useEffect(() => {

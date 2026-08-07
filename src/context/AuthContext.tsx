@@ -1,63 +1,40 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { User, Session } from '@supabase/supabase-js';
+import React, { createContext, useContext } from 'react';
+import { useSasoriAuth, UseSasoriAuthReturn } from '../hooks/useSasoriAuth';
 
-interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  loading: boolean;
-  logout: () => Promise<void>;
+// 🛰️ Creación del canal cuántico del contexto global de autenticación
+const AuthContext = createContext<UseSasoriAuthReturn | undefined>(undefined);
+
+interface AuthProviderProps {
+  children: React.ReactNode;
 }
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  session: null,
-  loading: true,
-  logout: async () => {},
-});
-
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const initializeAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (mounted) {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    };
-
-    initializeAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  const logout = async () => {
-    await supabase.auth.signOut();
-  };
+/**
+ * 🌌 PROVEEDOR GLOBAL DE AUTENTICACIÓN (AuthPrvoder)
+ * Distribuye de forma homogénea el estado del piloto hacia todas las vistas de la aplicación,
+ * centralizando las llamadas en el motor maestro de `useSasoriAuth`.
+ */
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const auth = useSasoriAuth();
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, logout }}>
+    <AuthContext.Provider value={auth}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => {
-  return useContext(AuthContext);
+/**
+ * 🛠️ HOOK CONSUMIDOR GLOBAL: `useAuth`
+ * Permite a cualquier componente hijo (vistas de inventario, naves, HUD) acceder 
+ * instantáneamente a las credenciales del usuario y funciones de desconexión.
+ */
+export const useAuth = (): UseSasoriAuthReturn => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error(
+      "🚨 [GALAXYDUST KERNEL]: `useAuth` debe ser utilizado estrictamente dentro de un contenedor <AuthProvider />. " +
+      "Verifique la inicialización de la jerarquía en `src/App.tsx`."
+    );
+  }
+  return context;
 };
