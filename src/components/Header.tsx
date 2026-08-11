@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
-import { 
-  ChevronDown, ChevronUp, Bell, Settings, User, 
-  Database, Zap, Coins, Shield, Sparkles 
-} from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Bell, Settings, User } from 'lucide-react';
 
 interface HeaderProps {
   userProfile?: any;
+  activeTab?: string;
+  onSelectTab?: (tab: string) => void;
   unreadNotificationsCount?: number;
   onOpenNotifications?: () => void;
   onOpenSettings?: () => void;
@@ -13,143 +12,195 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   userProfile,
+  activeTab = 'MAIN',
+  onSelectTab,
   unreadNotificationsCount = 0,
   onOpenNotifications,
   onOpenSettings
 }) => {
-  const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [openDropdown, setOpenDropdown] = useState<'MONEDA' | 'RECURSOS' | null>(null);
+
+  const currencyRef = useRef<HTMLDivElement>(null);
+  const resourceRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar dropdowns al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        currencyRef.current && !currencyRef.current.contains(event.target as Node) &&
+        resourceRef.current && !resourceRef.current.contains(event.target as Node)
+      ) {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const toggleDropdown = (type: 'MONEDA' | 'RECURSOS') => {
+    setOpenDropdown(prev => (prev === type ? null : type));
+  };
+
+  // Monedas del juego desde perfil o fallback
+  const currencies = [
+    { label: 'GD COIN', value: userProfile?.gd_coin || 0, color: 'text-amber-300' },
+    { label: 'QUANTUM CREDIT', value: userProfile?.quantum_credit || 0, color: 'text-cyan-300' },
+    { label: 'PHANTOM COIN', value: userProfile?.phantom_coin || 0, color: 'text-purple-300' },
+    { label: 'HALLOWEEN COIN', value: userProfile?.halloween_coin || 0, color: 'text-orange-400' },
+    { label: 'XMAS COIN', value: userProfile?.xmas_coin || 0, color: 'text-red-400' },
+    { label: 'VALENTINE COIN', value: userProfile?.valentine_coin || 0, color: 'text-pink-400' }
+  ];
+
+  // Recursos del juego desde perfil o fallback
+  const resources = [
+    { label: 'METAL', value: userProfile?.metal || 0, color: 'text-cyan-200' },
+    { label: 'CRISTAL', value: userProfile?.crystal || 0, color: 'text-purple-200' },
+    { label: 'DEUTERIO', value: userProfile?.deuterium || 0, color: 'text-blue-300' },
+    { label: 'MATERIA OSCURA', value: userProfile?.dark_matter || 0, color: 'text-indigo-400' },
+    { label: 'OMNIPLATE', value: userProfile?.omniplate || 0, color: 'text-emerald-300' },
+    { label: 'ORICHALTRON', value: userProfile?.orichaltron || 0, color: 'text-yellow-300' },
+    { label: 'LUNAR FIBER', value: userProfile?.lunar_fiber || 0, color: 'text-slate-200' },
+    { label: 'INFINITE CORE', value: userProfile?.infinite_core || 0, color: 'text-teal-300' }
+  ];
+
+  const tabs = [
+    { id: 'MAIN', label: 'MAIN' },
+    { id: 'CAN', label: 'C.A.N.' },
+    { id: 'EXPEDITIONS', label: 'EXPEDICIONES' }
+  ];
 
   return (
-    <header className="w-full bg-[#05080c]/98 border-b border-cyan-500/40 font-mono text-left select-none sticky top-0 z-50 backdrop-blur-md transition-all duration-300">
+    <header className="w-full bg-[#05080c]/98 border-b border-cyan-500/40 px-2 sm:px-4 py-1.5 flex items-center justify-between gap-2 shrink-0 select-none z-50 font-mono backdrop-blur-md sticky top-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)]">
       
-      {/* ─── BARRA COMPACTA PERMANENTE (SOLO 32px-36px DE ALTO) ─── */}
-      <div 
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-2 py-1 flex items-center justify-between gap-2 cursor-pointer hover:bg-cyan-950/40 transition-colors"
-      >
-        {/* Usuario + Estado Rápido */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <div className="w-6 h-6 rounded bg-cyan-950 border border-cyan-400/80 flex items-center justify-center text-cyan-300 font-bold text-[9px] shadow-[0_0_6px_rgba(34,211,238,0.3)]">
-            <User className="w-3.5 h-3.5 text-cyan-400" />
-          </div>
-          <span className="text-[9.5px] font-black text-white uppercase tracking-wider truncate max-w-[100px]">
+      {/* ─── 1. ESQUINA IZQUIERDA: PERFIL / AVATAR ─── */}
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-cyan-950 border border-cyan-400/80 flex items-center justify-center text-cyan-300 font-bold shadow-[0_0_8px_rgba(34,211,238,0.3)]">
+          {userProfile?.avatar_url ? (
+            <img src={userProfile.avatar_url} alt="Avatar" className="w-full h-full object-cover rounded-lg" />
+          ) : (
+            <User className="w-4 h-4 text-cyan-400" />
+          )}
+        </div>
+        <div className="flex flex-col text-left">
+          <span className="text-[9.5px] sm:text-[11px] font-black text-white uppercase tracking-wider truncate max-w-[90px] sm:max-w-[130px]">
             {userProfile?.username || 'COMANDANTE'}
           </span>
-          <span className="text-[7.5px] bg-cyan-950 border border-cyan-800 text-cyan-300 px-1 py-0.2 rounded font-mono font-bold">
+          <span className="text-[7.5px] sm:text-[8.5px] font-mono font-bold text-cyan-400 uppercase">
             LVL {userProfile?.level || 1}
           </span>
         </div>
-
-        {/* Resumen Rápido de Moneda Principal (Vista previa) */}
-        <div className="flex items-center gap-2 text-[8.5px] font-bold">
-          <div className="flex items-center gap-1 text-amber-300 bg-black/60 px-1.5 py-0.5 rounded border border-amber-900/60">
-            <Coins className="w-3 h-3 text-amber-400" />
-            <span>{(userProfile?.gd_coin || 0).toLocaleString()} GD</span>
-          </div>
-        </div>
-
-        {/* Botón Indicador de Acordeón */}
-        <div className="flex items-center gap-1 shrink-0 bg-cyan-950/80 border border-cyan-500/50 px-2 py-0.5 rounded text-[8px] text-cyan-300 font-bold uppercase tracking-wider">
-          <span>{isExpanded ? 'CERRAR' : 'RECURSOS'}</span>
-          {isExpanded ? (
-            <ChevronUp className="w-3.5 h-3.5 text-cyan-400" />
-          ) : (
-            <ChevronDown className="w-3.5 h-3.5 text-cyan-400 animate-bounce" />
-          )}
-        </div>
       </div>
 
-      {/* ─── PANEL ACORDEÓN DESPLEGABLE (MENÚ Y BILLETERA HARMONIOSA) ─── */}
-      <div 
-        className={`w-full overflow-hidden transition-all duration-300 ease-in-out bg-[#03060a] border-t border-cyan-900/50 ${
-          isExpanded ? 'max-h-[280px] p-2 sm:p-3 opacity-100' : 'max-h-0 p-0 opacity-0 pointer-events-none'
-        }`}
-      >
-        <div className="max-w-5xl mx-auto flex flex-col gap-2.5">
-          
-          {/* GRIDA DE RECURSOS Y MONEDAS */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[8.5px] font-mono">
-            
-            {/* Metal */}
-            <div className="bg-[#050a0f] border border-cyan-900/80 p-1.5 rounded-lg flex items-center justify-between">
-              <div className="flex items-center gap-1 text-zinc-400">
-                <Database className="w-3.5 h-3.5 text-cyan-400" />
-                <span>METAL:</span>
+      {/* ─── 2. CENTRO: PESTAÑAS DE NAVEGACIÓN ─── */}
+      <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto custom-scrollbar px-1 py-0.5 max-w-[35%] sm:max-w-none">
+        {tabs.map(tab => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => onSelectTab && onSelectTab(tab.id)}
+              className={`px-2.5 py-1 rounded-md text-[8.5px] sm:text-[10px] font-bold tracking-widest uppercase transition-all cursor-pointer whitespace-nowrap border ${
+                isActive
+                  ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)] font-black'
+                  : 'bg-black/50 text-zinc-400 border-transparent hover:text-white hover:bg-cyan-950/30'
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ─── 3. ESQUINA DERECHA: MONEDA, RECURSOS Y CONTROLES ─── */}
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        
+        {/* DROPDOWN MONEDA (Sin ícono, solo texto) */}
+        <div className="relative" ref={currencyRef}>
+          <button
+            onClick={() => toggleDropdown('MONEDA')}
+            className={`px-2.5 py-1 rounded-md text-[8.5px] sm:text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer border ${
+              openDropdown === 'MONEDA'
+                ? 'bg-amber-950/90 text-amber-300 border-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.3)]'
+                : 'bg-black/60 text-amber-400 border-amber-900/60 hover:border-amber-500/80 hover:bg-amber-950/30'
+            }`}
+          >
+            Moneda
+          </button>
+
+          {openDropdown === 'MONEDA' && (
+            <div className="absolute right-0 mt-1.5 w-48 sm:w-56 bg-[#05080c]/98 border border-amber-500/50 rounded-xl p-2 shadow-[0_0_20px_rgba(0,0,0,0.9)] z-50 backdrop-blur-md space-y-1.5">
+              <span className="text-[7.5px] text-amber-400/80 font-black uppercase tracking-widest block pb-1 border-b border-amber-900/40 text-left px-1">
+                // SALDO DE MONEDAS
+              </span>
+              <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
+                {currencies.map((curr, idx) => (
+                  <div key={idx} className="flex justify-between items-center px-1.5 py-1 bg-black/60 rounded border border-amber-950/60 text-[8.5px] sm:text-[9px]">
+                    <span className="text-zinc-400 uppercase font-bold">{curr.label}</span>
+                    <span className={`font-mono font-bold ${curr.color}`}>{(curr.value || 0).toLocaleString()}</span>
+                  </div>
+                ))}
               </div>
-              <span className="text-cyan-200 font-bold">{(userProfile?.metal || 0).toLocaleString()}</span>
             </div>
-
-            {/* Cristal */}
-            <div className="bg-[#050a0f] border border-purple-900/80 p-1.5 rounded-lg flex items-center justify-between">
-              <div className="flex items-center gap-1 text-zinc-400">
-                <Zap className="w-3.5 h-3.5 text-purple-400" />
-                <span>CRISTAL:</span>
-              </div>
-              <span className="text-purple-200 font-bold">{(userProfile?.crystal || 0).toLocaleString()}</span>
-            </div>
-
-            {/* Deuterio */}
-            <div className="bg-[#050a0f] border border-blue-900/80 p-1.5 rounded-lg flex items-center justify-between">
-              <div className="flex items-center gap-1 text-zinc-400">
-                <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                <span>DEUTERIO:</span>
-              </div>
-              <span className="text-blue-200 font-bold">{(userProfile?.deuterium || 0).toLocaleString()}</span>
-            </div>
-
-            {/* GD Coins */}
-            <div className="bg-[#050a0f] border border-amber-900/80 p-1.5 rounded-lg flex items-center justify-between">
-              <div className="flex items-center gap-1 text-zinc-400">
-                <Coins className="w-3.5 h-3.5 text-amber-400" />
-                <span>GD COIN:</span>
-              </div>
-              <span className="text-amber-300 font-bold">{(userProfile?.gd_coin || 0).toLocaleString()}</span>
-            </div>
-
-          </div>
-
-          {/* OPCIONES DE PANEL Y ACCIONES HARMONIOSAS */}
-          <div className="flex items-center justify-between pt-1 border-t border-cyan-950">
-            <div className="flex items-center gap-2 text-[8px] text-zinc-400 font-bold uppercase">
-              <Shield className="w-3 h-3 text-cyan-400" />
-              <span>FACCIÓN: {userProfile?.faction || 'ALACRÁN'}</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* Botón Notificaciones */}
-              <button
-                onClick={() => {
-                  if (onOpenNotifications) onOpenNotifications();
-                  setIsExpanded(false);
-                }}
-                className="px-2.5 py-1 bg-cyan-950 hover:bg-cyan-900 border border-cyan-700 text-cyan-200 rounded-lg text-[8.5px] font-bold uppercase flex items-center gap-1.5 transition-all cursor-pointer"
-              >
-                <Bell className="w-3.5 h-3.5 text-cyan-400" />
-                <span>NOTIFICACIONES</span>
-                {unreadNotificationsCount > 0 && (
-                  <span className="bg-red-600 text-white text-[7px] font-black px-1 rounded-full">
-                    {unreadNotificationsCount}
-                  </span>
-                )}
-              </button>
-
-              {/* Botón Ajustes */}
-              <button
-                onClick={() => {
-                  if (onOpenSettings) onOpenSettings();
-                  setIsExpanded(false);
-                }}
-                className="px-2.5 py-1 bg-black/60 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 rounded-lg text-[8.5px] font-bold uppercase flex items-center gap-1.5 transition-all cursor-pointer"
-              >
-                <Settings className="w-3.5 h-3.5 text-zinc-400" />
-                <span>AJUSTES</span>
-              </button>
-            </div>
-          </div>
-
+          )}
         </div>
+
+        {/* DROPDOWN RECURSOS (Sin ícono, solo texto) */}
+        <div className="relative" ref={resourceRef}>
+          <button
+            onClick={() => toggleDropdown('RECURSOS')}
+            className={`px-2.5 py-1 rounded-md text-[8.5px] sm:text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer border ${
+              openDropdown === 'RECURSOS'
+                ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)]'
+                : 'bg-black/60 text-cyan-300 border-cyan-900/60 hover:border-cyan-500/80 hover:bg-cyan-950/30'
+            }`}
+          >
+            Recursos
+          </button>
+
+          {openDropdown === 'RECURSOS' && (
+            <div className="absolute right-0 mt-1.5 w-52 sm:w-60 bg-[#05080c]/98 border border-cyan-500/50 rounded-xl p-2 shadow-[0_0_20px_rgba(0,0,0,0.9)] z-50 backdrop-blur-md space-y-1.5">
+              <span className="text-[7.5px] text-cyan-400/80 font-black uppercase tracking-widest block pb-1 border-b border-cyan-900/40 text-left px-1">
+                // RESERVA DE RECURSOS
+              </span>
+              <div className="space-y-1 max-h-52 overflow-y-auto custom-scrollbar">
+                {resources.map((res, idx) => (
+                  <div key={idx} className="flex justify-between items-center px-1.5 py-1 bg-black/60 rounded border border-cyan-950/60 text-[8.5px] sm:text-[9px]">
+                    <span className="text-zinc-400 uppercase font-bold">{res.label}</span>
+                    <span className={`font-mono font-bold ${res.color}`}>{(res.value || 0).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* NOTIFICACIONES */}
+        <button
+          onClick={onOpenNotifications}
+          className="relative p-1.5 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-800 text-cyan-300 rounded-md transition-all cursor-pointer"
+          title="Notificaciones"
+        >
+          <Bell className="w-3.5 h-3.5 text-cyan-300" />
+          {unreadNotificationsCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[7px] font-black w-3.5 h-3.5 rounded-full border border-black flex items-center justify-center animate-pulse">
+              {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+            </span>
+          )}
+        </button>
+
+        {/* AJUSTES */}
+        <button
+          onClick={onOpenSettings}
+          className="p-1.5 bg-black/60 hover:bg-cyan-950 border border-cyan-900 text-zinc-400 hover:text-white rounded-md transition-all cursor-pointer"
+          title="Ajustes"
+        >
+          <Settings className="w-3.5 h-3.5" />
+        </button>
+
       </div>
 
     </header>
   );
 };
+
+export default Header;
