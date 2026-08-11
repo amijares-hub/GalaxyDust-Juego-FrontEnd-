@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   CornerUpLeft, X, Search, Rocket, Lock, MapPin, Plus, Trash2, 
-  Sparkles, AlertTriangle, ShieldCheck, Box, Wrench, Bot, FileText, Package, Check, XCircle
+  Sparkles, AlertTriangle, ShieldCheck, Box, Wrench, Bot, FileText, Package, Check, XCircle, Clock, Pickaxe, Radio
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -56,6 +56,17 @@ export interface Expedition {
   type?: 'EXPLORATION' | 'MINING' | 'DOMINATION';
 }
 
+export interface ExpeditionLog {
+  id: string;
+  expedition_id: string;
+  event_type: string;
+  title: string;
+  message: string;
+  rewards_looted?: any;
+  damage_sustained?: number;
+  created_at: string;
+}
+
 export interface MiningDrop {
   name: string;
   amount: number;
@@ -90,6 +101,15 @@ const resolveImageUrl = (rawUrl?: string, fallbackId?: string) => {
     return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/render/image/public/galaxy-assets/seed_ships/${fallbackId}.png?width=256&height=256&resize=contain&format=webp&quality=80`;
   }
   return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
+};
+
+const formatDuration = (ms: number): string => {
+  if (ms <= 0) return '00h 00m 00s';
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
 };
 
 // Normalizadores de categorías
@@ -199,7 +219,6 @@ const GC_RULES: Record<string, GCRequirement> = {
   }
 };
 
-// LISTA CON PELA EN PRIMERA POSICIÓN Y LUEGO GC1 (INARA)
 const DEFAULT_GC_LIST = ["PELA", "GC1", "GC2", "GC3", "GC4", "GC5", "GC6", "GC7", "GC8"];
 
 export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
@@ -220,15 +239,19 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   const [isDispatchPanelActive, setIsDispatchPanelActive] = useState(false);
   const [isAdrift, setIsAdrift] = useState(false);
 
+  // Reloj en tiempo real
+  const [now, setNow] = useState<number>(Date.now());
+
   // Categorías e Inventario Despacho
   const [currentLeftCategory, setCurrentLeftCategory] = useState<LeftMenuCategory>('Naves');
   const [inventoryAssets, setInventoryAssets] = useState<Asset[]>([]);
   const [selectedAssets, setSelectedAssets] = useState<Asset[]>([]);
 
-  // Estados Supabase y Flotas
+  // Estados Supabase
   const [fleets, setFleets] = useState<Fleet[]>([]);
   const [selectedFleet, setSelectedFleet] = useState<Fleet | null>(null);
   const [activeExpeditions, setActiveExpeditions] = useState<Expedition[]>([]);
+  const [expeditionLogs, setExpeditionLogs] = useState<Record<string, ExpeditionLog[]>>({});
   const [loading, setLoading] = useState(false);
 
   // Modales
@@ -248,14 +271,22 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     return parts.join(' > ') || 'SELECCIONA COORDENADAS GALÁCTICAS';
   };
 
-  // ─── CONEXIÓN A INVENTARIO REAL COMPLETO DESDE SUPABASE ───
+  // Temporizador para actualización en vivo cada segundo
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // ─── CONEXIÓN A INVENTARIO Y EXPEDICIONES REALES DESDE SUPABASE ───
   const syncDatabaseData = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || '9abc737e-9c3d-4349-a976-59af24f51f4d';
 
-      // 1. Cargar Historial de Expediciones Completadas
+      // 1. Historial de Expediciones Completadas
       const { data: historyRows } = await supabase
         .from('expedition_history')
         .select('galaxy_cluster')
@@ -268,7 +299,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
       });
       setCompletedCountsByGC(counts);
 
-      // 2. Helper genérico para cargar categorías de inventario real
+      // 2. Helper genérico para cargar inventario real
       const loadCategoryAssets = async (
         userTable: string,
         seedTable: string,
@@ -327,7 +358,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         }
       };
 
-      // Cargar todas las categorías
       const [ships, tools, astrobots, consumables, licenses] = await Promise.all([
         loadCategoryAssets('user_ships', 'seed_ships', 'Naves', 'ship_id', 'ship_id', ['ship_name', 'name']),
         loadCategoryAssets('user_tools', 'seed_tools', 'Tools', 'tool_id', 'id', ['name', 'title']),
@@ -360,7 +390,23 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         .order('launch_time', { ascending: false });
 
       if (expData) {
-        setActiveExpeditions(expData.map((e: any) => ({ ...e, progress: 0 })));
+        setActiveExpeditions(expData);
+      }
+
+      // 5. Cargar Logs / Eventos Reales de Expedición
+      const { data: logsData } = await supabase
+        .from('expedition_logs')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (logsData) {
+        const map: Record<string, ExpeditionLog[]> = {};
+        logsData.forEach((log: any) => {
+          if (!map[log.expedition_id]) map[log.expedition_id] = [];
+          map[log.expedition_id].push(log);
+        });
+        setExpeditionLogs(map);
       }
 
     } catch (err) {
@@ -374,19 +420,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   useEffect(() => {
     syncDatabaseData();
   }, []);
-
-  // Telemetría de Vuelo
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveExpeditions(prev => prev.map(exp => {
-        const total = new Date(exp.estimated_return_time).getTime() - new Date(exp.launch_time).getTime();
-        const elapsed = Date.now() - new Date(exp.launch_time).getTime();
-        const progress = Math.min(100, Math.max(0, (elapsed / (total || 1)) * 100));
-        return { ...exp, progress: parseFloat(progress.toFixed(1)) };
-      }));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [activeExpeditions.length]);
 
   // Validaciones
   const checkGCRequirements = (gcCode: string): { allowed: boolean; reason?: string } => {
@@ -412,7 +445,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     const allTools = [...assets.filter(a => isToolAsset(a.type)), ...(fleet?.tools || [])];
     const allLicenses = [...assets.filter(a => isLicenseAsset(a.type)), ...(fleet?.licenses || [])];
 
-    // Regla PELA / Deriva
     if (gcCode === "PELA" || isAdrift) {
       const hasNonNFT = allShips.some(s => s.is_nft === false || !s.is_nft);
       if (!hasNonNFT) {
@@ -521,13 +553,25 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     }
   };
 
+  // ─── RECLAMO DE RECOMPENSAS + ACTUALIZACIÓN DE BILLETERA Y PLANETA ───
   const handleClaimExpeditionRewards = async (exp: Expedition) => {
     setClaimingExpeditionId(exp.id);
+
+    // 1. Calcular recursos reales según el tiempo transcurrido
+    const launchMs = new Date(exp.launch_time).getTime();
+    const returnMs = new Date(exp.estimated_return_time).getTime();
+    const totalMs = Math.max(1000, returnMs - launchMs);
+    const elapsedMs = Math.min(totalMs, Math.max(0, now - launchMs));
+    const elapsedHours = elapsedMs / (3600 * 1000);
+
+    const minedMetal = Math.max(500, Math.floor(elapsedHours * 4500));
+    const minedCrystal = Math.max(250, Math.floor(elapsedHours * 2200));
+
     const drop: MiningDrop = {
-      name: "BLUEPRINT DE REFUERZO",
+      name: `METAL: +${minedMetal.toLocaleString()} | CRISTAL: +${minedCrystal.toLocaleString()}`,
       amount: 1,
       rarity: "EPIC",
-      icon: "📄"
+      icon: "💎"
     };
     setCurrentRewardDrop(drop);
     setIsRewardSummaryOpen(true);
@@ -537,20 +581,63 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
       const userId = user?.id || '9abc737e-9c3d-4349-a976-59af24f51f4d';
 
       if (isValidUUID(exp.id)) {
+        // A. Marcar expedición como CLAIMED
         await supabase
           .from('active_expeditions')
           .update({ status: 'CLAIMED' })
           .eq('id', exp.id);
 
+        // B. Insertar en historial de expediciones completadas
         await supabase.from('expedition_history').insert({
           user_id: userId,
           galaxy_cluster: exp.galaxy_cluster || 'PELA',
           completed_at: new Date().toISOString()
         });
+
+        // C. ACTUALIZAR LA BILLETERA DE RECURSOS EN USER_PROFILES
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('metal, crystal')
+          .eq('id', userId)
+          .single();
+
+        if (profile) {
+          const currentMetal = parseFloat(profile.metal || 0);
+          const currentCrystal = parseFloat(profile.crystal || 0);
+
+          await supabase
+            .from('user_profiles')
+            .update({
+              metal: currentMetal + minedMetal,
+              crystal: currentCrystal + minedCrystal,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', userId);
+        }
+
+        // D. REGISTRAR PLANETA DESCUBIERTO EN BD
+        const newStarId = isValidUUID(exp.id) ? exp.id : crypto.randomUUID();
+        const planetName = exp.sector_name || "NUEVO PLANETA EXPLORADO";
+
+        await supabase.from('user_discovered_stars').insert({
+          star_id: newStarId,
+          discoverer_id: userId,
+          star_name: planetName,
+          sector_coordinates: `${exp.galaxy_cluster || 'PELA'}:${exp.star_cluster || 'SC1'}`,
+          resource_richness: { metal: minedMetal, crystal: minedCrystal },
+          discovered_at: new Date().toISOString()
+        });
+
+        await supabase.from('user_locations').insert({
+          user_id: userId,
+          location_id: newStarId,
+          is_discovered: true,
+          created_at: new Date().toISOString()
+        });
       }
 
       if (triggerNotification) {
-        triggerNotification(`⛏️ RECOMPENSAS REGISTRADAS`);
+        triggerNotification(`✅ BILLETERA ACTUALIZADA Y PLANETA ${exp.sector_name.toUpperCase()} REGISTRADO`);
       }
 
       syncDatabaseData();
@@ -619,7 +706,9 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
       <div className="w-full max-w-7xl mx-auto bg-[#080b0e] border border-cyan-500/30 p-5 rounded-2xl shadow-2xl relative overflow-hidden font-mono text-left select-none flex flex-col gap-4">
         <div className="w-full bg-[#05070a] border border-cyan-500/30 p-3.5 rounded-xl flex justify-between items-center shrink-0">
           <div className="flex items-center gap-2.5">
-            <h1 className="text-sm font-black text-white uppercase tracking-widest">EXPEDITIONS IN FLIGHT</h1>
+            <h1 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+              <Radio className="w-4 h-4 text-cyan-400 animate-pulse" /> EXPEDITIONS IN FLIGHT
+            </h1>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -666,27 +755,96 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 NO HAY OPERACIONES EN CURSO REGISTRADAS EN ESTE SECTOR
               </div>
             ) : (
-              getFilteredFlights().map((exp) => (
-                <div key={exp.id} className="p-3.5 rounded-xl border border-cyan-500/40 bg-[#050910] shadow-lg flex flex-col justify-between gap-2.5">
-                  <div className="flex justify-between items-start">
-                    <span className="text-[10.5px] font-black text-white uppercase truncate">{exp.fleet_name}</span>
-                    <span className="text-[7.5px] text-zinc-500 font-mono">{exp.progress && exp.progress >= 100 ? 'COMPLETADO' : 'EN VUELO'}</span>
-                  </div>
-                  <span className="text-[9px] text-cyan-300 font-bold uppercase">{exp.galaxy_cluster} / {exp.sector_name}</span>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[7.5px] text-zinc-400">
-                      <span>PROGRESO</span>
-                      <span className="text-cyan-400 font-bold">{exp.progress || 0}%</span>
+              getFilteredFlights().map((exp) => {
+                const launchMs = new Date(exp.launch_time).getTime();
+                const returnMs = new Date(exp.estimated_return_time).getTime();
+                const totalDurationMs = Math.max(1000, returnMs - launchMs);
+                const elapsedMs = Math.max(0, now - launchMs);
+                const remainingMs = Math.max(0, returnMs - now);
+                
+                const progressPct = Math.min(100, Math.max(0, (elapsedMs / totalDurationMs) * 100));
+
+                const elapsedHours = elapsedMs / (3600 * 1000);
+                const minedMetal = Math.max(500, Math.floor(elapsedHours * 4500));
+                const minedCrystal = Math.max(250, Math.floor(elapsedHours * 2200));
+
+                const logsForExp = expeditionLogs[exp.id] || [];
+
+                return (
+                  <div key={exp.id} className="p-3.5 rounded-xl border border-cyan-500/40 bg-[#050910] shadow-lg flex flex-col justify-between gap-2.5 relative">
+                    <div className="flex justify-between items-start">
+                      <div className="flex flex-col">
+                        <span className="text-[10.5px] font-black text-white uppercase truncate">{exp.fleet_name}</span>
+                        <span className="text-[8px] text-cyan-400 font-bold uppercase">{exp.galaxy_cluster} / {exp.sector_name}</span>
+                      </div>
+                      <span className={`text-[7.5px] font-mono px-2 py-0.5 rounded font-black border ${
+                        remainingMs === 0 ? 'bg-emerald-950 text-emerald-400 border-emerald-800' : 'bg-amber-950 text-amber-400 border-amber-800 animate-pulse'
+                      }`}>
+                        {remainingMs === 0 ? 'COMPLETADO' : 'EN VUELO'}
+                      </span>
                     </div>
-                    <div className="w-full h-1.5 bg-neutral-900 rounded-full overflow-hidden p-0.5 border border-cyan-950">
-                      <div className="h-full bg-cyan-400 rounded-full transition-all duration-300" style={{ width: `${exp.progress || 0}%` }} />
+
+                    {/* TIEMPO QUE LLEVA Y TIEMPO QUE FALTA */}
+                    <div className="grid grid-cols-2 gap-2 bg-black/60 p-2 rounded-lg border border-cyan-950 text-[8px]">
+                      <div className="flex flex-col">
+                        <span className="text-zinc-500 uppercase flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5 text-cyan-400" /> Tiempo Transcurrido:
+                        </span>
+                        <span className="text-cyan-300 font-bold font-mono">{formatDuration(elapsedMs)}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-zinc-500 uppercase flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5 text-amber-400" /> Tiempo Restante:
+                        </span>
+                        <span className="text-amber-300 font-bold font-mono">
+                          {remainingMs > 0 ? formatDuration(remainingMs) : '00h 00m 00s'}
+                        </span>
+                      </div>
                     </div>
+
+                    {/* RECURSOS ACUMULADOS EN TIEMPO REAL */}
+                    <div className="bg-[#020508] p-2 rounded-lg border border-cyan-950 flex justify-between items-center text-[8px]">
+                      <span className="text-zinc-400 uppercase flex items-center gap-1 font-bold">
+                        <Pickaxe className="w-3 h-3 text-amber-400" /> Extracción Acumulada:
+                      </span>
+                      <div className="flex gap-2 font-mono font-bold">
+                        <span className="text-zinc-300">Metal: <span className="text-cyan-300">+{minedMetal.toLocaleString()}</span></span>
+                        <span className="text-zinc-300">Cristal: <span className="text-purple-300">+{minedCrystal.toLocaleString()}</span></span>
+                      </div>
+                    </div>
+
+                    {/* EVENTOS REALES DE EXPEDICIÓN */}
+                    <div className="p-2 bg-black/40 border border-cyan-950 rounded-lg text-[7.5px] space-y-1">
+                      <span className="text-cyan-400 font-bold uppercase tracking-wider block">EVENTOS REGISTRADOS EN MISIÓN:</span>
+                      {logsForExp.length === 0 ? (
+                        <p className="text-zinc-600 uppercase">Sin anomalías ni eventos críticos reportados.</p>
+                      ) : (
+                        logsForExp.map((log) => (
+                          <div key={log.id} className="flex justify-between items-center text-zinc-300">
+                            <span className="truncate max-w-[220px]">• {log.title || log.message}</span>
+                            <span className="text-amber-400 font-mono">{log.damage_sustained ? `-${log.damage_sustained} HP` : 'OK'}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* BARRA DE PROGRESO */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[7.5px] text-zinc-400">
+                        <span>PROGRESO DE TELEMETRÍA</span>
+                        <span className="text-cyan-400 font-bold">{progressPct.toFixed(1)}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-neutral-900 rounded-full overflow-hidden p-0.5 border border-cyan-950">
+                        <div className="h-full bg-cyan-400 rounded-full transition-all duration-300" style={{ width: `${progressPct}%` }} />
+                      </div>
+                    </div>
+
+                    <button onClick={() => handleClaimExpeditionRewards(exp)} className="w-full py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-[9px] uppercase rounded-lg shadow cursor-pointer">
+                      CLAIM REWARDS
+                    </button>
                   </div>
-                  <button onClick={() => handleClaimExpeditionRewards(exp)} className="w-full py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-[9px] uppercase rounded-lg shadow cursor-pointer">
-                    CLAIM REWARDS
-                  </button>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -837,7 +995,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
         </div>
       ) : (
-        /* VISTA 2: DISPATCH PANEL CON INDICADORES EN TIEMPO REAL */
+        /* VISTA 2: DISPATCH PANEL */
         <div className="w-full flex-1 flex flex-col md:flex-row gap-3.5 overflow-hidden h-[480px]">
           <div className="w-full md:w-[260px] border border-cyan-500/20 bg-[#05070a] rounded-xl shrink-0 p-3 flex flex-col justify-between h-full">
             <div className="flex flex-col gap-1">
@@ -921,7 +1079,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               </div>
             </div>
 
-            {/* BARRA DE DIAGNÓSTICO EN TIEMPO REAL */}
+            {/* DIAGNÓSTICO EN TIEMPO REAL */}
             <div className="p-2 bg-black/60 border border-cyan-950 rounded-lg flex flex-wrap gap-3 items-center text-[8px] font-mono shrink-0">
               <span className="text-zinc-500 font-bold uppercase border-r border-cyan-950 pr-2">COMPONENTES {currentGC}:</span>
               

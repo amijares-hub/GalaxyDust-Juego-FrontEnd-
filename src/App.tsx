@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthView } from './components/AuthView';
 import { Homepage } from './pages/Homepage';
 import { RefreshCw } from 'lucide-react';
+import { LandscapeGuard } from './components/ui/LandscapeGuard';
 
 function AppContent() {
   const { user, screen, logout } = useAuth();
@@ -41,8 +42,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <LandscapeGuard>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </LandscapeGuard>
   );
 }
