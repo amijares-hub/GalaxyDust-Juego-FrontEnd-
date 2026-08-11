@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Eye, Target, CheckCircle2, Clock,
-  Settings, X, Rocket, Layers, Cpu, Bot, Globe, Activity
+  Settings, X, Rocket, Layers, Cpu, Bot, Globe, Activity, Bell
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ExpeditionsView } from '../components/ExpeditionsView';
@@ -363,10 +363,25 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         </button>
 
         {/* 2. NOTIFICACIONES */}
-        <HeaderNotificationBell 
-          onClick={() => { setActiveTab("home"); setActiveWindow("notifications"); }} 
-          isActive={activeWindow === "notifications"} 
-        />
+        <button
+          onClick={() => { setActiveTab("home"); setActiveWindow("notifications"); }}
+          className={`relative p-2.5 rounded-xl border backdrop-blur-md transition-all cursor-pointer shadow-lg group ${
+            activeWindow === "notifications"
+              ? "bg-cyan-950/90 text-cyan-300 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.5)] scale-105"
+              : "bg-black/80 text-cyan-400 border-cyan-500/40 hover:border-cyan-400 hover:bg-cyan-950/80 hover:scale-110"
+          }`}
+          title="Notificaciones"
+        >
+          <Bell className="w-5 h-5 text-cyan-400" />
+          {unreadNotifCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white font-mono text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-black">
+              {unreadNotifCount}
+            </span>
+          )}
+          <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center bg-black/90 border border-cyan-500/60 text-cyan-300 text-[8px] font-mono font-bold uppercase px-2 py-1 rounded shadow-2xl whitespace-nowrap pointer-events-none">
+            NOTIFICACIONES
+          </div>
+        </button>
 
         {/* 3. SETTINGS */}
         <button
