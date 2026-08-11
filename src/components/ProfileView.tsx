@@ -1,745 +1,653 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
 import {
-  User,
-  Shield,
-  Swords,
-  Award,
-  Compass,
-  Camera,
-  Eye,
-  EyeOff,
-  Layers,
-  Cpu,
-  Bot,
-  Rocket,
-  ShoppingBag,
-  TrendingUp,
-  Gavel,
-  History,
-  CheckCircle2,
-  Search
+  User, ShieldCheck, Zap, Swords, Coins, Database, Compass,
+  MapPin, BarChart2, CheckCircle2, Lock, ArrowLeft, Layers, Box, Sparkles, X, Edit3, Award
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface ProfileViewProps {
-  onBack: () => void;
+  onBack?: () => void;
   triggerNotification?: (text: string, e?: any) => void;
+  onProfileUpdate?: (updatedFields: { avatar_url?: string; badge_name?: string; badge_image?: string }) => void;
 }
 
-type ProfileTab = 'OVERVIEW' | 'PVP_PVE' | 'ECONOMY' | 'ACHIEVEMENTS';
-type EconomyFilter = 'TODOS' | 'COMPRAS' | 'VENTAS' | 'SUBASTADO';
-type AuctionSubFilter = 'TODOS' | 'COMPRA' | 'VENTA';
+// 🌐 LISTA DE AVATARES HABILITADOS POR EL JUEGO
+const GAME_AVATARS = [
+  "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Avatares/1.png",
+  "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Avatares/2.png",
+  "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Avatares/3.png",
+  "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Avatares/4.png",
+  "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=300",
+  "https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=300",
+  "https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=300",
+  "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=300"
+];
 
-export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotification }) => {
-  const [activeTab, setActiveTab] = useState<ProfileTab>('OVERVIEW');
+// 🎖️ CATÁLOGO DE INSIGNIAS HABILITADAS POR EL JUEGO
+const GAME_BADGES = [
+  {
+    id: "badge_1",
+    name: "INSIGNIA SUPREMA",
+    image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600"
+  },
+  {
+    id: "badge_2",
+    name: "COMANDANTE DE SECTOR",
+    image: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=600"
+  },
+  {
+    id: "badge_3",
+    name: "VANGUARDIA GALÁCTICA",
+    image: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=600"
+  },
+  {
+    id: "badge_4",
+    name: "ALIANZA DE LA CORONA",
+    image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=600"
+  },
+  {
+    id: "badge_5",
+    name: "NEXUS CÓSMICO",
+    image: "https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=600"
+  },
+  {
+    id: "badge_6",
+    name: "GUARDIÁN DEL VACÍO",
+    image: "https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=600"
+  }
+];
+
+export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotification, onProfileUpdate }) => {
+  const [activeTab, setActiveTab] = useState<'STATS' | 'PVP-PVE' | 'ECONOMY' | 'ACHIEVEMENTS'>('STATS');
   const [loading, setLoading] = useState(true);
-  const [revealCoordinates, setRevealCoordinates] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [isBadgeModalOpen, setIsBadgeModalOpen] = useState(false);
 
-  // Filtros y Búsqueda de Log Económico
-  const [economyFilter, setEconomyFilter] = useState<EconomyFilter>('TODOS');
-  const [auctionSubFilter, setAuctionSubFilter] = useState<AuctionSubFilter>('TODOS');
-  const [economySearch, setEconomySearch] = useState<string>('');
-
-  // Estados del Piloto
-  const [profileData, setProfileData] = useState({
-    username: 'AMIJARES',
-    level: 27,
-    rankTitle: 'COMANDANTE IMPERIAL',
-    faction: 'ALACRAN',
-    allianceName: 'SIN ALIANZA',
-    allianceRole: 'LÍDER DE ALIANZA',
-    currentEP: 48500,
-    maxEP: 100000,
-    powerScore: 156420,
-    totalAssetsCount: 148,
-    activeStars: 5,
-    expeditionsCount: 142,
-    coordinates: 'GC-01 > GALAXY-04 > SC-02 > SYSTEM-09 > PLANET-X',
-    winRate: 68,
-    totalCombats: 85,
-    wins: 58,
-    losses: 27,
-    kdRatio: 2.15,
-    mostUsedShipName: 'PHANTOM MK-IV',
-    mostUsedShipImg: 'https://images.unsplash.com/photo-1541185933-ef5d8ed016c2?w=500&auto=format&fit=crop&q=80',
-    avatarUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=400',
-    
-    // Descubrimientos Galácticos
-    discoveries: {
-      gc: { discovered: 1, total: 1, pct: 100 },
-      galaxies: { discovered: 4, total: 5, pct: 80 },
-      starClusters: { discovered: 12, total: 20, pct: 60 },
-      starSystems: { discovered: 35, total: 100, pct: 35 },
-      planets: { discovered: 90, total: 500, pct: 18 }
-    },
-
-    // Desglose de Assets por Categoría
-    assetsBreakdown: [
-      { id: 'ships', label: 'NAVES', count: 42, icon: Rocket, color: 'text-cyan-400' },
-      { id: 'structures', label: 'ESTRUCTURAS', count: 28, icon: Layers, color: 'text-emerald-400' },
-      { id: 'tech', label: 'TECNOLOGÍAS', count: 54, icon: Cpu, color: 'text-purple-400' },
-      { id: 'astrobots', label: 'ASTROBOTS', count: 24, icon: Bot, color: 'text-amber-400' }
-    ],
-
-    // Métrica de Economía / Marketplace
-    economyMetrics: {
-      totalPurchases: '28 COMPRAS',
-      totalPurchasesVal: '42,500 GD',
-      totalSales: '19 VENTAS',
-      totalSalesVal: '89,200 GD',
-      successfulAuctions: '14 ÉXITOS',
-      registeredAuctions: '18 SUBASTAS'
-    },
-
-    // Log de Actividad Marketplace
-    marketplaceLogs: [
-      { id: 'TX-901', type: 'COMPRA', asset: 'PACK ACELERADOR DE 8H', commander: 'MERCADO IMPERIAL', amount: '-1,500 GD', date: 'HACE 1 HORA', status: 'COMPLETADO', isAuction: false },
-      { id: 'TX-884', type: 'VENTA', asset: 'NAVE DESTROYER CLASS', commander: 'PILOTO_VANGUARD', amount: '+15,000 GD', date: 'HACE 3 HORAS', status: 'COMPLETADO', isAuction: false },
-      { id: 'TX-712', type: 'SUBASTA ÉXITO', asset: 'BLUEPRINT CHRONO-IMPERATOR', commander: 'COMANDANTE_KRONOS', amount: '+28,500 GD', date: 'HACE 1 DÍA', status: 'CERRADO', isAuction: true, auctionType: 'VENTA' },
-      { id: 'TX-605', type: 'SUBASTA REGISTRADA', asset: 'NÚCLEO INFINITO NIVEL 4', commander: 'SÍNDICO_PRO', amount: '20,000 GD', date: 'HACE 2 DÍAS', status: 'EN CURSO', isAuction: true, auctionType: 'VENTA' },
-      { id: 'TX-519', type: 'SUBASTA COMPRA', asset: 'BLUEPRINT TOX-SYNDICATE', commander: 'PILOTO_AETHER', amount: '-250 PH', date: 'HACE 3 DÍAS', status: 'COMPLETADO', isAuction: true, auctionType: 'COMPRA' }
-    ]
+  // ─── ESTADOS DE DATOS REALES DE SUPABASE ───
+  const [profileData, setProfileData] = useState<any>({
+    username: 'COMANDANTE',
+    avatar_url: '',
+    level: 1,
+    ep: 0,
+    max_ep: 1000,
+    power_score: 0,
+    metal: 0,
+    crystal: 0,
+    deuterium: 0,
+    dark_matter: 0,
+    gd_coin: 0,
+    quantum_credit: 0,
+    phantom_coin: 0,
+    badge_name: 'INSIGNIA SUPREMA',
+    badge_image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600',
+    created_at: ''
   });
 
-  // Carga de datos reales desde Supabase
-  useEffect(() => {
-    async function loadProfile() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+  const [expeditionStats, setExpeditionStats] = useState({
+    completed: 0,
+    active: 0,
+    historyByCluster: {} as Record<string, number>
+  });
 
-        const { data: dbProfile } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
+  const [assetCounts, setAssetStats] = useState({
+    ships: 0,
+    tools: 0,
+    fleets: 0,
+    discoveredStars: 0
+  });
 
-        if (dbProfile) {
-          setProfileData(prev => ({
-            ...prev,
-            username: dbProfile.name || user.email?.split('@')[0].toUpperCase() || 'AMIJARES',
-            powerScore: parseFloat(dbProfile.power_score || prev.powerScore),
-            avatarUrl: dbProfile.avatar_url || prev.avatarUrl,
-            allianceName: dbProfile.alliance_name || prev.allianceName,
-            allianceRole: dbProfile.alliance_role || prev.allianceRole
-          }));
-        }
-      } catch (err) {
-        console.error('Error al cargar perfil:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadProfile();
-  }, []);
+  const [battleLogs, setBattleLogs] = useState<any[]>([]);
 
-  // Handler optimizado para subida de avatar a Supabase Storage con upsert y cache-buster
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      if (triggerNotification) triggerNotification("⚠️ EL ARCHIVO EXCEDE 5MB");
-      return;
-    }
-
+  // ─── CONSULTA DE DATOS REALES DESDE SUPABASE ───
+  const fetchRealUserData = async () => {
+    setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
+      const userId = user?.id || '9abc737e-9c3d-4349-a976-59af24f51f4d';
 
-      const fileExt = file.name.split('.').pop() || 'png';
-      const filePath = `${user.id}/avatar.${fileExt}`;
-
-      // 1. Subida directa con upsert: true (sobrescribe automáticamente)
-      const { error: uploadError } = await supabase
-        .storage
-        .from('avatars')
-        .upload(filePath, file, { 
-          upsert: true, 
-          cacheControl: '0' 
-        });
-
-      if (uploadError) throw uploadError;
-
-      // 2. Obtener la URL pública de la imagen
-      const { data: { publicUrl } } = supabase
-        .storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      // Cache-buster para forzar actualización inmediata en la interfaz
-      const updatedAvatarUrl = `${publicUrl}?t=${Date.now()}`;
-
-      // 3. Actualizar user_profiles en la base de datos
-      const { error: updateError } = await supabase
+      // 1. Cargar Perfil de Usuario
+      const { data: profile } = await supabase
         .from('user_profiles')
-        .update({ avatar_url: updatedAvatarUrl })
-        .eq('user_id', user.id);
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
 
-      if (updateError) throw updateError;
+      if (profile) {
+        setProfileData({
+          username: profile.username || profile.name || user?.email?.split('@')[0] || 'PILOTO IMPERIAL',
+          avatar_url: profile.avatar_url || profile.avatarUrl || GAME_AVATARS[0],
+          level: profile.level || 1,
+          ep: profile.exp_points || profile.ep || 0,
+          max_ep: (profile.level || 1) * 1000,
+          power_score: parseFloat(profile.power_score || 0),
+          metal: parseFloat(profile.metal || 0),
+          crystal: parseFloat(profile.crystal || 0),
+          deuterium: parseFloat(profile.deuterium || 0),
+          dark_matter: parseFloat(profile.dark_matter || 0),
+          gd_coin: parseFloat(profile.gd_coin || 0),
+          quantum_credit: parseFloat(profile.quantum_credit || 0),
+          phantom_coin: parseFloat(profile.phantom_coin || 0),
+          badge_name: profile.badge_name || GAME_BADGES[0].name,
+          badge_image: profile.badge_image || GAME_BADGES[0].image,
+          created_at: profile.created_at || new Date().toISOString()
+        });
+      }
 
-      // 4. Actualizar estado local
-      setProfileData(prev => ({ ...prev, avatarUrl: updatedAvatarUrl }));
+      // 2. Cargar Estadísticas de Expediciones
+      const { data: historyRows, count: completedCount } = await supabase
+        .from('expedition_history')
+        .select('galaxy_cluster', { count: 'exact' })
+        .eq('user_id', userId);
 
-      if (triggerNotification) triggerNotification("📷 AVATAR ACTUALIZADO Y GUARDADO EN LA BASE DE DATOS");
+      const { count: activeCount } = await supabase
+        .from('active_expeditions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('status', 'LAUNCHED');
 
-    } catch (err: any) {
-      console.error("Error al procesar el avatar:", err);
-      const errorMsg = err?.message || err?.error_description || "Error en el servidor de Storage";
-      if (triggerNotification) triggerNotification(`❌ ERROR: ${errorMsg}`);
+      const clusterMap: Record<string, number> = {};
+      (historyRows || []).forEach((row: any) => {
+        const gc = row.galaxy_cluster || 'PELA';
+        clusterMap[gc] = (clusterMap[gc] || 0) + 1;
+      });
+
+      setExpeditionStats({
+        completed: completedCount || 0,
+        active: activeCount || 0,
+        historyByCluster: clusterMap
+      });
+
+      // 3. Cargar Activos
+      const { count: shipsCount } = await supabase
+        .from('user_ships')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
+      const { count: toolsCount } = await supabase
+        .from('user_tools')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
+      const { count: fleetsCount } = await supabase
+        .from('fleets')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
+      const { count: starsCount } = await supabase
+        .from('user_discovered_stars')
+        .select('id', { count: 'exact', head: true })
+        .eq('discoverer_id', userId);
+
+      setAssetStats({
+        ships: shipsCount || 0,
+        tools: toolsCount || 0,
+        fleets: fleetsCount || 0,
+        discoveredStars: starsCount || 0
+      });
+
+      // 4. Logs
+      const { data: logs } = await supabase
+        .from('expedition_logs')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (logs) {
+        setBattleLogs(logs);
+      }
+
+    } catch (err) {
+      console.error("Error al cargar perfil real:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Lógica de Filtrado del Log de Transacciones
-  const getFilteredLogs = () => {
-    return profileData.marketplaceLogs.filter((log) => {
-      if (economyFilter === 'COMPRAS' && (log.type !== 'COMPRA' || log.isAuction)) return false;
-      if (economyFilter === 'VENTAS' && (log.type !== 'VENTA' || log.isAuction)) return false;
-      if (economyFilter === 'SUBASTADO') {
-        if (!log.isAuction) return false;
-        if (auctionSubFilter === 'COMPRA' && log.auctionType !== 'COMPRA') return false;
-        if (auctionSubFilter === 'VENTA' && log.auctionType !== 'VENTA') return false;
+  useEffect(() => {
+    fetchRealUserData();
+  }, []);
+
+  // ─── CAMBIAR AVATAR INSTANTÁNEAMENTE Y PERSISTIR EN SUPABASE ───
+  const handleSelectAvatar = async (avatarUrl: string) => {
+    // 1. Actualización Inmediata en el estado local de ProfileView
+    setProfileData((prev: any) => ({ ...prev, avatar_url: avatarUrl }));
+    setIsAvatarModalOpen(false);
+
+    // 2. Notificar inmediatamente a Homepage para actualizar el HEADER en tiempo real
+    if (onProfileUpdate) {
+      onProfileUpdate({ avatar_url: avatarUrl });
+    }
+
+    // 3. Persistir en la base de datos Supabase en segundo plano
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('user_profiles')
+          .update({ avatar_url: avatarUrl })
+          .eq('id', user.id);
       }
 
-      if (economySearch.trim() !== '') {
-        const query = economySearch.toLowerCase();
-        const matchesAsset = log.asset.toLowerCase().includes(query);
-        const matchesCommander = log.commander.toLowerCase().includes(query);
-        if (!matchesAsset && !matchesCommander) return false;
+      if (triggerNotification) {
+        triggerNotification("✅ AVATAR CAMBIADO Y GUARDADO");
       }
-
-      return true;
-    });
+    } catch (err) {
+      console.error("Error al guardar avatar en Supabase:", err);
+    }
   };
 
+  // ─── CAMBIAR INSIGNIA INSTANTÁNEAMENTE Y PERSISTIR EN SUPABASE ───
+  const handleSelectBadge = async (badge: { name: string; image: string }) => {
+    // 1. Actualización Inmediata en el estado local de ProfileView
+    setProfileData((prev: any) => ({
+      ...prev,
+      badge_name: badge.name,
+      badge_image: badge.image
+    }));
+    setIsBadgeModalOpen(false);
+
+    // 2. Notificar a Homepage si requiere actualización de estado global
+    if (onProfileUpdate) {
+      onProfileUpdate({ badge_name: badge.name, badge_image: badge.image });
+    }
+
+    // 3. Persistir en la base de datos Supabase
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('user_profiles')
+          .update({
+            badge_name: badge.name,
+            badge_image: badge.image
+          })
+          .eq('id', user.id);
+      }
+
+      if (triggerNotification) {
+        triggerNotification(`✅ INSIGNIA CAMBIADA Y GUARDADA: ${badge.name}`);
+      }
+    } catch (err) {
+      console.error("Error al guardar la insignia en Supabase:", err);
+    }
+  };
+
+  const epPercentage = Math.min(100, Math.max(0, (profileData.ep / profileData.max_ep) * 100));
+
+  const realAchievements = [
+    { title: "BAUTISMO DE VUELO", desc: "Completar la primera expedición táctica", done: expeditionStats.completed > 0 },
+    { title: "COMANDANTE DE FLOTA", desc: "Poseer al menos 5 naves en el hangar", done: assetCounts.ships >= 5 },
+    { title: "CARTÓGRAFO ESTELAR", desc: "Descubrir al menos 1 nuevo sector/estrella", done: assetCounts.discoveredStars > 0 },
+    { title: "MINERO IMPERIAL", desc: "Extraer más de 10,000 unidades de Metal", done: profileData.metal >= 10000 },
+    { title: "PODER ABRUMADOR", desc: "Superar los 100,000 puntos de Poder Total", done: profileData.power_score >= 100000 }
+  ];
+
   return (
-    <div className="w-full h-full bg-black text-white font-sans flex flex-col justify-start items-center p-4 md:p-6 select-none overflow-y-auto">
+    <div className="w-full max-w-7xl mx-auto bg-[#080b0e] border border-cyan-500/30 p-4 sm:p-6 rounded-2xl shadow-2xl relative font-mono text-left select-none flex flex-col gap-4 text-white">
       
-      {/* Input oculto para subida de imagen */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleAvatarUpload}
-        accept="image/*"
-        className="hidden"
-      />
-
-      {/* ─── ENCABEZADO SUPERIOR DEL PERFIL ─── */}
-      <div className="w-full max-w-7xl flex flex-col gap-4 mb-4">
-        
-        {/* Banner de Identidad del Comandante */}
-        <div className="w-full bg-[#080a0e] border border-cyan-500/30 p-4 rounded-lg flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-md relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-2 h-full bg-red-600 shadow-[0_0_10px_#ef4444]" />
-
-          <div className="flex items-center gap-4 z-10">
-            {/* Avatar Interactivo con Subida de Imagen */}
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="relative w-16 h-16 rounded border-2 border-cyan-400 bg-neutral-900 overflow-hidden shrink-0 shadow-[0_0_15px_rgba(34,211,238,0.3)] cursor-pointer group"
-              title="Haz clic para cambiar tu foto de perfil"
+      {/* ─── BARRA SUPERIOR ─── */}
+      <div className="w-full bg-[#05070a] border border-cyan-500/30 p-3 rounded-xl flex justify-between items-center shrink-0">
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="p-1.5 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 rounded-lg transition-colors cursor-pointer"
+              title="Volver"
             >
-              <img src={profileData.avatarUrl} alt="Avatar" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-              
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-cyan-300">
-                <Camera className="w-4 h-4 mb-0.5" />
-                <span className="text-[6.5px] font-mono uppercase font-bold">SUBIR</span>
-              </div>
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
+          <div className="flex flex-col text-left">
+            <h1 className="text-sm font-black tracking-widest text-white uppercase flex items-center gap-2">
+              <User className="w-4 h-4 text-cyan-400" />
+              PERFIL DE COMANDO IMPERIAL
+            </h1>
+          </div>
+        </div>
+      </div>
 
-              <div className="absolute bottom-0 inset-x-0 bg-red-600/90 text-[8px] font-mono font-black text-center text-white py-0.5 uppercase z-10">
+      {/* ─── TARJETA PRINCIPAL DE PERFIL ─── */}
+      <div className="w-full bg-[#05070a] border border-cyan-500/30 p-4 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
+        <div className="flex items-center gap-4 w-full md:w-auto">
+          
+          {/* AVATAR CLICKABLE PARA CAMBIAR DENTRO DEL JUEGO */}
+          <div 
+            onClick={() => setIsAvatarModalOpen(true)}
+            className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-black border-2 border-cyan-400/80 hover:border-cyan-300 flex items-center justify-center overflow-hidden shrink-0 shadow-[0_0_15px_rgba(34,211,238,0.3)] cursor-pointer group transition-all"
+            title="Cambiar Avatar"
+          >
+            {profileData.avatar_url ? (
+              <img src={profileData.avatar_url} alt="Avatar" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+            ) : (
+              <User className="w-8 h-8 text-cyan-400" />
+            )}
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+              <Edit3 className="w-5 h-5 text-cyan-300" />
+            </div>
+          </div>
+
+          <div className="flex flex-col text-left gap-1.5">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-black text-white uppercase tracking-wider">
+                {profileData.username}
+              </h2>
+              <span className="text-[8px] font-black bg-cyan-950 border border-cyan-500/60 text-cyan-300 px-2 py-0.5 rounded uppercase">
                 LVL {profileData.level}
-              </div>
+              </span>
             </div>
 
-            {/* Nombre y Commander's Total Power */}
-            <div className="flex flex-col text-left">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-xl font-black tracking-widest text-white uppercase font-sans">
-                  {profileData.username}
-                </h1>
-                
-                <div className="px-2.5 py-1 bg-gradient-to-r from-amber-500/20 to-emerald-500/20 border border-amber-500/40 text-amber-300 text-[8.5px] font-mono font-black uppercase rounded flex items-center gap-1.5 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
-                  <span>COMMANDER'S TOTAL POWER:</span>
-                  <span className="text-emerald-400 font-extrabold">{profileData.powerScore.toLocaleString()} POW</span>
-                </div>
+            {/* BARRA DE EXPERIENCIA (EP) */}
+            <div className="w-full max-w-xs space-y-1">
+              <div className="flex justify-between text-[7.5px] text-zinc-400 font-mono">
+                <span>PUNTOS DE EXPERIENCIA (EP)</span>
+                <span className="text-cyan-400 font-bold">{profileData.ep} / {profileData.max_ep}</span>
               </div>
-
-              <p className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider mt-1">
-                {profileData.rankTitle} &nbsp;|&nbsp; <span className="text-cyan-400 font-bold">{profileData.allianceRole} - {profileData.allianceName}</span>
-              </p>
+              <div className="w-full h-1.5 bg-neutral-900 rounded-full overflow-hidden p-0.5 border border-cyan-950">
+                <div className="h-full bg-cyan-400 rounded-full transition-all duration-300" style={{ width: `${epPercentage}%` }} />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Solapas de Navegación del Perfil */}
-        <div className="w-full bg-[#05070a] border-b border-cyan-500/30 flex items-center gap-1 overflow-x-auto scrollbar-none font-mono text-[10px] uppercase font-bold tracking-widest">
-          {[
-            { id: 'OVERVIEW', label: 'OVERVIEW' },
-            { id: 'PVP_PVE', label: 'PVP / PVE' },
-            { id: 'ECONOMY', label: 'ECONOMY' },
-            { id: 'ACHIEVEMENTS', label: 'ACHIEVEMENTS' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as ProfileTab)}
-              className={`px-6 py-3 transition-all cursor-pointer border-b-2 flex items-center gap-2 whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'bg-cyan-950/40 border-cyan-400 text-cyan-300 shadow-[0_4px_12px_rgba(34,211,238,0.15)] font-black'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02]'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        {/* ─── TARJETA DE INSIGNIA REGISTRADA + BOTÓN AZUL "CAMBIAR" ─── */}
+        <div 
+          className="relative w-full md:w-64 h-16 rounded-xl border border-cyan-500/50 bg-cover bg-center overflow-hidden flex items-center justify-between p-3 shadow-lg shrink-0 group"
+          style={{ backgroundImage: `url('${profileData.badge_image}')` }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-black/90" />
+          
+          <span className="relative z-10 text-[10px] font-black text-cyan-300 uppercase tracking-widest truncate max-w-[140px] drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+            {profileData.badge_name}
+          </span>
+
+          {/* BOTÓN AZUL CAMBIAR */}
+          <button
+            onClick={() => setIsBadgeModalOpen(true)}
+            className="relative z-10 px-2.5 py-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 border border-cyan-400/80 text-white text-[8px] font-black tracking-widest uppercase rounded shadow-[0_0_8px_rgba(34,211,238,0.4)] active:scale-95 transition-all cursor-pointer"
+          >
+            CAMBIAR
+          </button>
         </div>
 
       </div>
 
-      {/* ─── CONTENIDO DINÁMICO ─── */}
-      <div className="w-full max-w-7xl flex-1">
-        <AnimatePresence mode="wait">
-          
-          {/* 🟢 SOLAPA 1: OVERVIEW */}
-          {activeTab === 'OVERVIEW' && (
-            <motion.div
-              key="tab-overview"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-              className="grid grid-cols-1 lg:grid-cols-12 gap-4"
-            >
-              
-              {/* 1. CAJA IZQUIERDA: RANK & PROGRESO EP */}
-              <div className="lg:col-span-4 bg-[#080a0e] border border-cyan-500/20 p-4 rounded flex flex-col justify-between text-left relative">
-                <div>
-                  <div className="text-[9px] font-mono text-cyan-400 font-black tracking-widest uppercase mb-3 border-b border-cyan-900/40 pb-1 flex justify-between">
-                    <span>RANK & PROGRESO EP</span>
-                    <span>LVL {profileData.level}</span>
-                  </div>
-
-                  <div className="flex flex-col items-center justify-center py-4 my-2 bg-black/40 border border-cyan-950 rounded">
-                    <div className="w-16 h-16 rounded-full border-2 border-dashed border-red-500/60 flex items-center justify-center bg-red-950/20 shadow-[0_0_15px_rgba(239,68,68,0.2)] mb-2">
-                      <span className="text-xl font-black font-sans text-red-400">{profileData.level}</span>
-                    </div>
-                    <span className="text-[11px] font-black text-white uppercase tracking-widest">{profileData.rankTitle}</span>
-                  </div>
-
-                  <div className="space-y-1 my-4 font-mono">
-                    <div className="flex justify-between text-[8.5px] uppercase text-zinc-400">
-                      <span>EXPERIENCIA DEL COMANDANTE</span>
-                      <span className="text-cyan-300 font-bold">{profileData.currentEP.toLocaleString()} / {profileData.maxEP.toLocaleString()}</span>
-                    </div>
-                    <div className="w-full h-2 bg-neutral-900 border border-cyan-900/50 rounded-full overflow-hidden p-0.5">
-                      <div className="h-full bg-gradient-to-r from-cyan-600 to-red-500 rounded-full" style={{ width: `${(profileData.currentEP / profileData.maxEP) * 100}%` }} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2.5 mt-4 font-mono text-[8.5px]">
-                    <span className="text-zinc-500 tracking-widest uppercase block font-bold border-b border-cyan-950 pb-1">DESCUBRIMIENTOS GALÁCTICOS</span>
-                    
-                    <div>
-                      <div className="flex justify-between text-zinc-300 mb-0.5">
-                        <span className="flex items-center gap-1 text-cyan-300 font-bold">GALACTIC CLUSTERS (GC)</span>
-                        <span className="text-cyan-400 font-bold">{profileData.discoveries.gc.pct}% ({profileData.discoveries.gc.discovered}/{profileData.discoveries.gc.total})</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-neutral-900 rounded overflow-hidden"><div className="h-full bg-cyan-400" style={{ width: `${profileData.discoveries.gc.pct}%` }} /></div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-zinc-300 mb-0.5">
-                        <span className="flex items-center gap-1 font-bold">GALAXIAS</span>
-                        <span className="text-cyan-400 font-bold">{profileData.discoveries.galaxies.pct}% ({profileData.discoveries.galaxies.discovered}/{profileData.discoveries.galaxies.total})</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-neutral-900 rounded overflow-hidden"><div className="h-full bg-cyan-500" style={{ width: `${profileData.discoveries.galaxies.pct}%` }} /></div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-zinc-300 mb-0.5">
-                        <span className="flex items-center gap-1 font-bold">STAR CLUSTERS</span>
-                        <span className="text-purple-400 font-bold">{profileData.discoveries.starClusters.pct}% ({profileData.discoveries.starClusters.discovered}/{profileData.discoveries.starClusters.total})</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-neutral-900 rounded overflow-hidden"><div className="h-full bg-purple-500" style={{ width: `${profileData.discoveries.starClusters.pct}%` }} /></div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-zinc-300 mb-0.5">
-                        <span className="flex items-center gap-1 font-bold">STAR SYSTEMS</span>
-                        <span className="text-amber-400 font-bold">{profileData.discoveries.starSystems.pct}% ({profileData.discoveries.starSystems.discovered}/{profileData.discoveries.starSystems.total})</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-neutral-900 rounded overflow-hidden"><div className="h-full bg-amber-500" style={{ width: `${profileData.discoveries.starSystems.pct}%` }} /></div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-zinc-300 mb-0.5">
-                        <span className="flex items-center gap-1 font-bold">PLANETAS</span>
-                        <span className="text-emerald-400 font-bold">{profileData.discoveries.planets.pct}% ({profileData.discoveries.planets.discovered}/{profileData.discoveries.planets.total})</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-neutral-900 rounded overflow-hidden"><div className="h-full bg-emerald-500" style={{ width: `${profileData.discoveries.planets.pct}%` }} /></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-cyan-950 font-mono text-[8px] text-zinc-500 text-left flex justify-between items-center">
-                  <div>
-                    <span className="text-cyan-400 font-bold block mb-0.5">COORDENADAS DE C.A.N:</span>
-                    <p className={`transition-all font-bold ${revealCoordinates ? 'text-zinc-200 blur-none' : 'text-zinc-600 blur-sm select-none'}`}>
-                      {profileData.coordinates}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setRevealCoordinates(!revealCoordinates)}
-                    className="px-2 py-1 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 rounded text-[7.5px] font-bold uppercase flex items-center gap-1 cursor-pointer transition-colors"
-                  >
-                    {revealCoordinates ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                    <span>{revealCoordinates ? 'OCULTAR' : 'REVELAR'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 2. CAJA CENTRAL: MÉTRICAS DE RENDIMIENTO */}
-              <div className="lg:col-span-5 bg-[#080a0e] border border-cyan-500/20 p-4 rounded flex flex-col justify-between text-left space-y-4">
-                <div>
-                  <div className="text-[9px] font-mono text-cyan-400 font-black tracking-widest uppercase mb-3 border-b border-cyan-900/40 pb-1 flex justify-between">
-                    <span>MÉTRICAS DE RENDIMIENTO</span>
-                    <span>OVERALL ASSETS</span>
-                  </div>
-
-                  <div className="text-center py-3 bg-black/40 border border-cyan-950 rounded relative">
-                    <span className="text-5xl font-black font-sans text-white tracking-tighter drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">
-                      {profileData.totalAssetsCount}
-                    </span>
-                    <p className="text-[8px] font-mono text-cyan-400 uppercase tracking-widest mt-1 font-bold">
-                      TOTAL DE ASSETS ACTUALES
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 my-3 font-mono">
-                    {profileData.assetsBreakdown.map((item) => {
-                      const IconComp = item.icon;
-                      return (
-                        <div key={item.id} className="bg-black/60 border border-cyan-950 p-2 rounded text-center flex flex-col items-center justify-center">
-                          <IconComp className={`w-4 h-4 mb-1 ${item.color}`} />
-                          <span className="text-[7px] text-zinc-500 uppercase block font-bold">{item.label}</span>
-                          <span className="text-xs font-black text-white mt-0.5">{item.count}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="flex items-center gap-4 bg-black/40 border border-cyan-950 p-3 rounded mb-3">
-                    <div className="relative w-14 h-14 shrink-0 flex items-center justify-center">
-                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                        <path className="text-neutral-800" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                        <path className="text-red-500" strokeDasharray={`${profileData.winRate}, 100`} strokeWidth="3.5" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      </svg>
-                      <span className="absolute text-[10px] font-black font-mono text-white">{profileData.winRate}%</span>
-                    </div>
-                    <div className="flex flex-col text-left font-mono text-[8.5px]">
-                      <span className="text-white font-bold uppercase">PORCENTAJE DE VICTORIAS EN COMBATE</span>
-                      <span className="text-zinc-400 mt-0.5">VICTORIAS: <strong className="text-emerald-400">{profileData.wins}</strong> &nbsp;|&nbsp; DERROTAS: <strong className="text-red-400">{profileData.losses}</strong></span>
-                      <span className="text-zinc-500 text-[7.5px] mt-1">COMBATES TOTALES: {profileData.totalCombats}</span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 text-center font-mono">
-                    <div className="bg-black/60 border border-cyan-950 p-2 rounded">
-                      <span className="text-[7.5px] text-zinc-500 uppercase block font-bold">K/D RATIO</span>
-                      <span className="text-sm font-bold text-white">{profileData.kdRatio}</span>
-                    </div>
-                    <div className="bg-black/60 border border-cyan-950 p-2 rounded">
-                      <span className="text-[7.5px] text-zinc-500 uppercase block font-bold">EXPEDICIONES</span>
-                      <span className="text-sm font-bold text-cyan-400">{profileData.expeditionsCount}</span>
-                    </div>
-                    <div className="bg-black/60 border border-cyan-950 p-2 rounded">
-                      <span className="text-[7.5px] text-zinc-500 uppercase block font-bold">ESTRELLAS DOM.</span>
-                      <span className="text-sm font-bold text-amber-400">{profileData.activeStars}</span>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-
-              {/* 3. CAJA DERECHA: NAVE MÁS USADA & DOG TAGS */}
-              <div className="lg:col-span-3 flex flex-col gap-4">
-                
-                <div className="bg-[#080a0e] border border-cyan-500/20 p-4 rounded flex flex-col items-center justify-between relative min-h-[220px] overflow-hidden group">
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent z-10" />
-                  <img
-                    src={profileData.mostUsedShipImg}
-                    alt={profileData.mostUsedShipName}
-                    className="absolute inset-0 w-full h-full object-cover brightness-75 group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="relative z-20 w-full flex justify-between items-center text-[7.5px] font-mono text-cyan-400 uppercase font-bold border-b border-cyan-500/30 pb-1">
-                    <span>NAVE MÁS USADA</span>
-                    <span className="text-amber-400 font-extrabold">FLAGSHIP</span>
-                  </div>
-                  <div className="relative z-20 mt-auto text-center font-mono">
-                    <span className="text-[9px] bg-black/90 border border-cyan-500/50 text-white px-2.5 py-1 rounded uppercase font-black tracking-widest shadow-md">
-                      {profileData.mostUsedShipName}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="bg-[#080a0e] border border-cyan-500/20 p-4 rounded text-left font-mono">
-                  <span className="text-[8.5px] text-cyan-400 font-bold uppercase tracking-widest block mb-2 border-b border-cyan-950 pb-1">
-                    INSIGNIAS & DOG TAGS
-                  </span>
-                  
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-black/60 border border-cyan-900/40 p-2 rounded flex flex-col items-center justify-center text-center">
-                      <Award className="w-6 h-6 text-amber-400 mb-1" />
-                      <span className="text-[7.5px] text-white font-bold uppercase">{profileData.faction} PRIMUS</span>
-                    </div>
-                    <div className="bg-black/60 border border-cyan-900/40 p-2 rounded flex flex-col items-center justify-center text-center">
-                      <Shield className="w-6 h-6 text-cyan-400 mb-1" />
-                      <span className="text-[7.5px] text-white font-bold uppercase">VANGUARD SHIELD</span>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-            </motion.div>
-          )}
-
-          {/* 🔴 SOLAPA 2: PVP / PVE */}
-          {activeTab === 'PVP_PVE' && (
-            <motion.div
-              key="tab-pvp"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="bg-[#080a0e] border border-cyan-500/20 p-6 rounded text-left font-mono space-y-4"
-            >
-              <h3 className="text-xs font-black text-cyan-400 uppercase tracking-widest border-b border-cyan-900/40 pb-2">
-                HISTORIAL DE COMBATES Y REGISTRO DE BATALLAS (PVP / PVE)
-              </h3>
-              
-              <div className="space-y-2">
-                {[
-                  { id: 'LOG-881', type: 'PVP', target: 'SECTOR ALPHA - STAR Y1', result: 'VICTORIA', date: 'HACE 2 Horas', loot: '+25K METAL' },
-                  { id: 'LOG-412', type: 'PVE', target: 'INCURSIÓN ANOMALÍA COLOIDAL', result: 'VICTORIA', date: 'HACE 5 Horas', loot: '+1 BLUEPRINT' },
-                  { id: 'LOG-109', type: 'PVP', target: 'DEFENSA DE ESTRELLA O-9', result: 'DERROTA', date: 'HACE 1 Día', loot: '-10K CRISTAL' }
-                ].map((log) => (
-                  <div key={log.id} className="p-3 bg-black/60 border border-cyan-950 rounded flex justify-between items-center text-[10px]">
-                    <div className="flex items-center gap-3">
-                      <span className={`px-2 py-0.5 rounded text-[8px] font-bold ${log.result === 'VICTORIA' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-red-950 text-red-400 border border-red-800'}`}>
-                        {log.result}
-                      </span>
-                      <span className="text-white font-bold">{log.target}</span>
-                    </div>
-                    <div className="flex items-center gap-4 text-zinc-400 text-[8.5px]">
-                      <span>{log.loot}</span>
-                      <span>{log.date}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {/* 🟡 SOLAPA 3: ECONOMY */}
-          {activeTab === 'ECONOMY' && (
-            <motion.div
-              key="tab-economy"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="bg-[#080a0e] border border-cyan-500/20 p-6 rounded text-left font-mono space-y-6"
-            >
-              <div className="flex justify-between items-center border-b border-cyan-900/40 pb-2">
-                <h3 className="text-xs font-black text-cyan-400 uppercase tracking-widest flex items-center gap-2">
-                  <ShoppingBag className="w-4 h-4 text-cyan-400" />
-                  RESUMEN FINANCIERO Y ACTIVIDAD EN MARKETPLACE
-                </h3>
-                <span className="text-[8px] text-zinc-500 uppercase">SINCRO CON INGAME MARKET</span>
-              </div>
-              
-              {/* 4 Cuadros Métricos de Economía */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
-                
-                <div className="bg-black/60 border border-cyan-950 p-4 rounded flex flex-col justify-between items-center relative overflow-hidden group hover:border-cyan-500/40 transition-colors">
-                  <div className="flex items-center gap-1.5 text-[8px] text-zinc-400 uppercase mb-2">
-                    <ShoppingBag className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>TOTAL DE COMPRAS</span>
-                  </div>
-                  <span className="text-lg font-black text-white">{profileData.economyMetrics.totalPurchases}</span>
-                  <span className="text-[8.5px] text-cyan-400 font-bold mt-1">{profileData.economyMetrics.totalPurchasesVal}</span>
-                </div>
-
-                <div className="bg-black/60 border border-cyan-950 p-4 rounded flex flex-col justify-between items-center relative overflow-hidden group hover:border-emerald-500/40 transition-colors">
-                  <div className="flex items-center gap-1.5 text-[8px] text-zinc-400 uppercase mb-2">
-                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>TOTAL DE VENTAS</span>
-                  </div>
-                  <span className="text-lg font-black text-white">{profileData.economyMetrics.totalSales}</span>
-                  <span className="text-[8.5px] text-emerald-400 font-bold mt-1">{profileData.economyMetrics.totalSalesVal}</span>
-                </div>
-
-                <div className="bg-black/60 border border-cyan-950 p-4 rounded flex flex-col justify-between items-center relative overflow-hidden group hover:border-amber-500/40 transition-colors">
-                  <div className="flex items-center gap-1.5 text-[8px] text-zinc-400 uppercase mb-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
-                    <span>SUBASTAS CON ÉXITO</span>
-                  </div>
-                  <span className="text-lg font-black text-white">{profileData.economyMetrics.successfulAuctions}</span>
-                  <span className="text-[8.5px] text-amber-400 font-bold mt-1">100% TRANSACCIONADO</span>
-                </div>
-
-                <div className="bg-black/60 border border-cyan-950 p-4 rounded flex flex-col justify-between items-center relative overflow-hidden group hover:border-purple-500/40 transition-colors">
-                  <div className="flex items-center gap-1.5 text-[8px] text-zinc-400 uppercase mb-2">
-                    <Gavel className="w-3.5 h-3.5 text-purple-400" />
-                    <span>SUBASTAS REGISTRADAS</span>
-                  </div>
-                  <span className="text-lg font-black text-white">{profileData.economyMetrics.registeredAuctions}</span>
-                  <span className="text-[8.5px] text-purple-400 font-bold mt-1">HISTORIAL JUGADOR</span>
-                </div>
-
-              </div>
-
-              {/* ─── LOG DE TRANSMISIONES CON FILTROS Y BUSCADOR ─── */}
-              <div className="space-y-3 pt-2">
-                
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-cyan-950 pb-2.5">
-                  
-                  <div className="flex flex-wrap items-center gap-2 md:gap-3">
-                    <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5 shrink-0">
-                      <History className="w-3.5 h-3.5 text-cyan-400" />
-                      LOG DE COMPRAS, VENTAS Y SUBASTAS REALIZADAS
-                    </span>
-
-                    <div className="flex items-center gap-1 bg-black/60 p-0.5 border border-cyan-950 rounded-lg">
-                      {(['TODOS', 'COMPRAS', 'VENTAS', 'SUBASTADO'] as EconomyFilter[]).map((tab) => (
-                        <button
-                          key={tab}
-                          onClick={() => setEconomyFilter(tab)}
-                          className={`px-2.5 py-1 text-[8px] font-mono font-bold uppercase rounded transition-colors cursor-pointer ${
-                            economyFilter === tab
-                              ? 'bg-cyan-950 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                              : 'text-zinc-500 hover:text-zinc-300'
-                          }`}
-                        >
-                          {tab}
-                        </button>
-                      ))}
-                    </div>
-
-                    {economyFilter === 'SUBASTADO' && (
-                      <div className="flex items-center gap-1 bg-purple-950/30 p-0.5 border border-purple-500/30 rounded-lg animate-fadeIn">
-                        <span className="text-[7.5px] text-purple-400 font-mono font-bold px-1.5">MODO:</span>
-                        {(['TODOS', 'COMPRA', 'VENTA'] as AuctionSubFilter[]).map((sub) => (
-                          <button
-                            key={sub}
-                            onClick={() => setAuctionSubFilter(sub)}
-                            className={`px-2 py-0.5 text-[7.5px] font-mono font-bold uppercase rounded transition-colors cursor-pointer ${
-                              auctionSubFilter === sub
-                                ? 'bg-purple-600 text-white'
-                                : 'text-purple-300 hover:text-white'
-                            }`}
-                          >
-                            {sub}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="relative w-full md:w-60 shrink-0">
-                    <Search className="absolute left-2.5 top-2 w-3 h-3 text-cyan-500" />
-                    <input
-                      type="text"
-                      placeholder="BUSCAR PILOTO O ASSET..."
-                      value={economySearch}
-                      onChange={(e) => setEconomySearch(e.target.value)}
-                      className="w-full bg-black/80 border border-cyan-950 hover:border-cyan-800 focus:border-cyan-500 rounded pl-8 pr-7 py-1.5 text-[8.5px] font-mono text-cyan-200 placeholder-zinc-600 outline-none uppercase transition-colors"
-                    />
-                    {economySearch && (
-                      <button
-                        onClick={() => setEconomySearch('')}
-                        className="absolute right-2 top-2 text-zinc-500 hover:text-white text-[9px] font-mono"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-
-                </div>
-
-                <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-cyan-950">
-                  {getFilteredLogs().length === 0 ? (
-                    <div className="p-8 text-center text-zinc-600 text-[9px] font-mono uppercase tracking-widest">
-                      NO SE ENCONTRARON REGISTROS QUE COINCIDAN CON LOS CRITERIOS
-                    </div>
-                  ) : (
-                    getFilteredLogs().map((log) => (
-                      <div key={log.id} className="p-3 bg-black/60 border border-cyan-950 hover:border-cyan-800 rounded flex justify-between items-center text-[9.5px] transition-colors">
-                        <div className="flex items-center gap-3">
-                          <span className={`px-2 py-0.5 rounded text-[8px] font-bold border ${
-                            log.type === 'COMPRA' ? 'bg-cyan-950 text-cyan-400 border-cyan-800' :
-                            log.type === 'VENTA' ? 'bg-emerald-950 text-emerald-400 border-emerald-800' :
-                            log.type === 'SUBASTA ÉXITO' ? 'bg-amber-950 text-amber-400 border-amber-800' :
-                            log.type === 'SUBASTA COMPRA' ? 'bg-purple-950 text-purple-300 border-purple-800' :
-                            'bg-purple-950 text-purple-400 border-purple-800'
-                          }`}>
-                            {log.type}
-                          </span>
-                          <div className="flex flex-col text-left">
-                            <span className="text-white font-bold uppercase">{log.asset}</span>
-                            <span className="text-[7.5px] text-cyan-500 font-mono">COMANDANTE: {log.commander}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-5 font-mono text-[8.5px]">
-                          <span className={`font-bold ${log.amount.startsWith('+') ? 'text-emerald-400' : log.amount.startsWith('-') ? 'text-red-400' : 'text-amber-300'}`}>
-                            {log.amount}
-                          </span>
-                          <span className="text-zinc-500">{log.date}</span>
-                          <span className="text-zinc-400 font-bold bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">{log.status}</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-              </div>
-
-            </motion.div>
-          )}
-
-          {/* 🟣 SOLAPA 4: ACHIEVEMENTS */}
-          {activeTab === 'ACHIEVEMENTS' && (
-            <motion.div
-              key="tab-achievements"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="bg-[#080a0e] border border-cyan-500/20 p-6 rounded text-left font-mono space-y-4"
-            >
-              <h3 className="text-xs font-black text-cyan-400 uppercase tracking-widest border-b border-cyan-900/40 pb-2">
-                LOGROS Y RECOMPENSAS LOGRADAS
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {[
-                  { title: 'PRIMER SALTO HIPERESPACIAL', desc: 'Completar la primera expedición', status: 'DESBLOQUEADO' },
-                  { title: 'DOMINADOR DE SECTORES', desc: 'Conquistar 5 estrellas activas', status: 'DESBLOQUEADO' },
-                  { title: 'SEÑOR DE LA GUERRA', desc: 'Destruir 50 naves enemigas', status: 'EN PROGRESO (35/50)' }
-                ].map((item, idx) => (
-                  <div key={idx} className="bg-black/60 border border-cyan-950 p-3 rounded flex items-center justify-between text-[9px]">
-                    <div>
-                      <div className="text-white font-bold uppercase">{item.title}</div>
-                      <div className="text-zinc-500 text-[8px]">{item.desc}</div>
-                    </div>
-                    <span className="text-amber-400 font-bold">{item.status}</span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-        </AnimatePresence>
+      {/* ─── PESTAÑAS SUB-MENÚ ─── */}
+      <div className="w-full grid grid-cols-4 gap-1.5 bg-black/60 p-1 rounded-lg border border-cyan-950 text-[9px] font-bold text-center uppercase">
+        {(['STATS', 'PVP-PVE', 'ECONOMY', 'ACHIEVEMENTS'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`py-2 rounded transition-all cursor-pointer border ${
+              activeTab === tab
+                ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black shadow-md'
+                : 'bg-black/40 text-zinc-400 border-transparent hover:text-white'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
+
+      {/* ─── PESTAÑA 1: STATS ─── */}
+      {activeTab === 'STATS' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="bg-[#050910] border border-cyan-500/30 p-4 rounded-xl flex flex-col justify-between gap-2 shadow-lg">
+              <div className="flex justify-between items-start">
+                <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider">DOMINACIÓN ACTIVA</span>
+                <MapPin className="w-4 h-4 text-cyan-400" />
+              </div>
+              <div className="text-2xl font-black text-white font-mono">{assetCounts.discoveredStars}</div>
+              <span className="text-[7.5px] text-zinc-500 uppercase">Estrellas / Sectores Descubiertos</span>
+            </div>
+
+            <div className="bg-[#050910] border border-cyan-500/30 p-4 rounded-xl flex flex-col justify-between gap-2 shadow-lg">
+              <div className="flex justify-between items-start">
+                <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider">EXPEDICIONES</span>
+                <Compass className="w-4 h-4 text-cyan-400" />
+              </div>
+              <div className="flex justify-between items-baseline font-mono">
+                <span className="text-2xl font-black text-white">{expeditionStats.completed}</span>
+                <span className="text-[9px] text-amber-400 font-bold">{expeditionStats.active} EN VUELO</span>
+              </div>
+              <span className="text-[7.5px] text-zinc-500 uppercase">Completadas con éxito</span>
+            </div>
+
+            <div className="bg-[#050910] border border-cyan-500/30 p-4 rounded-xl flex flex-col justify-between gap-2 shadow-lg">
+              <div className="flex justify-between items-start">
+                <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider">PODER TOTAL</span>
+                <Zap className="w-4 h-4 text-cyan-400" />
+              </div>
+              <div className="text-2xl font-black text-cyan-300 font-mono">{profileData.power_score.toLocaleString()} POW</div>
+              <span className="text-[7.5px] text-zinc-500 uppercase">Score acumulado de armada</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-[#05070a] border border-cyan-950 p-3 rounded-xl text-[8.5px] font-mono">
+            <div className="flex flex-col p-2 bg-black/40 rounded border border-cyan-950">
+              <span className="text-zinc-500 uppercase">Naves en Hangar:</span>
+              <span className="text-white font-black text-sm">{assetCounts.ships}</span>
+            </div>
+            <div className="flex flex-col p-2 bg-black/40 rounded border border-cyan-950">
+              <span className="text-zinc-500 uppercase">Herramientas:</span>
+              <span className="text-amber-400 font-black text-sm">{assetCounts.tools}</span>
+            </div>
+            <div className="flex flex-col p-2 bg-black/40 rounded border border-cyan-950">
+              <span className="text-zinc-500 uppercase">Flotas Creadas:</span>
+              <span className="text-cyan-300 font-black text-sm">{assetCounts.fleets}</span>
+            </div>
+            <div className="flex flex-col p-2 bg-black/40 rounded border border-cyan-950">
+              <span className="text-zinc-500 uppercase">Sectores Mapeados:</span>
+              <span className="text-emerald-400 font-black text-sm">{assetCounts.discoveredStars}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── PESTAÑA 2: PVP - PVE ─── */}
+      {activeTab === 'PVP-PVE' && (
+        <div className="space-y-3">
+          <div className="bg-[#05070a] border border-cyan-950 p-3 rounded-xl text-[9px] uppercase font-bold text-cyan-400 flex justify-between items-center">
+            <span>REGISTRO DE OPERACIONES Y MISIONES RECIENTES</span>
+            <Swords className="w-4 h-4 text-cyan-400" />
+          </div>
+
+          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+            {battleLogs.length === 0 ? (
+              <div className="p-8 text-center text-zinc-600 text-[9px] uppercase tracking-widest bg-black/40 border border-cyan-950 rounded-xl">
+                NO HAY REGISTROS DE BATALLA O INCIDENTES REPORTADOS
+              </div>
+            ) : (
+              battleLogs.map((log) => (
+                <div key={log.id} className="p-3 bg-[#050910] border border-cyan-950 rounded-lg flex justify-between items-center text-[8.5px] font-mono">
+                  <div className="flex flex-col text-left">
+                    <span className="font-bold text-white uppercase">{log.title || 'MISION COMPLETADA'}</span>
+                    <span className="text-zinc-400 text-[7.5px]">{log.message}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-amber-400 font-bold block">{log.damage_sustained ? `-${log.damage_sustained} HP` : 'OK'}</span>
+                    <span className="text-zinc-600 text-[7px]">{new Date(log.created_at).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── PESTAÑA 3: ECONOMY ─── */}
+      {activeTab === 'ECONOMY' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="bg-[#05070a] border border-cyan-950 p-4 rounded-xl space-y-2.5 text-left">
+            <span className="text-[9px] font-black text-cyan-400 uppercase tracking-widest block border-b border-cyan-950 pb-1">
+              RESERVA DE RECURSOS BÁSICOS
+            </span>
+            <div className="space-y-2 text-[9px] font-mono">
+              <div className="flex justify-between items-center p-2 bg-black/50 rounded border border-cyan-950">
+                <span className="text-zinc-400 flex items-center gap-1.5"><Database className="w-3.5 h-3.5 text-cyan-400" /> METAL:</span>
+                <span className="text-cyan-200 font-bold">{profileData.metal.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-black/50 rounded border border-purple-950">
+                <span className="text-zinc-400 flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-purple-400" /> CRISTAL:</span>
+                <span className="text-purple-200 font-bold">{profileData.crystal.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-black/50 rounded border border-blue-950">
+                <span className="text-zinc-400 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-blue-400" /> DEUTERIO:</span>
+                <span className="text-blue-200 font-bold">{profileData.deuterium.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-black/50 rounded border border-indigo-950">
+                <span className="text-zinc-400 flex items-center gap-1.5"><Box className="w-3.5 h-3.5 text-indigo-400" /> MATERIA OSCURA:</span>
+                <span className="text-indigo-300 font-bold">{profileData.dark_matter.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[#05070a] border border-cyan-950 p-4 rounded-xl space-y-2.5 text-left">
+            <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest block border-b border-amber-950 pb-1">
+              SALDO DE MONEDAS Y DIVISAS
+            </span>
+            <div className="space-y-2 text-[9px] font-mono">
+              <div className="flex justify-between items-center p-2 bg-black/50 rounded border border-amber-950">
+                <span className="text-zinc-400 flex items-center gap-1.5"><Coins className="w-3.5 h-3.5 text-amber-400" /> GD COIN:</span>
+                <span className="text-amber-300 font-bold">{profileData.gd_coin.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-black/50 rounded border border-cyan-950">
+                <span className="text-zinc-400 flex items-center gap-1.5"><BarChart2 className="w-3.5 h-3.5 text-cyan-400" /> QUANTUM CREDIT:</span>
+                <span className="text-cyan-300 font-bold">{profileData.quantum_credit.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-black/50 rounded border border-purple-950">
+                <span className="text-zinc-400 flex items-center gap-1.5"><Layers className="w-3.5 h-3.5 text-purple-400" /> PHANTOM COIN:</span>
+                <span className="text-purple-300 font-bold">{profileData.phantom_coin.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── PESTAÑA 4: ACHIEVEMENTS ─── */}
+      {activeTab === 'ACHIEVEMENTS' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+          {realAchievements.map((ach, idx) => (
+            <div key={idx} className={`p-3 rounded-xl border flex items-center justify-between text-left font-mono ${
+              ach.done ? 'bg-cyan-950/40 border-cyan-500/60' : 'bg-black/60 border-cyan-950 opacity-50'
+            }`}>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[9.5px] font-black text-white uppercase">{ach.title}</span>
+                <span className="text-[7.5px] text-zinc-400 normal-case">{ach.desc}</span>
+              </div>
+              {ach.done ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              ) : (
+                <Lock className="w-4 h-4 text-zinc-600 shrink-0" />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ─── MODAL 1: SELECCIÓN DE AVATAR DEL JUEGO ─── */}
+      {isAvatarModalOpen && (
+        <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 font-mono">
+          <div className="w-full max-w-md bg-[#080b0e] border border-cyan-500/50 rounded-2xl p-5 text-left space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-cyan-950 pb-3">
+              <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
+                <User className="w-4 h-4 text-cyan-400" /> SELECCIONAR AVATAR IMPERIAL
+              </h3>
+              <button 
+                onClick={() => setIsAvatarModalOpen(false)}
+                className="p-1 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-[8.5px] text-zinc-400 uppercase">
+              Selecciona un avatar. La imagen se actualizará automáticamente en todo el centro de mando.
+            </p>
+
+            <div className="grid grid-cols-4 gap-3 py-2 max-h-[260px] overflow-y-auto custom-scrollbar">
+              {GAME_AVATARS.map((url, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => handleSelectAvatar(url)}
+                  className={`w-full aspect-square rounded-xl bg-black border-2 cursor-pointer overflow-hidden transition-all hover:scale-105 ${
+                    profileData.avatar_url === url 
+                      ? 'border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.6)]' 
+                      : 'border-cyan-950 hover:border-cyan-600'
+                  }`}
+                >
+                  <img src={url} alt={`Avatar ${idx + 1}`} className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-2 border-t border-cyan-950 flex justify-end">
+              <button
+                onClick={() => setIsAvatarModalOpen(false)}
+                className="px-4 py-2 bg-black border border-zinc-800 text-zinc-400 hover:text-white text-[9px] font-bold uppercase rounded-lg cursor-pointer"
+              >
+                CANCELAR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL 2: CATÁLOGO DE INSIGNIAS HABILITADAS ─── */}
+      {isBadgeModalOpen && (
+        <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 font-mono">
+          <div className="w-full max-w-lg bg-[#080b0e] border border-cyan-500/50 rounded-2xl p-5 text-left space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-cyan-950 pb-3">
+              <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
+                <Award className="w-4 h-4 text-cyan-400" /> CATÁLOGO DE INSIGNIAS HABILITADAS
+              </h3>
+              <button 
+                onClick={() => setIsBadgeModalOpen(false)}
+                className="p-1 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-[8.5px] text-zinc-400 uppercase">
+              Selecciona una insignia activa para guardarla automáticamente en tu tarjeta de comando.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+              {GAME_BADGES.map((badge) => (
+                <div
+                  key={badge.id}
+                  onClick={() => handleSelectBadge(badge)}
+                  className={`relative h-20 rounded-xl border-2 cursor-pointer overflow-hidden flex items-center justify-center p-3 transition-all hover:scale-102 ${
+                    profileData.badge_name === badge.name
+                      ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.5)]'
+                      : 'border-cyan-950 hover:border-cyan-600'
+                  }`}
+                  style={{ backgroundImage: `url('${badge.image}')`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-black/90" />
+                  <span className="relative z-10 text-[9.5px] font-black text-cyan-300 uppercase tracking-widest text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+                    {badge.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-2 border-t border-cyan-950 flex justify-end">
+              <button
+                onClick={() => setIsBadgeModalOpen(false)}
+                className="px-4 py-2 bg-black border border-zinc-800 text-zinc-400 hover:text-white text-[9px] font-bold uppercase rounded-lg cursor-pointer"
+              >
+                CANCELAR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
 };
+
+export default ProfileView;

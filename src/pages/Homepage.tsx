@@ -493,7 +493,18 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
               </motion.div>
             ) : (
               <motion.div key="sector-profile-screen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full">
-                <ProfileView onBack={() => setActiveWindow("home")} triggerNotification={handleTriggerNotification} />
+                <ProfileView 
+                  onBack={() => setActiveWindow("home")} 
+                  triggerNotification={handleTriggerNotification} 
+                  onProfileUpdate={(updatedFields) => {
+                    if (updatedFields.avatar_url) {
+                      setUser(prev => ({
+                        ...prev,
+                        avatarUrl: updatedFields.avatar_url || prev.avatarUrl
+                      }));
+                    }
+                  }}
+                />
               </motion.div>
             )
           )}
