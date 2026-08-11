@@ -274,8 +274,8 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
   };
 
   return (
-    <div 
-      className="relative min-h-screen w-screen overflow-hidden bg-[#070809] text-white flex flex-col justify-start items-center font-sans select-none bg-cover bg-center bg-no-repeat bg-fixed overflow-x-hidden"
+    <main 
+      className="w-full min-h-screen bg-black flex flex-col items-center justify-start overflow-y-auto p-1 sm:p-3 bg-cover bg-center bg-no-repeat bg-fixed overflow-x-hidden font-sans select-none text-white relative"
       style={{ backgroundImage: `url('${GAME_ASSETS.background}')` }}
     >
       {/* Capa de contraste traslúcida */}
@@ -813,6 +813,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       {/* ─── HUD DEL CHAT EN TIEMPO REAL ─── */}
       <ChatSystem userAllianceName={user.allianceName} triggerNotification={handleTriggerNotification} />
 
-    </div>
+    </main>
   );
 };
