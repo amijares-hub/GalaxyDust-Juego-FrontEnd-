@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, AlertCircle, RefreshCw, ShieldCheck, KeyRound } from 'lucide-react';
-import { useSasoriAuth } from '../hooks/useSasoriAuth';
+import { useAuth } from '../context/AuthContext';
 
 export const AuthView: React.FC = () => {
   // 🛰️ Acoplamiento total al motor de estados unificado de Sasori
@@ -14,7 +14,7 @@ export const AuthView: React.FC = () => {
     submitLogin,
     submitRegister,
     verifyTwoFA
-  } = useSasoriAuth();
+  } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
