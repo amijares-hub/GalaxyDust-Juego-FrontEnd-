@@ -6,20 +6,19 @@ import { RefreshCw } from 'lucide-react';
 import { LandscapeGuard } from './components/ui/LandscapeGuard';
 
 function AppContent() {
-  const { user, screen, logout } = useAuth();
+  const { user, logout } = useAuth();
   const [initializing, setInitializing] = useState(true);
 
-  // 🛡️ LOCK DE HIDRATACIÓN: Sostiene tu pantalla de carga original mientras el Kernel valida el token
+  // 🛡️ Margen de sincronización al arrancar para que Supabase hidrate la sesión
   useEffect(() => {
-    // Le damos un margen de cortesía de 650ms al handshake asíncrono de Supabase
     const timer = setTimeout(() => {
       setInitializing(false);
-    }, 650);
+    }, 500);
 
     return () => clearTimeout(timer);
-  }, [user, screen]);
+  }, [user]);
 
-  // 🔄 PANTALLA NATIVA DE CARGA RESTAURADA
+  // 🔄 Pantalla de carga mientras se valida el token de Supabase
   if (initializing) {
     return (
       <div className="w-screen h-screen bg-[#0C0D0E] flex flex-col items-center justify-center text-cyan-500 font-mono space-y-4">
@@ -31,12 +30,12 @@ function AppContent() {
     );
   }
 
-  // 🛰️ Si el piloto ya está autenticado y su pantalla asignada es la consola, abrimos compuertas
-  if (user && screen === 'homepage') {
+  // 🚀 SI HAY USUARIO AUTENTICADO -> ENTRADA DIRECTA A LA HOMEPAGE
+  if (user) {
     return <Homepage user={user} onLogout={logout} />;
   }
 
-  // 🔐 Para cualquier otra fase intermedia (Login, Registro, Segundo Factor OTP), mantenemos la terminal
+  // 🔐 Si no hay usuario -> Pantalla de Login / Registro
   return <AuthView />;
 }
 

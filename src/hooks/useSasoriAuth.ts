@@ -93,9 +93,31 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
 
     hydrateActiveSession();
 
-    // Escucha en tiempo real si la sesión expira o el token cambia globalmente
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' && isMounted) {
+    // Escucha en tiempo real cambios de sesión (Login social, Token Refresh, Logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user && isMounted) {
+        // Solo actualiza si aún no hay usuario cargado (evita re-renders en social login OAuth)
+        const { data: dbProfile } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+
+        if (!isMounted) return;
+
+        setUser({
+          email: session.user.email || '',
+          name: dbProfile?.username || session.user.email?.split('@')[0].toUpperCase() || 'PILOTO',
+          provider: (session.user.app_metadata.provider || 'password') as any,
+          registrationDate: dbProfile?.created_at ? new Date(dbProfile.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          mfaEnabled: dbProfile?.mfa_enabled ?? false,
+          verified: true,
+          avatarUrl: dbProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${session.user.email}`,
+          assignedToken: 'GD-SEC-' + session.user.id.slice(0, 8).toUpperCase(),
+        });
+        setScreenState('homepage');
+        setState('connected');
+      } else if (event === 'SIGNED_OUT' && isMounted) {
         setUser(null);
         setScreenState('menu');
         setState('idle');
