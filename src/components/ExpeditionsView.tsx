@@ -854,7 +854,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
   // ─── RENDERIZADO PRINCIPAL ───
   return (
-    <div className="w-full max-w-7xl mx-auto bg-[#080b0e] border border-cyan-500/30 p-5 rounded-2xl shadow-2xl relative overflow-hidden font-mono text-left select-none flex flex-col gap-3 min-h-[580px]">
+    <div className="w-full h-full max-h-[calc(100vh-2.8rem)] mx-auto bg-[#080b0e] border border-cyan-500/30 p-2 sm:p-3.5 rounded-xl shadow-2xl relative overflow-hidden font-mono text-left select-none flex flex-col gap-1.5 sm:gap-2.5">
 
       {/* NAVBAR SUPERIOR */}
       <div className="w-full bg-[#05070a] border border-cyan-500/30 p-3 rounded-xl flex justify-between items-center shrink-0">

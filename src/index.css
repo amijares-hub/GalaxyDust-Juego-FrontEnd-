@@ -26,3 +26,36 @@
   );
   background-size: 100% 4px;
 }
+
+/* ─── AUTO-ESCALADO EXTREMO PARA MÓVILES EN MODO HORIZONTAL (LANDSCAPE) ─── */
+@media (max-height: 500px) and (orientation: landscape) {
+  html {
+    font-size: 13px; /* Escala los rem globalmente */
+  }
+
+  /* Reducir márgenes y paddings globales para aprovechar espacio vertical */
+  body {
+    overflow: hidden !important;
+  }
+
+  /* Ajuste de scrollbars para pantallas delgadas */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 3px;
+    height: 3px;
+  }
+
+  /* Forzar que los contenedores no superen la pantalla */
+  #swgoh-expedition-screen,
+  #swgoh-notifications-screen,
+  .expedition-container {
+    max-height: calc(100vh - 2.5rem) !important;
+    padding: 0.5rem !important;
+    gap: 0.4rem !important;
+  }
+
+  /* Reducir altura de botones y paneles en landscape */
+  button {
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
+  }
+}
