@@ -17,19 +17,12 @@ import { ChatSystem } from '../components/ChatSystem';
 import { Header } from '../components/Header';
 import { miningService } from '../services/miningService';
 
-// 🌐 DICCIONARIO DE ASSETS OFICIALES (SUPABASE)
 const GAME_ASSETS = {
   background: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20(Ambientes%20)/22.jpg",
   crystal: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/Crystal.png",
   metal: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/Metal.png",
   deuterium: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/Deuterium.png",
   gdCoin: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/GD%20Coin.png",
-  halloweenCoin: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/Halloween%20Coin.png",
-  darkMatter: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/logo_PNG_11.png",
-  phantomCoin: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/Phantom%20Coin.png",
-  primalToken: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/Primal%20Token.png",
-  quantumCredit: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/Quatum%20Credit.png",
-  xenoplasm: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/Xenoplasm.png",
 };
 
 interface UserProfile {
@@ -72,73 +65,29 @@ interface SectorCard {
 }
 
 const cards: SectorCard[] = [
-  {
-    id: "expedition",
-    title: "EXPEDITION",
-    description: "Venture into the unknown, explore, farm, and dominate the galaxy.",
-    imageSrc: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop",
-    targetWindow: "expeditions"
-  },
-  {
-    id: "alliance",
-    title: "ALLIANCE",
-    description: "Coordinate your power. Expand your dominion.",
-    imageSrc: "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=800&auto=format&fit=crop",
-    targetWindow: "alliance"
-  },
-  {
-    id: "market",
-    title: "MARKET",
-    description: "Acquire cargo bundles, speedups, and imperial fleet supplies.",
-    imageSrc: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=800&auto=format&fit=crop",
-    targetTab: "marketplace"
-  },
-  {
-    id: "phantom",
-    title: "PHANTOM STATION",
-    description: "Exchange void crystals, blueprints, and rare synaptic upgrades.",
-    imageSrc: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800&auto=format&fit=crop",
-    targetTab: "phantom"
-  }
+  { id: "expedition", title: "EXPEDITION", description: "Venture into the unknown, explore, farm, and dominate the galaxy.", imageSrc: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop", targetWindow: "expeditions" },
+  { id: "alliance", title: "ALLIANCE", description: "Coordinate your power. Expand your dominion.", imageSrc: "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=800&auto=format&fit=crop", targetWindow: "alliance" },
+  { id: "market", title: "MARKET", description: "Acquire cargo bundles, speedups, and imperial fleet supplies.", imageSrc: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=800&auto=format&fit=crop", targetTab: "marketplace" },
+  { id: "phantom", title: "PHANTOM STATION", description: "Exchange void crystals, blueprints, and rare synaptic upgrades.", imageSrc: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800&auto=format&fit=crop", targetTab: "phantom" }
 ];
 
 export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
   const [activeMissionType, setActiveMissionType] = useState<MissionType>('DAILY');
-
   const [activeTab, setActiveTab] = useState<"home" | "marketplace" | "phantom" | "can" | "inventory" | "mission">("home");
   const [activeWindow, setActiveWindow] = useState<"home" | "expeditions" | "expeditions_flights" | "alliance" | "profile" | "settings" | "notifications">("home");
-  
-  // Estado dinámico para Notificaciones No Leídas
+
+  // ─── ESTADOS REACTIVOS DEL PERFIL PARA RE-RENDERIZAR EL HEADER EN VIVO ───
+  const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string>(user.avatarUrl);
+  const [currentBadgeName, setCurrentBadgeName] = useState<string>('INSIGNIA SUPREMA');
+  const [currentBadgeImage, setCurrentBadgeImage] = useState<string>('');
+
   const [unreadNotifCount, setUnreadNotifCount] = useState<number>(0);
   const [activeFlightsCount, setActiveFlightsCount] = useState<number>(0);
-
   const [utcTime, setUtcTime] = useState<string>(miningService.getFormattedUtcTime());
 
   const [power, setPower] = useState(0);
-  const [currencies, setCurrencies] = useState({
-    gd_coin: 0,
-    quantum_credit: 0,
-    phantom_coin: 0,
-    halloween_coin: 0,
-    xmas_coin: 0,
-    valentine_coin: 0
-  });
-
-  const [resources, setResources] = useState({
-    metal: 0,
-    crystal: 0,
-    deuterium: 0,
-    dark_matter: 0,
-    omniplate: 0,
-    orichaltron: 0,
-    lunar_fiber: 0,
-    infinite_core: 0,
-    primal_token: 0,
-    xenoplasm: 0,
-    organium: 0,
-    mana: 0,
-    wood: 0
-  });
+  const [currencies, setCurrencies] = useState({ gd_coin: 0, quantum_credit: 0, phantom_coin: 0, halloween_coin: 0, xmas_coin: 0, valentine_coin: 0 });
+  const [resources, setResources] = useState({ metal: 0, crystal: 0, deuterium: 0, dark_matter: 0, omniplate: 0, orichaltron: 0, lunar_fiber: 0, infinite_core: 0, primal_token: 0, xenoplasm: 0, organium: 0, mana: 0, wood: 0 });
 
   const handleTriggerNotification = (text: string, e?: any) => {
     console.log("📢 [SYSTEM_NOTIFICATION]:", text);
@@ -147,21 +96,13 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
   const [missions, setMissions] = useState<Mission[]>([
     { id: 'M-D1', type: 'DAILY', title: 'EXPEDICIÓN DE MINERÍA', description: 'Completar 3 expediciones de minería con éxito', progress: 3, maxProgress: 3, reward: '+50 CRISTALES', claimed: false },
     { id: 'M-D2', type: 'DAILY', title: 'SINCRO DE C.A.N.', description: 'Escanear 1 cluster galáctico en el mapa estelar', progress: 1, maxProgress: 1, reward: '+100 GD COINS', claimed: true },
-    { id: 'M-D3', type: 'DAILY', title: 'COMERCIO INGAME', description: 'Realizar 1 compra o venta en el Marketplace', progress: 0, maxProgress: 1, reward: '+10 PHANTOM COINS', claimed: false },
-    { id: 'M-W1', type: 'WEEKLY', title: 'DOMINACIÓN TERRITORIAL', description: 'Conquistar o defender 2 estrellas en modo Dominación', progress: 1, maxProgress: 2, reward: '+500 CRISTALES', claimed: false },
-    { id: 'M-W2', type: 'WEEKLY', title: 'CRAFTING DE FLOTA', description: 'Ensamblar 2 naves en el hangar de inventario', progress: 2, maxProgress: 2, reward: '+1,500 GD COINS', claimed: false },
-    { id: 'M-M1', type: 'MONTHLY', title: 'MAESTRÍA DE SECTORES', description: 'Completar 50 expediciones en la galaxia', progress: 32, maxProgress: 50, reward: '+2,500 CRISTALES + 1 BLUEPRINT', claimed: false },
-    { id: 'M-E1', type: 'EVENT', title: 'INCURSIÓN ANOMALÍA COLOIDAL', description: 'Recolectar 5,000 de Xenoplasma durante el evento activo', progress: 1200, maxProgress: 5000, reward: '+1 PRIMAL TOKEN', claimed: false },
-    { id: 'M-L1', type: 'LIMITED', title: 'DESAFÍO FLASH DE VANGUARDIA', description: 'Alcanzar 160,000 de Poder de Comando en las próximas 12 horas', progress: 156420, maxProgress: 160000, reward: '+300 PHANTOM COINS', claimed: false },
-    { id: 'M-F1', type: 'FLEET', title: 'DESPLIEGUE ARMADO', description: 'Mantener 3 flotas personalizadas activas en el Fleet Manager', progress: 3, maxProgress: 3, reward: '+200 QUANTUM CREDITS', claimed: false },
-    { id: 'M-C1', type: 'CLAN', title: 'APORTE DE ALIANZA', description: 'Contribuir al fondo de tecnología de tu Clan o Alianza', progress: 500, maxProgress: 1000, reward: '+1,000 GD COINS', claimed: false }
+    { id: 'M-D3', type: 'DAILY', title: 'COMERCIO INGAME', description: 'Realizar 1 compra o venta en el Marketplace', progress: 0, maxProgress: 1, reward: '+10 PHANTOM COINS', claimed: false }
   ]);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setUtcTime(miningService.getFormattedUtcTime());
     }, 1000);
-
     return () => clearInterval(timer);
   }, []);
 
@@ -184,7 +125,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         setActiveFlightsCount(flightCount);
       }
 
-      // 2. Cargar Recuento Real de Notificaciones No Leídas desde Supabase
+      // 2. Cargar Notificaciones No Leídas
       const { count: notifCount } = await supabase
         .from('expedition_logs')
         .select('id', { count: 'exact', head: true })
@@ -193,18 +134,20 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
 
       if (notifCount !== null && notifCount !== undefined && isMounted) {
         setUnreadNotifCount(notifCount);
-      } else if (isMounted) {
-        setUnreadNotifCount(0);
       }
 
-      // 3. Cargar Perfil y Economía
+      // 3. Cargar Perfil usando la columna 'id' (CORREGIDO ERROR 400)
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('user_id', authUser.id)
-        .single();
+        .eq('id', authUser.id) // 👈 CORRECCIÓN: 'id' en lugar de 'user_id'
+        .maybeSingle();
 
       if (profile && isMounted) {
+        if (profile.avatar_url) setCurrentAvatarUrl(profile.avatar_url);
+        if (profile.badge_name) setCurrentBadgeName(profile.badge_name);
+        if (profile.badge_image) setCurrentBadgeImage(profile.badge_image);
+
         setPower(parseFloat(profile.power_score || 0));
         setCurrencies({
           gd_coin: parseFloat(profile.gd_coin || 0),
@@ -219,25 +162,20 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           metal: parseFloat(profile.metal || 0),
           crystal: parseFloat(profile.crystal || 0),
           deuterium: parseFloat(profile.deuterium || 0),
-          dark_matter: parseFloat(profile.dark_matter || 0),
-          omniplate: parseFloat(profile.omniplate || 0),
-          orichaltron: parseFloat(profile.orichaltron || 0),
-          lunar_fiber: parseFloat(profile.lunar_fiber || 0),
-          infinite_core: parseFloat(profile.infinite_core || 0),
-          primal_token: parseFloat(profile.primal_token || 0),
-          xenoplasm: parseFloat(profile.xenoplasm || 0),
-          organium: parseFloat(profile.organium || 0),
-          mana: parseFloat(profile.mana || 0),
-          wood: parseFloat(profile.wood || 0)
+          dark_matter: parseFloat(profile.dark_matter || 0)
         }));
       }
 
-      // Suscribirse a cambios en tiempo real
+      // Escuchar cambios en tiempo real
       channel = supabase
         .channel(`economy_hud_stream_${authUser.id}`)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_profiles', filter: `user_id=eq.${authUser.id}` }, (payload: any) => {
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_profiles', filter: `id=eq.${authUser.id}` }, (payload: any) => { // 👈 CORRECCIÓN 'id=eq.'
           const updated = payload.new;
           if (!updated || !isMounted) return;
+
+          if (updated.avatar_url) setCurrentAvatarUrl(updated.avatar_url);
+          if (updated.badge_name) setCurrentBadgeName(updated.badge_name);
+          if (updated.badge_image) setCurrentBadgeImage(updated.badge_image);
 
           setPower(parseFloat(updated.power_score || 0));
           setCurrencies({
@@ -248,22 +186,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
             xmas_coin: parseFloat(updated.xmas_coin || 0),
             valentine_coin: parseFloat(updated.valentine_coin || 0)
           });
-          setResources(prev => ({
-            ...prev,
-            metal: parseFloat(updated.metal || 0),
-            crystal: parseFloat(updated.crystal || 0),
-            deuterium: parseFloat(updated.deuterium || 0),
-            dark_matter: parseFloat(updated.dark_matter || 0),
-            omniplate: parseFloat(updated.omniplate || 0),
-            orichaltron: parseFloat(updated.orichaltron || 0),
-            lunar_fiber: parseFloat(updated.lunar_fiber || 0),
-            infinite_core: parseFloat(updated.infinite_core || 0),
-            primal_token: parseFloat(updated.primal_token || 0),
-            xenoplasm: parseFloat(updated.xenoplasm || 0),
-            organium: parseFloat(updated.organium || 0),
-            mana: parseFloat(updated.mana || 0),
-            wood: parseFloat(updated.wood || 0)
-          }));
         })
         .subscribe();
     };
@@ -275,10 +197,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       if (channel) supabase.removeChannel(channel);
     };
   }, []);
-
-  const handleClaimMission = (missionId: string) => {
-    setMissions(prev => prev.map(m => m.id === missionId ? { ...m, claimed: true } : m));
-  };
 
   return (
     <main 
@@ -292,27 +210,15 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         userProfile={{
           ...user,
           username: user.name,
-          avatar_url: user.avatarUrl,
+          avatar_url: currentAvatarUrl, // 👈 USAR EL ESTADO REACTIVO
           level: 1,
           gd_coin: currencies.gd_coin,
           quantum_credit: currencies.quantum_credit,
           phantom_coin: currencies.phantom_coin,
-          halloween_coin: currencies.halloween_coin,
-          xmas_coin: currencies.xmas_coin,
-          valentine_coin: currencies.valentine_coin,
           metal: resources.metal,
           crystal: resources.crystal,
           deuterium: resources.deuterium,
           dark_matter: resources.dark_matter,
-          omniplate: resources.omniplate,
-          orichaltron: resources.orichaltron,
-          lunar_fiber: resources.lunar_fiber,
-          infinite_core: resources.infinite_core,
-          primal_token: resources.primal_token,
-          xenoplasm: resources.xenoplasm,
-          organium: resources.organium,
-          mana: resources.mana,
-          wood: resources.wood,
         }}
         activeTab={activeTab === 'home' && activeWindow === 'home' ? 'MAIN' :
                    activeTab === 'can' ? 'CAN' :
@@ -336,275 +242,118 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         onOpenProfile={() => { setActiveTab('home'); setActiveWindow('profile'); }}
       />
 
-      {/* ⏱️ RELOJ UTC DISCRETO */}
+      {/* RELOJ UTC */}
       <div className="w-full px-6 pt-2 flex justify-start items-center z-20 pointer-events-none">
-        <div className="flex items-center gap-2 font-mono text-[10px] text-cyan-400/80 font-bold tracking-widest uppercase drop-shadow-[0_0_6px_rgba(6,182,212,0.4)]">
+        <div className="flex items-center gap-2 font-mono text-[10px] text-cyan-400/80 font-bold tracking-widest uppercase">
           <span>{utcTime}</span>
         </div>
       </div>
 
-      {/* 🎯 BARRA LATERAL DERECHA (QUICK ACCESS BAR) */}
+      {/* BARRA LATERAL DERECHA */}
       <div className="fixed right-6 top-24 flex flex-col items-center gap-3 z-30 font-mono">
         <button
           onClick={() => { setActiveTab("home"); setActiveWindow("expeditions_flights"); }}
-          className={`relative p-2.5 rounded-xl border backdrop-blur-md transition-all cursor-pointer shadow-lg group ${
-            activeWindow === "expeditions_flights"
-              ? "bg-cyan-950/90 text-cyan-300 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.5)] scale-105"
-              : "bg-black/80 text-cyan-400 border-cyan-500/40 hover:border-cyan-400 hover:bg-cyan-950/80 hover:scale-110"
-          }`}
-          title="Expeditions in Flight (Flotas en Vuelo)"
+          className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer"
         >
           <Eye className="w-5 h-5 text-cyan-400 animate-pulse" />
-          {activeFlightsCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 bg-cyan-400 text-black font-mono text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-[0_0_8px_rgba(6,182,212,0.8)] border border-black">
-              {activeFlightsCount}
-            </span>
-          )}
         </button>
 
         <button
           onClick={() => { setActiveTab("home"); setActiveWindow("notifications"); }}
-          className={`relative p-2.5 rounded-xl border backdrop-blur-md transition-all cursor-pointer shadow-lg group ${
-            activeWindow === "notifications"
-              ? "bg-cyan-950/90 text-cyan-300 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.5)] scale-105"
-              : "bg-black/80 text-cyan-400 border-cyan-500/40 hover:border-cyan-400 hover:bg-cyan-950/80 hover:scale-110"
-          }`}
-          title="Notificaciones"
+          className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer"
         >
           <Bell className="w-5 h-5 text-cyan-400" />
-          {unreadNotifCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white font-mono text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-black">
-              {unreadNotifCount}
-            </span>
-          )}
         </button>
 
         <button
           onClick={() => { setActiveTab("home"); setActiveWindow("settings"); }}
-          className={`relative p-2.5 rounded-xl border backdrop-blur-md transition-all cursor-pointer shadow-lg group ${
-            activeWindow === "settings"
-              ? "bg-cyan-950/90 text-cyan-300 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.5)] scale-105"
-              : "bg-black/80 text-cyan-400 border-cyan-500/40 hover:border-cyan-400 hover:bg-cyan-950/80 hover:scale-110"
-          }`}
-          title="Settings"
+          className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer"
         >
-          <Settings className="w-5 h-5 text-cyan-400 transition-transform group-hover:rotate-90 duration-300" />
+          <Settings className="w-5 h-5 text-cyan-400" />
         </button>
       </div>
 
       {/* CONTENIDO PRINCIPAL */}
       <div className="w-full max-w-7xl flex-1 overflow-y-auto px-8 py-4 z-10 flex flex-col items-center justify-start">
         <AnimatePresence mode="wait">
-          
-          {/* HOME */}
           {activeTab === "home" && (
             activeWindow === "home" ? (
-              <motion.div key="sector-home-screen" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} transition={{ duration: 0.2 }} className="w-full my-auto">
+              <motion.div key="sector-home-screen" className="w-full my-auto">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
                   {cards.map((card) => (
                     <div
                       key={card.id}
                       onClick={() => {
-                        if (card.targetWindow) {
-                          setActiveWindow(card.targetWindow);
-                        } else if (card.targetTab) {
-                          setActiveTab(card.targetTab);
-                        }
+                        if (card.targetWindow) setActiveWindow(card.targetWindow);
+                        else if (card.targetTab) setActiveTab(card.targetTab);
                       }}
-                      className="relative h-[440px] w-full rounded-xl overflow-hidden cursor-pointer border border-neutral-800 hover:border-red-500/60 transition-all duration-300 group flex flex-col justify-between p-6 bg-black/85 backdrop-blur-sm shadow-2xl"
+                      className="relative h-[440px] w-full rounded-xl overflow-hidden cursor-pointer border border-neutral-800 p-6 bg-black/85"
                     >
-                      <div className="absolute inset-0 z-0">
-                        <img
-                          src={card.imageSrc}
-                          alt={card.title}
-                          className="w-full h-full object-cover brightness-40 group-hover:scale-105 group-hover:brightness-60 transition-all duration-500"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-                      </div>
-
-                      <div className="relative z-10">
-                        <h2 className="text-xl font-black text-white uppercase tracking-widest group-hover:text-red-400 transition-colors">
-                          {card.title}
-                        </h2>
-                      </div>
-
-                      <div className="relative z-10 mt-auto">
-                        <p className="text-[11px] font-mono text-zinc-400 leading-relaxed uppercase">
-                          {card.description}
-                        </p>
-                      </div>
+                      <h2 className="text-xl font-black text-white uppercase tracking-widest">{card.title}</h2>
+                      <p className="text-[11px] font-mono text-zinc-400 mt-auto uppercase">{card.description}</p>
                     </div>
                   ))}
                 </div>
               </motion.div>
             ) : activeWindow === "expeditions" ? (
-              <motion.div key="sector-expeditions-screen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full">
+              <motion.div key="sector-expeditions-screen" className="w-full">
                 <ExpeditionsView initialView="selection" triggerNotification={handleTriggerNotification} />
               </motion.div>
             ) : activeWindow === "expeditions_flights" ? (
-              <motion.div key="sector-expeditions-flights-screen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full">
+              <motion.div key="sector-expeditions-flights-screen" className="w-full">
                 <ExpeditionsView initialView="flights" onBack={() => setActiveWindow("home")} triggerNotification={handleTriggerNotification} />
               </motion.div>
             ) : activeWindow === "alliance" ? (
-              <motion.div key="sector-alliance-screen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full">
+              <motion.div key="sector-alliance-screen" className="w-full">
                 <AllianceView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} onBack={() => setActiveWindow("home")} triggerNotification={handleTriggerNotification} />
               </motion.div>
-            ) : activeWindow === "settings" ? (
-              <motion.div key="sector-settings-screen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full bg-[#080b0e] border border-cyan-500/30 p-8 rounded-2xl font-mono text-left space-y-6">
-                <div className="flex justify-between items-center border-b border-cyan-900/50 pb-4">
-                  <div className="flex items-center gap-3">
-                    <Settings className="w-6 h-6 text-cyan-400" />
-                    <h2 className="text-lg font-black text-white uppercase tracking-widest">SETTINGS / CONFIGURACIÓN DE COMANDO</h2>
-                  </div>
-                  <button onClick={() => setActiveWindow("home")} className="px-3 py-1 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 rounded text-[9px] font-bold uppercase cursor-pointer">
-                    VOLVER
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[10px]">
-                  <div className="p-4 bg-black/60 border border-cyan-950 rounded-xl space-y-2">
-                    <span className="text-cyan-400 font-bold block uppercase">PREFERENCIAS DE AUDIO</span>
-                    <label className="flex items-center justify-between text-zinc-300">
-                      <span>EFECTOS DE SONIDO TÁCTICOS (SFX)</span>
-                      <input type="checkbox" defaultChecked className="accent-cyan-500" />
-                    </label>
-                  </div>
-                  <div className="p-4 bg-black/60 border border-cyan-950 rounded-xl space-y-2">
-                    <span className="text-cyan-400 font-bold block uppercase">RENDIMIENTO VISUAL</span>
-                    <label className="flex items-center justify-between text-zinc-300">
-                      <span>ANIMACIONES DE INTERFAZ</span>
-                      <input type="checkbox" defaultChecked className="accent-cyan-500" />
-                    </label>
-                  </div>
-                </div>
-              </motion.div>
             ) : activeWindow === "notifications" ? (
-              <motion.div key="sector-notifications-screen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full">
-                <NotificationsView
-                  onBack={() => setActiveWindow("home")}
-                  onNavigateModule={(mod) => {
-                    if (mod === 'AMI' || mod === 'FIF') setActiveTab('can');
-                    else if (mod === 'MARKET') setActiveTab('marketplace');
-                    else if (mod === 'EXPEDITION') setActiveWindow('expeditions');
-                    else if (mod === 'ALLIANCE') setActiveWindow('alliance');
-                    setActiveWindow(mod === 'EXPEDITION' ? 'expeditions' : mod === 'ALLIANCE' ? 'alliance' : 'home');
-                  }}
-                  triggerNotification={handleTriggerNotification}
-                />
+              <motion.div key="sector-notifications-screen" className="w-full">
+                <NotificationsView onBack={() => setActiveWindow("home")} triggerNotification={handleTriggerNotification} />
               </motion.div>
             ) : (
-              <motion.div key="sector-profile-screen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full">
+              /* VISTA DE PERFIL */
+              <motion.div key="sector-profile-screen" className="w-full">
                 <ProfileView 
                   onBack={() => setActiveWindow("home")} 
-                  triggerNotification={handleTriggerNotification} 
-                  onProfileUpdate={(updatedFields) => {
-                    if (updatedFields.avatar_url) {
-                      setUser(prev => ({
-                        ...prev,
-                        avatarUrl: updatedFields.avatar_url || prev.avatarUrl
-                      }));
-                    }
+                  triggerNotification={handleTriggerNotification}
+                  onProfileUpdate={(updated) => {
+                    if (updated.avatar_url) setCurrentAvatarUrl(updated.avatar_url);
+                    if (updated.badge_name) setCurrentBadgeName(updated.badge_name);
+                    if (updated.badge_image) setCurrentBadgeImage(updated.badge_image);
                   }}
                 />
               </motion.div>
             )
           )}
 
-          {/* MISSION */}
-          {activeTab === "mission" && (
-            <motion.div key="sector-mission-page" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full bg-[#080b0e] border border-cyan-500/30 p-6 sm:p-8 rounded-2xl font-mono text-left space-y-6 backdrop-blur-md shadow-2xl relative overflow-hidden">
-              <div className="flex justify-between items-center border-b border-cyan-900/50 pb-4">
-                <div className="flex items-center gap-3">
-                  <Target className="w-7 h-7 text-cyan-400 animate-pulse" />
-                  <div>
-                    <span className="text-[9px] font-mono text-cyan-400 tracking-widest block font-bold uppercase">
-                      SISTEMA DE PROGRESIVIDAD Y RECOMPENSAS
-                    </span>
-                    <h2 className="text-lg font-black tracking-widest text-white uppercase">
-                      MISSION CENTER
-                    </h2>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 overflow-x-auto scrollbar-none border-b border-cyan-950 pb-3 text-[9px] uppercase font-bold tracking-wider">
-                {(['DAILY', 'WEEKLY', 'MONTHLY', 'EVENT', 'LIMITED', 'FLEET', 'CLAN'] as MissionType[]).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setActiveMissionType(type)}
-                    className={`px-4 py-2 rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 border ${
-                      activeMissionType === type
-                        ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black shadow-[0_0_12px_rgba(6,182,212,0.3)]'
-                        : 'bg-black/40 text-zinc-500 border-transparent hover:text-zinc-300'
-                    }`}
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-cyan-950">
-                {missions.filter(m => m.type === activeMissionType).map((mission) => {
-                  const isComplete = mission.progress >= mission.maxProgress;
-                  const pct = Math.min(100, Math.floor((mission.progress / mission.maxProgress) * 100));
-
-                  return (
-                    <div key={mission.id} className="p-4 bg-black/60 border border-cyan-950 rounded-xl flex flex-col justify-between gap-3 relative">
-                      <div className="flex justify-between items-start gap-2">
-                        <div className="flex flex-col text-left">
-                          <span className="text-[11px] font-bold text-white uppercase tracking-wider">{mission.title}</span>
-                          <span className="text-[9px] text-zinc-400 mt-0.5 normal-case">{mission.description}</span>
-                        </div>
-                        <span className="text-[8.5px] font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20 shrink-0">{mission.reward}</span>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[8px] text-zinc-500">
-                          <span>PROGRESO</span>
-                          <span className="text-cyan-400 font-bold">{mission.progress} / {mission.maxProgress} ({pct}%)</span>
-                        </div>
-                        <div className="w-full h-2 bg-neutral-900 rounded-full overflow-hidden p-0.5 border border-cyan-950">
-                          <div className="h-full bg-cyan-400 rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
-
-          {/* MARKETPLACE */}
-          {activeTab === "marketplace" && (
-            <motion.div key="sector-marketplace-screen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full">
-              <MarketplaceView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} playerWood={resources.wood} setPlayerWood={() => { }} playerFood={resources.deuterium} setPlayerFood={() => { }} playerStone={resources.dark_matter} setPlayerStone={() => { }} playerOre={resources.metal} setPlayerOre={() => { }} onBack={() => setActiveTab("home")} triggerNotification={handleTriggerNotification} />
-            </motion.div>
-          )}
-
-          {/* PHANTOM STATION */}
-          {activeTab === "phantom" && (
-            <motion.div key="sector-phantom-screen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full">
-              <PhantomStationView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} onBack={() => setActiveTab("home")} triggerNotification={handleTriggerNotification} />
-            </motion.div>
-          )}
-
-          {/* INVENTARIO */}
-          {activeTab === "inventory" && (
-            <motion.div key="sector-inventory-screen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full">
-              <InventoryView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} onBack={() => setActiveTab("home")} triggerNotification={handleTriggerNotification} />
-            </motion.div>
-          )}
-
-          {/* C.A.N. MATRIX */}
           {activeTab === "can" && (
-            <motion.div key="sector-can-screen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full">
+            <motion.div key="sector-can-screen" className="w-full">
               <CanView />
             </motion.div>
           )}
-
+          
+          {activeTab === "marketplace" && (
+            <motion.div key="sector-marketplace-screen" className="w-full">
+              <MarketplaceView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} playerWood={resources.wood} setPlayerWood={() => { }} playerFood={resources.deuterium} setPlayerFood={() => { }} playerStone={resources.dark_matter} setPlayerStone={() => { }} playerOre={resources.metal} setPlayerOre={() => { }} onBack={() => setActiveTab("home")} triggerNotification={handleTriggerNotification} />
+            </motion.div>
+          )}
+          
+          {activeTab === "phantom" && (
+            <motion.div key="sector-phantom-screen" className="w-full">
+              <PhantomStationView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} onBack={() => setActiveTab("home")} triggerNotification={handleTriggerNotification} />
+            </motion.div>
+          )}
+          
+          {activeTab === "inventory" && (
+            <motion.div key="sector-inventory-screen" className="w-full">
+              <InventoryView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} onBack={() => setActiveTab("home")} triggerNotification={handleTriggerNotification} />
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
       <ChatSystem userAllianceName={user.allianceName} triggerNotification={handleTriggerNotification} />
-
     </main>
   );
 };
