@@ -60,7 +60,6 @@
   }
 }
 
-/* ─── CORRECCIÓN DE DESBORDE Y SCROLL TÁCTIL ─── */
 html, body, #root {
   width: 100%;
   min-height: 100dvh;
@@ -70,7 +69,6 @@ html, body, #root {
   /* Habilita el desplazamiento táctil natural en móviles */
   overflow-x: hidden !important;
   overflow-y: auto !important;
-  -webkit-overflow-scrolling: touch !important;
 }
 
 /* Evita que los contenedores flexibles recorten la parte superior */
@@ -109,6 +107,5 @@ html, body, #root {
 @media (max-height: 480px) {
   .custom-touch-scroll {
     overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
   }
 }

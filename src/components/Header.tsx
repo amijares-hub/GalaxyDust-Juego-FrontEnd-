@@ -25,7 +25,6 @@ export const Header: React.FC<HeaderProps> = ({
   const currencyRef = useRef<HTMLDivElement>(null);
   const resourceRef = useRef<HTMLDivElement>(null);
 
-  // Cerrar desplegables al hacer clic fuera del componente
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -47,9 +46,6 @@ export const Header: React.FC<HeaderProps> = ({
     { label: 'GD COIN', value: userProfile?.gd_coin || 0, color: 'text-amber-300' },
     { label: 'QUANTUM CREDIT', value: userProfile?.quantum_credit || 0, color: 'text-cyan-300' },
     { label: 'PHANTOM COIN', value: userProfile?.phantom_coin || 0, color: 'text-purple-300' },
-    { label: 'HALLOWEEN COIN', value: userProfile?.halloween_coin || 0, color: 'text-orange-400' },
-    { label: 'XMAS COIN', value: userProfile?.xmas_coin || 0, color: 'text-red-400' },
-    { label: 'VALENTINE COIN', value: userProfile?.valentine_coin || 0, color: 'text-pink-400' }
   ];
 
   const resources = [
@@ -57,10 +53,6 @@ export const Header: React.FC<HeaderProps> = ({
     { label: 'CRISTAL', value: userProfile?.crystal || 0, color: 'text-purple-200' },
     { label: 'DEUTERIO', value: userProfile?.deuterium || 0, color: 'text-blue-300' },
     { label: 'MATERIA OSCURA', value: userProfile?.dark_matter || 0, color: 'text-indigo-400' },
-    { label: 'OMNIPLATE', value: userProfile?.omniplate || 0, color: 'text-emerald-300' },
-    { label: 'ORICHALTRON', value: userProfile?.orichaltron || 0, color: 'text-yellow-300' },
-    { label: 'LUNAR FIBER', value: userProfile?.lunar_fiber || 0, color: 'text-slate-200' },
-    { label: 'INFINITE CORE', value: userProfile?.infinite_core || 0, color: 'text-teal-300' }
   ];
 
   const tabs = [
@@ -76,15 +68,15 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="w-full bg-[#05080c]/98 border-b border-cyan-500/40 px-2 sm:px-3 py-1 flex items-center justify-between gap-1 sm:gap-2 shrink-0 select-none z-50 font-mono backdrop-blur-md sticky top-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)]">
       
-      {/* ─── 1. ESQUINA IZQUIERDA: PERFIL / AVATAR ─── */}
+      {/* ─── 1. ESQUINA IZQUIERDA: PERFIL CON IMAGEN REAL DEL AVATAR ─── */}
       <div
         className="flex items-center gap-1.5 shrink-0 cursor-pointer group"
         onClick={() => onOpenProfile && onOpenProfile()}
         title="Ver Perfil"
       >
-        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-cyan-950 border border-cyan-400/80 group-hover:border-cyan-300 flex items-center justify-center text-cyan-300 font-bold shadow-[0_0_8px_rgba(34,211,238,0.3)] transition-all overflow-hidden">
+        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-black border border-cyan-400/80 group-hover:border-cyan-300 flex items-center justify-center text-cyan-300 font-bold shadow-[0_0_8px_rgba(34,211,238,0.3)] transition-all overflow-hidden">
           {userProfile?.avatar_url ? (
-            <img src={userProfile.avatar_url} alt="Avatar" className="w-full h-full object-cover rounded-lg" />
+            <img src={userProfile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
           ) : (
             <User className="w-3.5 h-3.5 text-cyan-400" />
           )}
@@ -99,7 +91,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* ─── 2. CENTRO: PESTAÑAS (Scroll Horizontal Silencioso) ─── */}
+      {/* ─── 2. CENTRO: PESTAÑAS ─── */}
       <div className="flex-1 flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none px-1 py-0.5 min-w-0">
         {tabs.map(tab => {
           const isActive = activeTab === tab.id;
@@ -119,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
         })}
       </div>
 
-      {/* ─── 3. ESQUINA DERECHA: MONEDA, RECURSOS Y CONTROLES ─── */}
+      {/* ─── 3. DERECHA: MONEDA Y RECURSOS ─── */}
       <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
         
         {/* DROPDOWN MONEDA */}
@@ -181,29 +173,6 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
         </div>
-
-        {/* NOTIFICACIONES */}
-        <button
-          onClick={onOpenNotifications}
-          className="relative p-1 sm:p-1.5 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-800 text-cyan-300 rounded-md transition-all cursor-pointer"
-          title="Notificaciones"
-        >
-          <Bell className="w-3.5 h-3.5 text-cyan-300" />
-          {unreadNotificationsCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[7px] font-black w-3.5 h-3.5 rounded-full border border-black flex items-center justify-center animate-pulse">
-              {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
-            </span>
-          )}
-        </button>
-
-        {/* AJUSTES */}
-        <button
-          onClick={onOpenSettings}
-          className="p-1 sm:p-1.5 bg-black/60 hover:bg-cyan-950 border border-cyan-900 text-zinc-400 hover:text-white rounded-md transition-all cursor-pointer"
-          title="Ajustes"
-        >
-          <Settings className="w-3.5 h-3.5" />
-        </button>
 
       </div>
 
