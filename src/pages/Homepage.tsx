@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Eye, User, ChevronDown, Target, CheckCircle2, Clock,
-  Settings, X, Rocket, Layers, Cpu, Bot, Bell, Globe, Activity
+  Eye, Target, CheckCircle2, Clock,
+  Settings, X, Rocket, Layers, Cpu, Bot, Globe, Activity
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ExpeditionsView } from '../components/ExpeditionsView';
@@ -14,7 +14,7 @@ import { CanView } from '../components/CanView';
 import { ProfileView } from '../components/ProfileView';
 import { NotificationsView } from '../components/NotificationsView';
 import { ChatSystem } from '../components/ChatSystem';
-import { HeaderNotificationBell } from '../components/HeaderNotificationBell';
+import { Header } from '../components/Header';
 import { miningService } from '../services/miningService';
 
 // 🌐 DICCIONARIO DE ASSETS OFICIALES (SUPABASE)
@@ -281,204 +281,55 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       {/* Capa de contraste traslúcida */}
       <div className="fixed inset-0 bg-black/55 backdrop-blur-[1px] z-0 pointer-events-none" />
 
-      {/* ─── BARRA SUPERIOR DE NAVEGACIÓN Y ECONOMÍA ─── */}
-      <div className="w-full px-6 py-3 flex items-center justify-between border-b border-white/10 bg-black/90 backdrop-blur-md z-40 gap-4 shrink-0">
-        
-        {/* PESTAÑAS IZQUIERDAS DE NAVEGACIÓN */}
-        <div className="flex items-center gap-6 font-mono text-[11px] uppercase tracking-widest shrink-0">
-          <button
-            onClick={() => { setActiveTab("home"); setActiveWindow("home"); }}
-            className={`pb-1 transition-colors cursor-pointer ${activeTab === "home" && activeWindow === "home" ? "text-white font-black border-b-2 border-red-500" : "text-neutral-400 hover:text-white"}`}
-          >
-            MAIN
-          </button>
-          <button
-            onClick={() => setActiveTab("can")}
-            className={`pb-1 transition-colors cursor-pointer ${activeTab === "can" ? "text-white font-black border-b-2 border-red-500" : "text-neutral-400 hover:text-white"}`}
-          >
-            C.A.N
-          </button>
-          <button
-            onClick={() => { setActiveTab("home"); setActiveWindow("expeditions"); }}
-            className={`pb-1 transition-colors cursor-pointer ${activeWindow === "expeditions" || activeWindow === "expeditions_flights" ? "text-white font-black border-b-2 border-red-500" : "text-neutral-400 hover:text-white"}`}
-          >
-            EXPEDITION
-          </button>
-          <button
-            onClick={() => setActiveTab("marketplace")}
-            className={`pb-1 transition-colors cursor-pointer ${activeTab === "marketplace" ? "text-white font-black border-b-2 border-red-500" : "text-neutral-400 hover:text-white"}`}
-          >
-            MARKET
-          </button>
-          <button
-            onClick={() => setActiveTab("phantom")}
-            className={`pb-1 transition-colors cursor-pointer ${activeTab === "phantom" ? "text-white font-black border-b-2 border-red-500" : "text-neutral-400 hover:text-white"}`}
-          >
-            PHANTOM
-          </button>
-          <button
-            onClick={() => setActiveTab("inventory")}
-            className={`pb-1 transition-colors cursor-pointer ${activeTab === "inventory" ? "text-white font-black border-b-2 border-red-500" : "text-neutral-400 hover:text-white"}`}
-          >
-            INVENTORY
-          </button>
-          <button
-            onClick={() => setActiveTab("mission")}
-            className={`pb-1 transition-colors cursor-pointer ${activeTab === "mission" ? "text-white font-black border-b-2 border-red-500" : "text-neutral-400 hover:text-white"}`}
-          >
-            MISSION
-          </button>
-        </div>
+      {/* ─── NUEVA BARRA SUPERIOR CON Header COMPONENTE ─── */}
+      <Header
+        userProfile={{
+          ...user,
+          username: user.name,
+          avatar_url: user.avatarUrl,
+          level: 1,
+          gd_coin: currencies.gd_coin,
+          quantum_credit: currencies.quantum_credit,
+          phantom_coin: currencies.phantom_coin,
+          halloween_coin: currencies.halloween_coin,
+          xmas_coin: currencies.xmas_coin,
+          valentine_coin: currencies.valentine_coin,
+          metal: resources.metal,
+          crystal: resources.crystal,
+          deuterium: resources.deuterium,
+          dark_matter: resources.dark_matter,
+          omniplate: resources.omniplate,
+          orichaltron: resources.orichaltron,
+          lunar_fiber: resources.lunar_fiber,
+          infinite_core: resources.infinite_core,
+          primal_token: resources.primal_token,
+          xenoplasm: resources.xenoplasm,
+          organium: resources.organium,
+          mana: resources.mana,
+          wood: resources.wood,
+        }}
+        activeTab={activeTab === 'home' && activeWindow === 'home' ? 'MAIN' :
+                   activeTab === 'can' ? 'CAN' :
+                   activeWindow === 'expeditions' || activeWindow === 'expeditions_flights' ? 'EXPEDITIONS' :
+                   activeTab === 'marketplace' ? 'MARKET' :
+                   activeTab === 'phantom' ? 'PHANTOM' :
+                   activeTab === 'inventory' ? 'INVENTORY' :
+                   activeTab === 'mission' ? 'MISSION' : 'MAIN'}
+        onSelectTab={(tab) => {
+          if (tab === 'MAIN') { setActiveTab('home'); setActiveWindow('home'); }
+          else if (tab === 'CAN') { setActiveTab('can'); }
+          else if (tab === 'EXPEDITIONS') { setActiveTab('home'); setActiveWindow('expeditions'); }
+          else if (tab === 'MARKET') { setActiveTab('marketplace'); }
+          else if (tab === 'PHANTOM') { setActiveTab('phantom'); }
+          else if (tab === 'INVENTORY') { setActiveTab('inventory'); }
+          else if (tab === 'MISSION') { setActiveTab('mission'); }
+        }}
+        unreadNotificationsCount={unreadNotifCount}
+        onOpenNotifications={() => { setActiveTab('home'); setActiveWindow('notifications'); }}
+        onOpenSettings={() => { setActiveTab('home'); setActiveWindow('settings'); }}
+        onOpenProfile={() => { setActiveTab('home'); setActiveWindow('profile'); }}
+      />
 
-        {/* ZONA DE MONEDAS Y RECURSOS CON ÍCONOS PNG (SIN TEXTOS GD, QC, PH) */}
-        <div className="flex items-center gap-3 flex-1 justify-end py-1 z-20 overflow-visible">
-          
-          {/* BLOQUE MONEDAS */}
-          <div className="flex items-center gap-1.5 bg-black/80 border border-amber-500/30 px-2.5 py-1 rounded-lg shrink-0 backdrop-blur-sm">
-            <span className="text-[8px] font-mono text-amber-500/80 uppercase tracking-wider mr-1 border-r border-amber-500/30 pr-1.5 font-black">MONEDAS</span>
-            
-            <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded border border-yellow-500/20" title="GD Coin">
-              <img src={GAME_ASSETS.gdCoin} alt="GD Coin" className="w-4 h-4 object-contain" />
-              <span>{formatVal(currencies.gd_coin)}</span>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20" title="Quantum Credit">
-              <img src={GAME_ASSETS.quantumCredit} alt="Quantum Credit" className="w-4 h-4 object-contain" />
-              <span>{formatVal(currencies.quantum_credit)}</span>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20" title="Phantom Coin">
-              <img src={GAME_ASSETS.phantomCoin} alt="Phantom Coin" className="w-4 h-4 object-contain" />
-              <span>{formatVal(currencies.phantom_coin)}</span>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20" title="Halloween Coin">
-              <img src={GAME_ASSETS.halloweenCoin} alt="Halloween Coin" className="w-4 h-4 object-contain" />
-              <span>{formatVal(currencies.halloween_coin)}</span>
-            </div>
-          </div>
-
-          {/* BLOQUE RECURSOS */}
-          <div className="flex items-center gap-1.5 bg-black/80 border border-cyan-500/30 px-2.5 py-1 rounded-lg shrink-0 relative backdrop-blur-sm">
-            <span className="text-[8px] font-mono text-cyan-400/80 uppercase tracking-wider mr-1 border-r border-cyan-500/30 pr-1.5 font-black">RECURSOS</span>
-            
-            <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-zinc-200 bg-zinc-800/50 px-2 py-0.5 rounded border border-zinc-700/40" title="Metal">
-              <img src={GAME_ASSETS.metal} alt="Metal" className="w-4 h-4 object-contain" />
-              <span>{formatVal(resources.metal)}</span>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20" title="Cristal">
-              <img src={GAME_ASSETS.crystal} alt="Cristal" className="w-4 h-4 object-contain" />
-              <span>{formatVal(resources.crystal)}</span>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-sky-300 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20" title="Deuterium">
-              <img src={GAME_ASSETS.deuterium} alt="Deuterium" className="w-4 h-4 object-contain" />
-              <span>{formatVal(resources.deuterium)}</span>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20" title="Dark Matter">
-              <img src={GAME_ASSETS.darkMatter} alt="Dark Matter" className="w-4 h-4 object-contain" />
-              <span>{formatVal(resources.dark_matter)}</span>
-            </div>
-
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowExtraResources(!showExtraResources);
-              }}
-              className="flex items-center gap-1 text-[9px] font-mono font-bold text-cyan-300 bg-cyan-950 hover:bg-cyan-900 px-2 py-1 rounded border border-cyan-500/50 transition-colors cursor-pointer"
-            >
-              <span>RESTO</span>
-              <ChevronDown className={`w-3 h-3 transition-transform ${showExtraResources ? 'rotate-180' : ''}`} />
-            </button>
-
-            <AnimatePresence>
-              {showExtraResources && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute top-full right-0 mt-2 p-3 bg-neutral-950/95 border border-cyan-500/40 rounded-xl shadow-2xl z-[99] w-80 grid grid-cols-2 gap-2 text-[9px] font-mono backdrop-blur-md"
-                >
-                  <div className="flex items-center gap-1.5 bg-black/80 p-1.5 rounded border border-cyan-950">
-                    <img src={GAME_ASSETS.primalToken} alt="Primal Token" className="w-4 h-4 object-contain" />
-                    <span className="text-zinc-400">PRIMAL:</span> 
-                    <span className="text-white font-bold ml-auto">{formatVal(resources.primal_token)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-black/80 p-1.5 rounded border border-cyan-950">
-                    <img src={GAME_ASSETS.xenoplasm} alt="Xenoplasm" className="w-4 h-4 object-contain" />
-                    <span className="text-zinc-400">XENO:</span> 
-                    <span className="text-white font-bold ml-auto">{formatVal(resources.xenoplasm)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-black/80 p-1.5 rounded border border-cyan-950">
-                    <span>🛡️</span> <span className="text-zinc-400">OMNIPLATE:</span> <span className="text-white font-bold ml-auto">{formatVal(resources.omniplate)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-black/80 p-1.5 rounded border border-cyan-950">
-                    <span>🔱</span> <span className="text-zinc-400">ORICHALTRON:</span> <span className="text-white font-bold ml-auto">{formatVal(resources.orichaltron)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-black/80 p-1.5 rounded border border-cyan-950">
-                    <span>🕸️</span> <span className="text-zinc-400">LUNAR FIBER:</span> <span className="text-white font-bold ml-auto">{formatVal(resources.lunar_fiber)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-black/80 p-1.5 rounded border border-cyan-950">
-                    <span>🔮</span> <span className="text-zinc-400">INFINITE CORE:</span> <span className="text-white font-bold ml-auto">{formatVal(resources.infinite_core)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-black/80 p-1.5 rounded border border-cyan-950">
-                    <span>🌿</span> <span className="text-zinc-400">ORGANIUM:</span> <span className="text-white font-bold ml-auto">{formatVal(resources.organium)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-black/80 p-1.5 rounded border border-cyan-950">
-                    <span>✨</span> <span className="text-zinc-400">MANA:</span> <span className="text-white font-bold ml-auto">{formatVal(resources.mana)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-black/80 p-1.5 rounded border border-cyan-950 col-span-2">
-                    <span>🪵</span> <span className="text-zinc-400">WOOD / MADERA:</span> <span className="text-white font-bold ml-auto">{formatVal(resources.wood)}</span>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-        </div>
-
-        {/* ─── PERFIL / AVATAR WIDGET FUTURISTA (ABRE DIRECTAMENTE PROFILEVIEW) ─── */}
-        <div 
-          onClick={() => {
-            setActiveTab("home");
-            setActiveWindow("profile");
-          }} 
-          className="group relative flex items-center gap-3 bg-black/80 hover:bg-black/95 border border-cyan-500/50 hover:border-cyan-400 pl-3.5 pr-2 py-1.5 rounded-full cursor-pointer transition-all duration-300 shadow-[0_0_15px_rgba(6,182,212,0.3)] hover:shadow-[0_0_25px_rgba(6,182,212,0.6)] shrink-0 ml-2 z-10 active:scale-95 backdrop-blur-md"
-          title="Ver Perfil del Comandante"
-        >
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500 via-sky-400 to-red-500 rounded-full blur opacity-25 group-hover:opacity-75 transition duration-500 -z-10 animate-pulse" />
-
-          <div className="flex flex-col text-right font-mono uppercase leading-tight">
-            <span className="text-[11px] font-black tracking-wider text-white group-hover:text-cyan-200 transition-colors drop-shadow-[0_0_5px_rgba(255,255,255,0.4)]">
-              {user.name || "AMIJARES"}
-            </span>
-            <div className="flex items-center justify-end gap-1.5 mt-0.5">
-              <span className="inline-flex items-center gap-1 bg-cyan-950/80 group-hover:bg-cyan-900 border border-cyan-400/50 text-cyan-300 text-[8.5px] font-black px-2 py-0.5 rounded-full tracking-widest shadow-[0_0_8px_rgba(6,182,212,0.4)]">
-                <User className="w-3 h-3 text-cyan-400" />
-                PERFIL
-              </span>
-            </div>
-          </div>
-
-          <div className="relative w-9 h-9 rounded-full p-[2px] bg-gradient-to-br from-cyan-400 via-sky-500 to-red-500 shadow-[0_0_12px_rgba(6,182,212,0.6)] shrink-0">
-            <div className="w-full h-full rounded-full bg-neutral-950 overflow-hidden relative flex items-center justify-center">
-              {user.avatarUrl ? (
-                <img 
-                  src={user.avatarUrl} 
-                  alt={user.name || "Avatar"} 
-                  className="w-full h-full object-cover rounded-full group-hover:scale-110 transition-transform duration-300"
-                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
-                />
-              ) : (
-                <User className="w-5 h-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(6,182,212,0.8)]" />
-              )}
-            </div>
-          </div>
-        </div>
-
-      </div>
 
       {/* ⏱️ RELOJ UTC DISCRETO ALINEADO COMPLETAMENTE AL BORDE IZQUIERDO */}
       <div className="w-full px-6 pt-2 flex justify-start items-center z-20 pointer-events-none">

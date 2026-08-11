@@ -8,6 +8,7 @@ interface HeaderProps {
   unreadNotificationsCount?: number;
   onOpenNotifications?: () => void;
   onOpenSettings?: () => void;
+  onOpenProfile?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,7 +17,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectTab,
   unreadNotificationsCount = 0,
   onOpenNotifications,
-  onOpenSettings
+  onOpenSettings,
+  onOpenProfile
 }) => {
   const [openDropdown, setOpenDropdown] = useState<'MONEDA' | 'RECURSOS' | null>(null);
 
@@ -66,15 +68,23 @@ export const Header: React.FC<HeaderProps> = ({
   const tabs = [
     { id: 'MAIN', label: 'MAIN' },
     { id: 'CAN', label: 'C.A.N.' },
-    { id: 'EXPEDITIONS', label: 'EXPEDICIONES' }
+    { id: 'EXPEDITIONS', label: 'EXPEDITION' },
+    { id: 'MARKET', label: 'MARKET' },
+    { id: 'PHANTOM', label: 'PHANTOM' },
+    { id: 'INVENTORY', label: 'INVENTORY' },
+    { id: 'MISSION', label: 'MISSION' },
   ];
 
   return (
     <header className="w-full bg-[#05080c]/98 border-b border-cyan-500/40 px-2 sm:px-4 py-1.5 flex items-center justify-between gap-2 shrink-0 select-none z-50 font-mono backdrop-blur-md sticky top-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)]">
       
       {/* ─── 1. ESQUINA IZQUIERDA: PERFIL / AVATAR ─── */}
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-cyan-950 border border-cyan-400/80 flex items-center justify-center text-cyan-300 font-bold shadow-[0_0_8px_rgba(34,211,238,0.3)]">
+      <div
+        className="flex items-center gap-2 shrink-0 cursor-pointer group"
+        onClick={() => onOpenProfile && onOpenProfile()}
+        title="Ver Perfil"
+      >
+        <div className="w-8 h-8 rounded-lg bg-cyan-950 border border-cyan-400/80 group-hover:border-cyan-300 flex items-center justify-center text-cyan-300 font-bold shadow-[0_0_8px_rgba(34,211,238,0.3)] transition-all overflow-hidden">
           {userProfile?.avatar_url ? (
             <img src={userProfile.avatar_url} alt="Avatar" className="w-full h-full object-cover rounded-lg" />
           ) : (
@@ -82,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
         <div className="flex flex-col text-left">
-          <span className="text-[9.5px] sm:text-[11px] font-black text-white uppercase tracking-wider truncate max-w-[90px] sm:max-w-[130px]">
+          <span className="text-[9.5px] sm:text-[11px] font-black text-white group-hover:text-cyan-200 uppercase tracking-wider truncate max-w-[90px] sm:max-w-[130px] transition-colors">
             {userProfile?.username || 'COMANDANTE'}
           </span>
           <span className="text-[7.5px] sm:text-[8.5px] font-mono font-bold text-cyan-400 uppercase">
