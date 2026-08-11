@@ -1,190 +1,153 @@
-import React, { useState, useEffect } from 'react';
-import { Info, Cpu, Layers, ShieldCheck } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-
-interface CanStats {
-  level: number;
-  structures_active: number;
-  structures_total: number;
-  tech_active: number;
-  tech_total: number;
-  badges_active: number;
-  badges_total: number;
-}
+import React, { useState } from 'react';
+import { Cpu, ShieldCheck, Zap, Info, ChevronRight } from 'lucide-react';
 
 export const CanView: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [stats, setStats] = useState<CanStats>({
-    level: 1,
-    structures_active: 10,
-    structures_total: 85,
-    tech_active: 5,
-    tech_total: 95,
-    badges_active: 2,
-    badges_total: 132
-  });
-
-  useEffect(() => {
-    const loadCanNetworkData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      setUserId(user.id);
-
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('can_level')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (!error && data) {
-        setStats(prev => ({
-          ...prev,
-          level: data.can_level || 1
-        }));
-      }
-    };
-    loadCanNetworkData();
-  }, []);
-
-  // 🆙 MEJORA PERSISTENTE: Transacción real de mutación de nodo central de automatización
-  const handleUpgradeLevel = async () => {
-    if (!userId || loading) return;
-    setLoading(true);
-
-    const nextLevel = stats.level + 1;
-
-    try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({ can_level: nextLevel })
-        .eq('user_id', userId);
-
-      if (error) throw error;
-
-      setStats(prev => ({ ...prev, level: nextLevel }));
-    } catch (err: any) {
-      console.error("Fallo al sincronizar la mejora del nodo C.A.N:", err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const activeSkills = [
-    "0,05 Technology Creation Time Reduction",
-    "2,5 Acquired Knowledge",
-    "0,05 Improves research efficiency, reducing the overall downtime",
-    "350 Crystal Production (Fixed)",
-    "1,05 Mine Production Boost",
-    "1,0 Ship Fabrication Time Reduction"
-  ];
+  const [canLevel] = useState(1);
 
   return (
-    <div className="w-full h-full bg-black text-white font-sans flex flex-col justify-start items-start px-12 pt-6 select-none overflow-y-auto">
-
-      <div className="mb-6 flex-shrink-0">
-        <div className="w-[236px] h-[120px] border border-neutral-800 bg-neutral-950 rounded-[1px] relative overflow-hidden group flex flex-col justify-end p-4">
-          <div className="absolute inset-0 z-0">
-            <img
-              src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=400"
-              alt="Inventory"
-              className="w-full h-full object-cover brightness-[0.35]"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent" />
+    <div className="w-full max-w-7xl mx-auto bg-[#080b0e] border border-cyan-500/30 p-4 sm:p-6 rounded-2xl shadow-2xl font-mono text-left select-none space-y-4 backdrop-blur-md relative overflow-hidden">
+      
+      {/* HEADER DE LA C.A.N. MATRIX */}
+      <div className="flex justify-between items-center border-b border-cyan-900/50 pb-3">
+        <div className="flex items-center gap-3">
+          <Cpu className="w-6 h-6 text-cyan-400 animate-pulse" />
+          <div>
+            <span className="text-[8.5px] font-mono text-cyan-400 tracking-widest block font-bold uppercase">
+              COMMAND ACTION NODE
+            </span>
+            <h2 className="text-base sm:text-lg font-black tracking-widest text-white uppercase">
+              C.A.N. MATRIX
+            </h2>
           </div>
-          <h2 className="relative z-10 text-[13px] font-bold tracking-widest text-white uppercase">
-            C.A.N. MATRIX
-          </h2>
+        </div>
+        <div className="flex items-center gap-1.5 bg-cyan-950/60 border border-cyan-800/50 px-2.5 py-1 rounded text-[8px] font-bold text-cyan-300 uppercase">
+          <Info className="w-3 h-3 text-cyan-400" />
+          <span>SINCRO MATRIZ ACTIVA</span>
         </div>
       </div>
 
-      <div className="w-full border border-cyan-500/20 bg-black rounded-[2px] overflow-hidden flex flex-col">
-        <div className="w-full grid grid-cols-12 border-b border-neutral-900 text-center font-bold tracking-widest text-[13px] uppercase bg-neutral-950/20 h-10 items-center">
-          <div className="col-span-3 border-r border-neutral-900 h-full flex items-center justify-center text-cyan-400">LEVEL</div>
-          <div className="col-span-5 border-r border-neutral-900 h-full flex items-center justify-center text-cyan-400">ASSETS</div>
-          <div className="col-span-4 h-full flex items-center justify-center text-cyan-400">SKILLS</div>
+      {/* CONTENEDOR PRINCIPAL EN GRILLA DE 12 COLUMNAS SIN SOLAPAMIENTO */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch min-h-[320px]">
+        
+        {/* COLUMNA 1: LEVEL (3 columnas en pantallas grandes) */}
+        <div className="lg:col-span-3 bg-black/60 border border-cyan-950 rounded-xl p-4 flex flex-col items-center justify-between text-center relative">
+          <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">
+            LEVEL
+          </span>
+
+          <div className="my-4 relative flex items-center justify-center">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-dashed border-cyan-500/40 animate-spin-slow absolute inset-0" />
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-cyan-400 bg-cyan-950/40 flex items-center justify-center text-3xl font-black text-white shadow-[0_0_20px_rgba(6,182,212,0.4)] relative z-10">
+              {canLevel}
+            </div>
+          </div>
+
+          <button className="w-full py-2 bg-gradient-to-r from-cyan-600 to-teal-600 hover:brightness-110 border border-cyan-400 text-white text-[9px] font-black uppercase tracking-widest rounded-lg shadow-lg cursor-pointer transition-all">
+            UPGRADE NODE
+          </button>
         </div>
 
-        <div className="w-full grid grid-cols-12 min-h-[260px]">
-          <div className="col-span-3 border-r border-neutral-900 p-5 flex flex-col justify-between items-center relative">
-            <div className="absolute top-3 left-4 text-cyan-400/80 cursor-pointer hover:text-cyan-400">
-              <Info className="w-4 h-4" />
-            </div>
+        {/* COLUMNA 2: ASSETS ACTIVADOS (5 columnas en pantallas grandes) */}
+        <div className="lg:col-span-5 bg-black/60 border border-cyan-950 rounded-xl p-3 sm:p-4 flex flex-col justify-between">
+          <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider block text-center mb-3">
+            ASSETS ACTIVADOS
+          </span>
 
-            <div className="my-auto relative flex items-center justify-center">
-              <div
-                style={{ animationDuration: '12s' }}
-                className="w-24 h-24 border-2 border-dashed border-cyan-500/30 rounded-full flex items-center justify-center p-2 animate-spin"
-              >
-                <div className="w-full h-full border border-cyan-400/50 rounded-full flex items-center justify-center"></div>
-              </div>
-              <div className="absolute font-sans font-black text-[32px] text-white tracking-tighter drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
-                {stats.level}
-              </div>
-            </div>
-
-            <button
-              onClick={handleUpgradeLevel}
-              disabled={loading || !userId}
-              className="w-full py-1 border border-cyan-500/50 hover:border-cyan-400 text-cyan-400 text-[11px] font-bold tracking-widest uppercase bg-black rounded-[1px] transition-colors cursor-pointer disabled:opacity-40"
-            >
-              {loading ? "PROCESSING..." : "UPGRADE NODE"}
-            </button>
-          </div>
-
-          <div className="col-span-5 border-r border-neutral-900 p-5 flex items-center justify-center gap-4">
-            <div className="flex-1 h-[140px] border border-neutral-800 bg-neutral-950/60 rounded-[2px] p-3 flex flex-col justify-between items-center relative">
-              <div className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-black border border-green-500 text-[10px] font-bold font-mono flex items-center justify-center text-green-400 shadow-[0_0_6px_rgba(34,197,94,0.4)]">
-                {stats.structures_active}
-              </div>
-              <span className="text-[9px] font-bold tracking-widest text-neutral-400 uppercase mt-1">STRUCTURES</span>
-              <Cpu className="w-6 h-6 text-cyan-500/60 stroke-[1.5]" />
-              <div className="text-[10px] font-mono text-neutral-500 text-center leading-tight">
-                <div>Activated: <span className="text-white font-sans">{stats.structures_active}</span></div>
-                <div className="mt-0.5">Total: <span className="text-white font-sans">{stats.structures_total}</span></div>
+          <div className="grid grid-cols-3 gap-2">
+            {/* STRUCTURES */}
+            <div className="bg-[#050910] border border-cyan-900/60 rounded-lg p-2.5 text-center flex flex-col justify-between items-center relative overflow-hidden group hover:border-cyan-500/80 transition-colors">
+              <span className="absolute top-1 right-1 text-[7.5px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-1.5 rounded-full">
+                10
+              </span>
+              <span className="text-[8px] sm:text-[9px] font-black text-zinc-300 uppercase mt-2">
+                STRUCTURES
+              </span>
+              <Cpu className="w-5 h-5 text-cyan-400 my-2 group-hover:scale-110 transition-transform" />
+              <div className="text-[7.5px] text-zinc-500 font-mono">
+                <div>Activated: <span className="text-white font-bold">10</span></div>
+                <div>Total: <span className="text-zinc-400">85</span></div>
               </div>
             </div>
 
-            <div className="flex-1 h-[140px] border border-neutral-800 bg-neutral-950/60 rounded-[2px] p-3 flex flex-col justify-between items-center relative">
-              <div className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-black border border-green-500 text-[10px] font-bold font-mono flex items-center justify-center text-green-400 shadow-[0_0_6px_rgba(34,197,94,0.4)]">
-                {stats.tech_active}
-              </div>
-              <span className="text-[9px] font-bold tracking-widest text-neutral-400 uppercase mt-1">TECHNOLOGIES</span>
-              <Layers className="w-6 h-6 text-cyan-500/60 stroke-[1.5]" />
-              <div className="text-[10px] font-mono text-neutral-500 text-center leading-tight">
-                <div>Activated: <span className="text-white font-sans">{stats.tech_active}</span></div>
-                <div className="mt-0.5">Total: <span className="text-white font-sans">{stats.tech_total}</span></div>
+            {/* TECHNOLOGIES */}
+            <div className="bg-[#050910] border border-cyan-900/60 rounded-lg p-2.5 text-center flex flex-col justify-between items-center relative overflow-hidden group hover:border-cyan-500/80 transition-colors">
+              <span className="absolute top-1 right-1 text-[7.5px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-1.5 rounded-full">
+                5
+              </span>
+              <span className="text-[8px] sm:text-[9px] font-black text-zinc-300 uppercase mt-2 truncate max-w-full">
+                TECHNOLOGIES
+              </span>
+              <Zap className="w-5 h-5 text-cyan-400 my-2 group-hover:scale-110 transition-transform" />
+              <div className="text-[7.5px] text-zinc-500 font-mono">
+                <div>Activated: <span className="text-white font-bold">5</span></div>
+                <div>Total: <span className="text-zinc-400">95</span></div>
               </div>
             </div>
 
-            <div className="flex-1 h-[140px] border border-neutral-800 bg-neutral-950/60 rounded-[2px] p-3 flex flex-col justify-between items-center relative">
-              <div className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-black border border-green-500 text-[10px] font-bold font-mono flex items-center justify-center text-green-400 shadow-[0_0_6px_rgba(34,197,94,0.4)]">
-                {stats.badges_active}
-              </div>
-              <span className="text-[9px] font-bold tracking-widest text-neutral-400 uppercase mt-1">BADGES</span>
-              <ShieldCheck className="w-6 h-6 text-cyan-500/60 stroke-[1.5]" />
-              <div className="text-[10px] font-mono text-neutral-500 text-center leading-tight">
-                <div>Activated: <span className="text-white font-sans">{stats.badges_active}</span></div>
-                <div className="mt-0.5">Total: <span className="text-white font-sans">{stats.badges_total}</span></div>
+            {/* BADGES */}
+            <div className="bg-[#050910] border border-cyan-900/60 rounded-lg p-2.5 text-center flex flex-col justify-between items-center relative overflow-hidden group hover:border-cyan-500/80 transition-colors">
+              <span className="absolute top-1 right-1 text-[7.5px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-1.5 rounded-full">
+                2
+              </span>
+              <span className="text-[8px] sm:text-[9px] font-black text-zinc-300 uppercase mt-2">
+                BADGES
+              </span>
+              <ShieldCheck className="w-5 h-5 text-cyan-400 my-2 group-hover:scale-110 transition-transform" />
+              <div className="text-[7.5px] text-zinc-500 font-mono">
+                <div>Activated: <span className="text-white font-bold">2</span></div>
+                <div>Total: <span className="text-zinc-400">132</span></div>
               </div>
             </div>
           </div>
 
-          <div className="col-span-4 p-5 flex flex-col justify-start items-start gap-3 overflow-hidden">
-            <div className="px-3 py-0.5 border border-cyan-500/40 bg-cyan-950/20 text-cyan-400 text-[9px] font-black tracking-widest uppercase rounded-[1px]">
+          <div className="mt-3 p-2 bg-cyan-950/30 border border-cyan-900/40 rounded text-[7.5px] text-cyan-300/80 text-center">
+            <span>• MAX BADGES SLOTS: 5 (DESBLOQUEA MÁS CON SKILLS DE ASSETS)</span>
+          </div>
+        </div>
+
+        {/* COLUMNA 3: SKILLS (4 columnas en pantallas grandes con Scroll Seguro) */}
+        <div className="lg:col-span-4 bg-black/60 border border-cyan-950 rounded-xl p-3 sm:p-4 flex flex-col justify-between min-w-0">
+          <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-cyan-950">
+            <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">
+              SKILLS ACTIVAS
+            </span>
+            <span className="text-[7.5px] bg-cyan-950 border border-cyan-800 text-cyan-300 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
               PASIVAS
+            </span>
+          </div>
+
+          <div className="space-y-2 text-[8px] sm:text-[8.5px] font-mono text-cyan-300 overflow-y-auto max-h-[200px] pr-1.5 custom-scrollbar text-left flex-1">
+            <div className="p-1.5 bg-[#050910] border border-cyan-950 rounded flex items-start gap-1.5">
+              <ChevronRight className="w-3 h-3 text-cyan-400 shrink-0 mt-0.5" />
+              <span>0,05 Technology Creation Time Reduction</span>
             </div>
-            <div className="flex-1 w-full flex flex-col gap-2 overflow-y-auto pr-1 text-[11px] font-mono font-bold text-cyan-400 tracking-wide leading-normal">
-              {activeSkills.map((skill, index) => (
-                <div key={index} className="hover:text-cyan-300 transition-colors py-0.5 border-b border-neutral-950">
-                  • {skill}
-                </div>
-              ))}
+            <div className="p-1.5 bg-[#050910] border border-cyan-950 rounded flex items-start gap-1.5">
+              <ChevronRight className="w-3 h-3 text-cyan-400 shrink-0 mt-0.5" />
+              <span className="text-cyan-200 font-bold">2,5 Acquired Knowledge</span>
+            </div>
+            <div className="p-1.5 bg-[#050910] border border-cyan-950 rounded flex items-start gap-1.5">
+              <ChevronRight className="w-3 h-3 text-cyan-400 shrink-0 mt-0.5" />
+              <span>0,05 Improves research efficiency, reducing overall downtime</span>
+            </div>
+            <div className="p-1.5 bg-[#050910] border border-cyan-950 rounded flex items-start gap-1.5">
+              <ChevronRight className="w-3 h-3 text-purple-400 shrink-0 mt-0.5" />
+              <span className="text-purple-300 font-bold">350 Crystal Production (Fixed)</span>
+            </div>
+            <div className="p-1.5 bg-[#050910] border border-cyan-950 rounded flex items-start gap-1.5">
+              <ChevronRight className="w-3 h-3 text-cyan-400 shrink-0 mt-0.5" />
+              <span>1,05 Mine Production Boost</span>
+            </div>
+            <div className="p-1.5 bg-[#050910] border border-cyan-950 rounded flex items-start gap-1.5">
+              <ChevronRight className="w-3 h-3 text-cyan-400 shrink-0 mt-0.5" />
+              <span>1,0 Ship Fabrication Time Reduction</span>
             </div>
           </div>
         </div>
+
       </div>
 
     </div>
   );
 };
+
+export default CanView;

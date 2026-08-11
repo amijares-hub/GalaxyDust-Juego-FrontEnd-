@@ -107,11 +107,11 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
 
   const [activeTab, setActiveTab] = useState<"home" | "marketplace" | "phantom" | "can" | "inventory" | "mission">("home");
   const [activeWindow, setActiveWindow] = useState<"home" | "expeditions" | "expeditions_flights" | "alliance" | "profile" | "settings" | "notifications">("home");
-  const [unreadNotifCount] = useState(3);
-  const [activeFlightsCount, setActiveFlightsCount] = useState(1);
-  const [showExtraResources, setShowExtraResources] = useState(false);
+  
+  // Estado dinámico para Notificaciones No Leídas
+  const [unreadNotifCount, setUnreadNotifCount] = useState<number>(0);
+  const [activeFlightsCount, setActiveFlightsCount] = useState<number>(0);
 
-  // Métrica UTC Discreta
   const [utcTime, setUtcTime] = useState<string>(miningService.getFormattedUtcTime());
 
   const [power, setPower] = useState(0);
@@ -140,12 +140,10 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     wood: 0
   });
 
-  // Gestor Global de Notificaciones para Vistas Hijas
   const handleTriggerNotification = (text: string, e?: any) => {
     console.log("📢 [SYSTEM_NOTIFICATION]:", text);
   };
 
-  // Lista de Misiones del Mission Center
   const [missions, setMissions] = useState<Mission[]>([
     { id: 'M-D1', type: 'DAILY', title: 'EXPEDICIÓN DE MINERÍA', description: 'Completar 3 expediciones de minería con éxito', progress: 3, maxProgress: 3, reward: '+50 CRISTALES', claimed: false },
     { id: 'M-D2', type: 'DAILY', title: 'SINCRO DE C.A.N.', description: 'Escanear 1 cluster galáctico en el mapa estelar', progress: 1, maxProgress: 1, reward: '+100 GD COINS', claimed: true },
@@ -159,7 +157,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     { id: 'M-C1', type: 'CLAN', title: 'APORTE DE ALIANZA', description: 'Contribuir al fondo de tecnología de tu Clan o Alianza', progress: 500, maxProgress: 1000, reward: '+1,000 GD COINS', claimed: false }
   ]);
 
-  // Temporizador para el Reloj UTC Discreto
   useEffect(() => {
     const timer = setInterval(() => {
       setUtcTime(miningService.getFormattedUtcTime());
@@ -176,16 +173,31 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser || !isMounted) return;
 
-      const { count } = await supabase
+      // 1. Cargar Recuento de Expediciones
+      const { count: flightCount } = await supabase
         .from('active_expeditions')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', authUser.id)
         .eq('status', 'LAUNCHED');
 
-      if (count !== null && count !== undefined && isMounted) {
-        setActiveFlightsCount(count > 0 ? count : 1);
+      if (flightCount !== null && flightCount !== undefined && isMounted) {
+        setActiveFlightsCount(flightCount);
       }
 
+      // 2. Cargar Recuento Real de Notificaciones No Leídas desde Supabase
+      const { count: notifCount } = await supabase
+        .from('expedition_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', authUser.id)
+        .eq('is_read', false);
+
+      if (notifCount !== null && notifCount !== undefined && isMounted) {
+        setUnreadNotifCount(notifCount);
+      } else if (isMounted) {
+        setUnreadNotifCount(0);
+      }
+
+      // 3. Cargar Perfil y Economía
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('*')
@@ -220,6 +232,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         }));
       }
 
+      // Suscribirse a cambios en tiempo real
       channel = supabase
         .channel(`economy_hud_stream_${authUser.id}`)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_profiles', filter: `user_id=eq.${authUser.id}` }, (payload: any) => {
@@ -263,12 +276,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     };
   }, []);
 
-  const formatVal = (num: number) => {
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `${(num / 1000).toFixed(0)}K`;
-    return num.toLocaleString();
-  };
-
   const handleClaimMission = (missionId: string) => {
     setMissions(prev => prev.map(m => m.id === missionId ? { ...m, claimed: true } : m));
   };
@@ -278,10 +285,9 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       className="w-full min-h-screen bg-black flex flex-col items-center justify-start overflow-y-auto p-1 sm:p-3 bg-cover bg-center bg-no-repeat bg-fixed overflow-x-hidden font-sans select-none text-white relative"
       style={{ backgroundImage: `url('${GAME_ASSETS.background}')` }}
     >
-      {/* Capa de contraste traslúcida */}
       <div className="fixed inset-0 bg-black/55 backdrop-blur-[1px] z-0 pointer-events-none" />
 
-      {/* ─── NUEVA BARRA SUPERIOR CON Header COMPONENTE ─── */}
+      {/* ─── BARRA SUPERIOR HEADER ─── */}
       <Header
         userProfile={{
           ...user,
@@ -330,17 +336,15 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         onOpenProfile={() => { setActiveTab('home'); setActiveWindow('profile'); }}
       />
 
-
-      {/* ⏱️ RELOJ UTC DISCRETO ALINEADO COMPLETAMENTE AL BORDE IZQUIERDO */}
+      {/* ⏱️ RELOJ UTC DISCRETO */}
       <div className="w-full px-6 pt-2 flex justify-start items-center z-20 pointer-events-none">
         <div className="flex items-center gap-2 font-mono text-[10px] text-cyan-400/80 font-bold tracking-widest uppercase drop-shadow-[0_0_6px_rgba(6,182,212,0.4)]">
           <span>{utcTime}</span>
         </div>
       </div>
 
-      {/* 🎯 BARRA LATERAL DERECHA DE ACCESO RÁPIDO (QUICK ACCESS BAR) */}
+      {/* 🎯 BARRA LATERAL DERECHA (QUICK ACCESS BAR) */}
       <div className="fixed right-6 top-24 flex flex-col items-center gap-3 z-30 font-mono">
-        {/* 1. EXPEDITION IN FLIGHT */}
         <button
           onClick={() => { setActiveTab("home"); setActiveWindow("expeditions_flights"); }}
           className={`relative p-2.5 rounded-xl border backdrop-blur-md transition-all cursor-pointer shadow-lg group ${
@@ -356,13 +360,8 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
               {activeFlightsCount}
             </span>
           )}
-
-          <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center bg-black/90 border border-cyan-500/60 text-cyan-300 text-[8px] font-mono font-bold uppercase px-2 py-1 rounded shadow-2xl whitespace-nowrap pointer-events-none">
-            EXPEDITIONS IN FLIGHT
-          </div>
         </button>
 
-        {/* 2. NOTIFICACIONES */}
         <button
           onClick={() => { setActiveTab("home"); setActiveWindow("notifications"); }}
           className={`relative p-2.5 rounded-xl border backdrop-blur-md transition-all cursor-pointer shadow-lg group ${
@@ -378,12 +377,8 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
               {unreadNotifCount}
             </span>
           )}
-          <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center bg-black/90 border border-cyan-500/60 text-cyan-300 text-[8px] font-mono font-bold uppercase px-2 py-1 rounded shadow-2xl whitespace-nowrap pointer-events-none">
-            NOTIFICACIONES
-          </div>
         </button>
 
-        {/* 3. SETTINGS */}
         <button
           onClick={() => { setActiveTab("home"); setActiveWindow("settings"); }}
           className={`relative p-2.5 rounded-xl border backdrop-blur-md transition-all cursor-pointer shadow-lg group ${
@@ -394,17 +389,14 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           title="Settings"
         >
           <Settings className="w-5 h-5 text-cyan-400 transition-transform group-hover:rotate-90 duration-300" />
-          <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center bg-black/90 border border-cyan-500/60 text-cyan-300 text-[8px] font-mono font-bold uppercase px-2 py-1 rounded shadow-2xl whitespace-nowrap pointer-events-none">
-            SETTINGS
-          </div>
         </button>
       </div>
 
-      {/* CONTENIDO PRINCIPAL DE PÁGINAS */}
+      {/* CONTENIDO PRINCIPAL */}
       <div className="w-full max-w-7xl flex-1 overflow-y-auto px-8 py-4 z-10 flex flex-col items-center justify-start">
         <AnimatePresence mode="wait">
           
-          {/* SECTOR HOME */}
+          {/* HOME */}
           {activeTab === "home" && (
             activeWindow === "home" ? (
               <motion.div key="sector-home-screen" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} transition={{ duration: 0.2 }} className="w-full my-auto">
@@ -475,10 +467,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                       <span>EFECTOS DE SONIDO TÁCTICOS (SFX)</span>
                       <input type="checkbox" defaultChecked className="accent-cyan-500" />
                     </label>
-                    <label className="flex items-center justify-between text-zinc-300">
-                      <span>MÚSICA AMBIENTAL ESTELAR</span>
-                      <input type="checkbox" defaultChecked className="accent-cyan-500" />
-                    </label>
                   </div>
                   <div className="p-4 bg-black/60 border border-cyan-950 rounded-xl space-y-2">
                     <span className="text-cyan-400 font-bold block uppercase">RENDIMIENTO VISUAL</span>
@@ -486,34 +474,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                       <span>ANIMACIONES DE INTERFAZ</span>
                       <input type="checkbox" defaultChecked className="accent-cyan-500" />
                     </label>
-                    <label className="flex items-center justify-between text-zinc-300">
-                      <span>PARTÍCULAS Y GLOW EN TIEMPO REAL</span>
-                      <input type="checkbox" defaultChecked className="accent-cyan-500" />
-                    </label>
-                  </div>
-
-                  <div className="p-4 bg-black/60 border border-cyan-950 rounded-xl space-y-2 col-span-1 md:col-span-2">
-                    <span className="text-cyan-400 font-bold block uppercase border-b border-cyan-950 pb-1 mb-2">
-                      PREFERENCIAS DE NOTIFICACIÓN (ALERTAS TÁCTICAS)
-                    </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[9.5px]">
-                      <label className="flex items-center justify-between text-zinc-300 bg-black/40 p-2 rounded border border-cyan-950">
-                        <span>ANUNCIOS IMPERIALES (ANNOUNCEMENTS)</span>
-                        <input type="checkbox" defaultChecked className="accent-cyan-500" />
-                      </label>
-                      <label className="flex items-center justify-between text-zinc-300 bg-black/40 p-2 rounded border border-cyan-950">
-                        <span>EXPEDICIONES Y FLOTAS (EXPEDITIONS)</span>
-                        <input type="checkbox" defaultChecked className="accent-cyan-500" />
-                      </label>
-                      <label className="flex items-center justify-between text-zinc-300 bg-black/40 p-2 rounded border border-cyan-950">
-                        <span>TRANSACCIONES DE MERCADO (MARKET)</span>
-                        <input type="checkbox" defaultChecked className="accent-cyan-500" />
-                      </label>
-                      <label className="flex items-center justify-between text-zinc-300 bg-black/40 p-2 rounded border border-cyan-950">
-                        <span>COMUNICADOS DE ALIANZA (ALLIANCE)</span>
-                        <input type="checkbox" defaultChecked className="accent-cyan-500" />
-                      </label>
-                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -538,10 +498,9 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
             )
           )}
 
-          {/* SECTOR MISSION (PÁGINA PRINCIPAL DE MISIONES) */}
+          {/* MISSION */}
           {activeTab === "mission" && (
             <motion.div key="sector-mission-page" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full bg-[#080b0e] border border-cyan-500/30 p-6 sm:p-8 rounded-2xl font-mono text-left space-y-6 backdrop-blur-md shadow-2xl relative overflow-hidden">
-              
               <div className="flex justify-between items-center border-b border-cyan-900/50 pb-4">
                 <div className="flex items-center gap-3">
                   <Target className="w-7 h-7 text-cyan-400 animate-pulse" />
@@ -554,9 +513,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                     </h2>
                   </div>
                 </div>
-                <span className="text-[9px] text-zinc-400 bg-cyan-950 px-3 py-1 rounded border border-cyan-800/40 uppercase font-bold">
-                  SINCRO EN TIEMPO REAL
-                </span>
               </div>
 
               <div className="flex items-center gap-2 overflow-x-auto scrollbar-none border-b border-cyan-950 pb-3 text-[9px] uppercase font-bold tracking-wider">
@@ -576,97 +532,57 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-cyan-950">
-                {missions.filter(m => m.type === activeMissionType).length === 0 ? (
-                  <div className="col-span-2 p-12 text-center text-zinc-600 text-[10px] uppercase tracking-widest">
-                    NO HAY MISIONES DISPONIBLES EN ESTA CATEGORÍA
-                  </div>
-                ) : (
-                  missions.filter(m => m.type === activeMissionType).map((mission) => {
-                    const isComplete = mission.progress >= mission.maxProgress;
-                    const pct = Math.min(100, Math.floor((mission.progress / mission.maxProgress) * 100));
+                {missions.filter(m => m.type === activeMissionType).map((mission) => {
+                  const isComplete = mission.progress >= mission.maxProgress;
+                  const pct = Math.min(100, Math.floor((mission.progress / mission.maxProgress) * 100));
 
-                    return (
-                      <div
-                        key={mission.id}
-                        className="p-4 bg-black/60 border border-cyan-950 hover:border-cyan-800 rounded-xl flex flex-col justify-between gap-3 relative transition-all"
-                      >
-                        <div className="flex justify-between items-start gap-2">
-                          <div className="flex flex-col text-left">
-                            <span className="text-[11px] font-bold text-white uppercase tracking-wider">
-                              {mission.title}
-                            </span>
-                            <span className="text-[9px] text-zinc-400 mt-0.5 normal-case">
-                              {mission.description}
-                            </span>
-                          </div>
-
-                          <span className="text-[8.5px] font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20 shrink-0">
-                            {mission.reward}
-                          </span>
+                  return (
+                    <div key={mission.id} className="p-4 bg-black/60 border border-cyan-950 rounded-xl flex flex-col justify-between gap-3 relative">
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex flex-col text-left">
+                          <span className="text-[11px] font-bold text-white uppercase tracking-wider">{mission.title}</span>
+                          <span className="text-[9px] text-zinc-400 mt-0.5 normal-case">{mission.description}</span>
                         </div>
-
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-[8px] text-zinc-500">
-                            <span>PROGRESO</span>
-                            <span className="text-cyan-400 font-bold">{mission.progress} / {mission.maxProgress} ({pct}%)</span>
-                          </div>
-                          <div className="w-full h-2 bg-neutral-900 rounded-full overflow-hidden p-0.5 border border-cyan-950">
-                            <div
-                              className="h-full bg-cyan-400 rounded-full transition-all duration-300"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
+                        <span className="text-[8.5px] font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20 shrink-0">{mission.reward}</span>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[8px] text-zinc-500">
+                          <span>PROGRESO</span>
+                          <span className="text-cyan-400 font-bold">{mission.progress} / {mission.maxProgress} ({pct}%)</span>
                         </div>
-
-                        <div className="flex justify-end mt-1">
-                          {mission.claimed ? (
-                            <span className="text-[8.5px] font-bold text-zinc-500 uppercase flex items-center gap-1">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> RECLAMADO
-                            </span>
-                          ) : isComplete ? (
-                            <button
-                              onClick={() => handleClaimMission(mission.id)}
-                              className="px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white text-[8.5px] font-black uppercase rounded shadow-[0_0_10px_rgba(16,185,129,0.4)] cursor-pointer transition-all animate-pulse"
-                            >
-                              RECLAMAR RECOMPENSA
-                            </button>
-                          ) : (
-                            <span className="text-[8px] text-zinc-500 uppercase font-bold flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5 text-zinc-500" /> EN PROGRESO
-                            </span>
-                          )}
+                        <div className="w-full h-2 bg-neutral-900 rounded-full overflow-hidden p-0.5 border border-cyan-950">
+                          <div className="h-full bg-cyan-400 rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
                         </div>
                       </div>
-                    );
-                  })
-                )}
+                    </div>
+                  );
+                })}
               </div>
-
             </motion.div>
           )}
 
-          {/* SECTOR MARKET */}
+          {/* MARKETPLACE */}
           {activeTab === "marketplace" && (
             <motion.div key="sector-marketplace-screen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full">
               <MarketplaceView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} playerWood={resources.wood} setPlayerWood={() => { }} playerFood={resources.deuterium} setPlayerFood={() => { }} playerStone={resources.dark_matter} setPlayerStone={() => { }} playerOre={resources.metal} setPlayerOre={() => { }} onBack={() => setActiveTab("home")} triggerNotification={handleTriggerNotification} />
             </motion.div>
           )}
 
-          {/* SECTOR PHANTOM STATION */}
+          {/* PHANTOM STATION */}
           {activeTab === "phantom" && (
             <motion.div key="sector-phantom-screen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full">
               <PhantomStationView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} onBack={() => setActiveTab("home")} triggerNotification={handleTriggerNotification} />
             </motion.div>
           )}
 
-          {/* SECTOR INVENTARIO */}
+          {/* INVENTARIO */}
           {activeTab === "inventory" && (
             <motion.div key="sector-inventory-screen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full">
               <InventoryView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} onBack={() => setActiveTab("home")} triggerNotification={handleTriggerNotification} />
             </motion.div>
           )}
 
-          {/* SECTOR C.A.N. MATRIX */}
+          {/* C.A.N. MATRIX */}
           {activeTab === "can" && (
             <motion.div key="sector-can-screen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full">
               <CanView />
@@ -676,7 +592,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         </AnimatePresence>
       </div>
 
-      {/* ─── HUD DEL CHAT EN TIEMPO REAL ─── */}
       <ChatSystem userAllianceName={user.allianceName} triggerNotification={handleTriggerNotification} />
 
     </main>
