@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, AlertCircle, RefreshCw, ShieldCheck, KeyRound } from 'lucide-react';
 import { useSasoriAuth } from '../hooks/useSasoriAuth';
-import spaceBackground from '../assets/images/space_background_1779360172256.png';
 
 export const AuthView: React.FC = () => {
   // 🛰️ Acoplamiento total al motor de estados unificado de Sasori
@@ -58,17 +57,15 @@ export const AuthView: React.FC = () => {
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#0C0D0E] flex flex-col justify-center items-center font-sans select-none text-white">
 
-      {/* Fondo espacial coloidal */}
+      {/* ─── FONDO ESPACIAL EXCLUSIVO DE INICIO DE SESIÓN ─── */}
       <div
-        className="absolute inset-0 opacity-[0.12] pointer-events-none z-0"
+        className="absolute inset-0 bg-cover bg-center opacity-40 pointer-events-none z-0 transition-opacity duration-700"
         style={{
-          backgroundImage: `url(${spaceBackground})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
+          backgroundImage: `url('https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20(Ambientes%20)/23.jpg')`,
         }}
       />
 
+      {/* Capa de destello y sombras de ambiente */}
       <div className="absolute top-0 left-0 w-full h-full opacity-30 pointer-events-none z-0">
         <div className="absolute top-[-100px] left-[-100px] w-[500px] h-[500px] bg-[#1C1E22] rounded-full blur-[140px]" />
         <div className="absolute bottom-[-100px] right-[-100px] w-[500px] h-[500px] bg-[#111214] rounded-full blur-[140px]" />
@@ -76,11 +73,14 @@ export const AuthView: React.FC = () => {
 
       <div className="relative z-10 w-full max-w-sm px-6">
 
-        {/* Cabecera del Kernel */}
+        {/* ─── LOGO Y TÍTULO DEL JUEGO ─── */}
         <div className="flex flex-col items-center mb-6">
-          <ShieldCheck className="w-10 h-10 text-cyan-500 mb-2 drop-shadow-[0_0_10px_rgba(6,182,212,0.6)]" />
+          <img
+            src="https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Logo/1.png"
+            alt="GalaxyDust Logo"
+            className="w-20 h-20 mb-2 object-contain drop-shadow-[0_0_15px_rgba(6,182,212,0.8)]"
+          />
           <h1 className="text-xl font-black uppercase tracking-[0.4em] text-white">GALAXYDUST</h1>
-          <p className="text-[10px] tracking-widest text-cyan-400 mt-1 uppercase">Terminal de Acceso Seguro</p>
         </div>
 
         <div className="bg-[#121315]/90 border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-2xl relative overflow-hidden">
@@ -168,7 +168,7 @@ export const AuthView: React.FC = () => {
                     type="submit" disabled={loading}
                     className="mt-2 w-full py-3.5 bg-cyan-600 hover:bg-cyan-500 text-white font-black uppercase tracking-[0.2em] text-[10px] rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all active:scale-[0.98] disabled:opacity-70 flex items-center justify-center cursor-pointer"
                   >
-                    {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : (activeTab === 'login' ? 'ESTABLECER CONEXIÓN' : 'REGISTRAR FIRMA')}
+                    {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : (activeTab === 'login' ? 'INICIAR SESIÓN' : 'REGISTRAR FIRMA')}
                   </button>
                 </form>
               </motion.div>
