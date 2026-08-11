@@ -83,24 +83,19 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
 
   const [power, setPower] = useState(0);
   const [currencies, setCurrencies] = useState({ gd_coin: 0, quantum_credit: 0, phantom_coin: 0, halloween_coin: 0, xmas_coin: 0, valentine_coin: 0 });
-  const [resources, setResources] = useState({ metal: 0, crystal: 0, deuterium: 0, dark_matter: 0, omniplate: 0, orichaltron: 0, lunar_fiber: 0, infinite_core: 0, primal_token: 0, xenoplasm: 0, organium: 0, mana: 0, wood: 0 });
+  const [resources, setResources] = useState({
+    metal: 0, crystal: 0, deuterium: 0, dark_matter: 0, omniplate: 0, orichaltron: 0,
+    lunar_fiber: 0, infinite_core: 0, primal_token: 0, xenoplasm: 0, organium: 0, mana: 0, wood: 0
+  });
 
   const handleTriggerNotification = (text: string, e?: any) => {
     console.log("📢 [SYSTEM_NOTIFICATION]:", text);
   };
 
-  // 🎯 LISTA COMPLETA DE MISIONES
   const [missions, setMissions] = useState<Mission[]>([
     { id: 'M-D1', type: 'DAILY', title: 'EXPEDICIÓN DE MINERÍA', description: 'Completar 3 expediciones de minería con éxito', progress: 3, maxProgress: 3, reward: '+50 CRISTALES', claimed: false },
     { id: 'M-D2', type: 'DAILY', title: 'SINCRO DE C.A.N.', description: 'Escanear 1 cluster galáctico en el mapa estelar', progress: 1, maxProgress: 1, reward: '+100 GD COINS', claimed: true },
-    { id: 'M-D3', type: 'DAILY', title: 'COMERCIO INGAME', description: 'Realizar 1 compra o venta en el Marketplace', progress: 0, maxProgress: 1, reward: '+10 PHANTOM COINS', claimed: false },
-    { id: 'M-W1', type: 'WEEKLY', title: 'DOMINACIÓN TERRITORIAL', description: 'Conquistar o defender 2 estrellas en modo Dominación', progress: 1, maxProgress: 2, reward: '+500 CRISTALES', claimed: false },
-    { id: 'M-W2', type: 'WEEKLY', title: 'CRAFTING DE FLOTA', description: 'Ensamblar 2 naves en el hangar de inventario', progress: 2, maxProgress: 2, reward: '+1,500 GD COINS', claimed: false },
-    { id: 'M-M1', type: 'MONTHLY', title: 'MAESTRÍA DE SECTORES', description: 'Completar 50 expediciones en la galaxia', progress: 32, maxProgress: 50, reward: '+2,500 CRISTALES + 1 BLUEPRINT', claimed: false },
-    { id: 'M-E1', type: 'EVENT', title: 'INCURSIÓN ANOMALÍA COLOIDAL', description: 'Recolectar 5,000 de Xenoplasma durante el evento activo', progress: 1200, maxProgress: 5000, reward: '+1 PRIMAL TOKEN', claimed: false },
-    { id: 'M-L1', type: 'LIMITED', title: 'DESAFÍO FLASH DE VANGUARDIA', description: 'Alcanzar 160,000 de Poder de Comando en las próximas 12 horas', progress: 156420, maxProgress: 160000, reward: '+300 PHANTOM COINS', claimed: false },
-    { id: 'M-F1', type: 'FLEET', title: 'DESPLIEGUE ARMADO', description: 'Mantener 3 flotas personalizadas activas en el Fleet Manager', progress: 3, maxProgress: 3, reward: '+200 QUANTUM CREDITS', claimed: false },
-    { id: 'M-C1', type: 'CLAN', title: 'APORTE DE ALIANZA', description: 'Contribuir al fondo de tecnología de tu Clan o Alianza', progress: 500, maxProgress: 1000, reward: '+1,000 GD COINS', claimed: false }
+    { id: 'M-D3', type: 'DAILY', title: 'COMERCIO INGAME', description: 'Realizar 1 compra o venta en el Marketplace', progress: 0, maxProgress: 1, reward: '+10 PHANTOM COINS', claimed: false }
   ]);
 
   const handleClaimMission = (missionId: string) => {
@@ -114,44 +109,26 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     return () => clearInterval(timer);
   }, []);
 
+  // 🔄 CARGA Y SINCRONIZACIÓN CONTINUA DE RECURSOS / MONEDAS REALES
   useEffect(() => {
     let channel: any;
     let isMounted = true;
 
-    const initEngine = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser || !isMounted) return;
-
-      const savedAvatar = localStorage.getItem(`user_avatar_${authUser.id}`);
-      if (savedAvatar) {
-        setCurrentAvatarUrl(savedAvatar);
-      }
-
-      const { count: flightCount } = await supabase
-        .from('active_expeditions')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', authUser.id)
-        .eq('status', 'LAUNCHED');
-
-      if (flightCount !== null && flightCount !== undefined && isMounted) {
-        setActiveFlightsCount(flightCount);
-      }
-
-      const { count: notifCount } = await supabase
-        .from('expedition_logs')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', authUser.id)
-        .eq('is_read', false);
-
-      if (notifCount !== null && notifCount !== undefined && isMounted) {
-        setUnreadNotifCount(notifCount);
-      }
-
-      const { data: profile } = await supabase
+    const loadUserProfile = async (authUser: any) => {
+      let { data: profile } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('id', authUser.id)
+        .eq('user_id', authUser.id)
         .maybeSingle();
+
+      if (!profile) {
+        const { data: profileById } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', authUser.id)
+          .maybeSingle();
+        profile = profileById;
+      }
 
       if (profile && isMounted) {
         if (profile.avatar_url) setCurrentAvatarUrl(profile.avatar_url);
@@ -164,16 +141,76 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           xmas_coin: parseFloat(profile.xmas_coin || 0),
           valentine_coin: parseFloat(profile.valentine_coin || 0)
         });
+        setResources({
+          metal: parseFloat(profile.metal || 0),
+          crystal: parseFloat(profile.crystal || 0),
+          deuterium: parseFloat(profile.deuterium || 0),
+          dark_matter: parseFloat(profile.dark_matter || 0),
+          omniplate: parseFloat(profile.omniplate || 0),
+          orichaltron: parseFloat(profile.orichaltron || 0),
+          lunar_fiber: parseFloat(profile.lunar_fiber || 0),
+          infinite_core: parseFloat(profile.infinite_core || 0),
+          primal_token: parseFloat(profile.primal_token || 0),
+          xenoplasm: parseFloat(profile.xenoplasm || 0),
+          organium: parseFloat(profile.organium || 0),
+          mana: parseFloat(profile.mana || 0),
+          wood: parseFloat(profile.wood || 0)
+        });
+      }
+    };
+
+    const initEngine = async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser || !isMounted) return;
+
+      const savedAvatar = localStorage.getItem(`user_avatar_${authUser.id}`);
+      if (savedAvatar) {
+        setCurrentAvatarUrl(savedAvatar);
       }
 
+      // Carga Inicial
+      await loadUserProfile(authUser);
+
+      // Expediciones
+      const { count: flightCount } = await supabase
+        .from('active_expeditions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', authUser.id)
+        .eq('status', 'LAUNCHED');
+
+      if (flightCount !== null && flightCount !== undefined && isMounted) {
+        setActiveFlightsCount(flightCount);
+      }
+
+      // Notificaciones
+      const { count: notifCount } = await supabase
+        .from('expedition_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', authUser.id)
+        .eq('is_read', false);
+
+      if (notifCount !== null && notifCount !== undefined && isMounted) {
+        setUnreadNotifCount(notifCount);
+      }
+
+      // Suscripción Realtime
       channel = supabase
         .channel(`economy_hud_stream_${authUser.id}`)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_profiles', filter: `id=eq.${authUser.id}` }, (payload: any) => {
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_profiles' }, (payload: any) => {
           const updated = payload.new;
           if (!updated || !isMounted) return;
-          if (updated.avatar_url) setCurrentAvatarUrl(updated.avatar_url);
+          if (updated.id === authUser.id || updated.user_id === authUser.id) {
+            loadUserProfile(authUser);
+          }
         })
         .subscribe();
+
+      // ⏱️ Failsafe: Refresco automático cada 3 segundos para garantizar la lectura de expediciones reclamadas
+      const pollInterval = setInterval(() => {
+        if (isMounted) loadUserProfile(authUser);
+      }, 3000);
+
+      return () => clearInterval(pollInterval);
     };
 
     initEngine();
@@ -191,7 +228,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     >
       <div className="fixed inset-0 bg-black/55 backdrop-blur-[1px] z-0 pointer-events-none" />
 
-      {/* BARRA SUPERIOR HEADER */}
+      {/* ─── BARRA SUPERIOR HEADER (ENVÍA TODOS LOS DATOS REALES) ─── */}
       <Header
         userProfile={{
           ...user,
@@ -201,10 +238,22 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           gd_coin: currencies.gd_coin,
           quantum_credit: currencies.quantum_credit,
           phantom_coin: currencies.phantom_coin,
+          halloween_coin: currencies.halloween_coin,
+          xmas_coin: currencies.xmas_coin,
+          valentine_coin: currencies.valentine_coin,
           metal: resources.metal,
           crystal: resources.crystal,
           deuterium: resources.deuterium,
           dark_matter: resources.dark_matter,
+          omniplate: resources.omniplate,
+          orichaltron: resources.orichaltron,
+          lunar_fiber: resources.lunar_fiber,
+          infinite_core: resources.infinite_core,
+          primal_token: resources.primal_token,
+          xenoplasm: resources.xenoplasm,
+          organium: resources.organium,
+          mana: resources.mana,
+          wood: resources.wood
         }}
         activeTab={activeTab === 'home' && activeWindow === 'home' ? 'MAIN' :
                    activeTab === 'can' ? 'CAN' :
@@ -252,7 +301,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       <div className="w-full max-w-7xl flex-1 overflow-y-auto px-8 py-4 z-10 flex flex-col items-center justify-start">
         <AnimatePresence mode="wait">
           
-          {/* HOME */}
+          {/* SECTOR HOME / TARJETAS */}
           {activeTab === "home" && (
             activeWindow === "home" ? (
               <motion.div key="sector-home-screen" className="w-full my-auto">
@@ -270,7 +319,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                         <img
                           src={card.imageSrc}
                           alt={card.title}
-                          className="w-full h-full object-cover brightness-40 group-hover:scale-105 group-hover:brightness-60 transition-all duration-500"
+                          className="w-full h-full object-cover brightness-50 group-hover:scale-105 group-hover:brightness-75 transition-all duration-500"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
                       </div>
@@ -311,7 +360,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
             )
           )}
 
-          {/* 🎯 RESTAURADO: SECTOR MISSION CENTER */}
+          {/* SECTOR MISSION CENTER */}
           {activeTab === "mission" && (
             <motion.div key="sector-mission-page" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full bg-[#080b0e] border border-cyan-500/30 p-6 sm:p-8 rounded-2xl font-mono text-left space-y-6 backdrop-blur-md shadow-2xl relative overflow-hidden">
               <div className="flex justify-between items-center border-b border-cyan-900/50 pb-4">

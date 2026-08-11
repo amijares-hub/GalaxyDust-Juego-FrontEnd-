@@ -47,7 +47,9 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputContent, setInputContent] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [unreadCount, setUnreadCount] = useState(3);
+
+  // 🎯 REAL Y CORREGIDO: Inicializa en 0 para no mostrar falsas notificaciones
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Sistema de DM Privado
   const [activeDmPartner, setActiveDmPartner] = useState<DmPartner | null>(null);
@@ -55,7 +57,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     { id: 'usr-demo-1', name: 'COMANDANTE_KRONOS', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', role: 'LÍDER' },
     { id: 'usr-demo-2', name: 'PILOTO_VANGUARD', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', role: 'OFICIAL' }
   ]);
-  const [currentUserId, setCurrentUserId] = useState<string>('user-current-id');
+  const [currentUserId, setCurrentUserId] = useState<string>('');
 
   // Selector de Emojis
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -90,7 +92,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     }
   }, [activeChannel, activeDmPartner, currentUserId, userAllianceName]);
 
-  // Cargar Historial y Suscribir
+  // Cargar Historial y Suscribir con conteo de no leídos real
   useEffect(() => {
     if (channelId === 'dm-none') {
       setMessages([]);
@@ -105,7 +107,11 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
 
       unsubscribe = chatService.subscribeToChannel(channelId, (newMsg) => {
         setMessages((prev) => [...prev, newMsg]);
-        if (!isOpen) setUnreadCount((prev) => prev + 1);
+
+        // 🎯 Aumenta la notificación SOLO si el chat está cerrado Y el mensaje es de otro jugador
+        if (!isOpen && newMsg.user_id !== currentUserId) {
+          setUnreadCount((prev) => prev + 1);
+        }
       });
     }
 
@@ -114,7 +120,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [channelId, isOpen]);
+  }, [channelId, isOpen, currentUserId]);
 
   // Auto-scroll
   useEffect(() => {
@@ -140,7 +146,6 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
         activeChannel === 'PRIVADO' && activeDmPartner ? activeDmPartner.id : null
       );
 
-      // Agregar directamente al feed local para asegurar envío instantáneo en DMs y Alianza
       setMessages((prev) => {
         if (prev.some((m) => m.id === sentMsg.id)) return prev;
         return [...prev, sentMsg];
@@ -230,7 +235,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
   return (
     <div className="fixed bottom-4 left-4 z-[9999] font-sans select-none">
       
-      {/* ─── 1. BOTÓN FLOTANTE HUD CIRCULAR SIN TEXTO CON BADGE ─── */}
+      {/* ─── 1. BOTÓN FLOTANTE HUD CIRCULAR SIN TEXTO CON BADGE DERECHO Y REAL ─── */}
       {!isOpen && (
         <motion.button
           initial={{ scale: 0.8, opacity: 0 }}
@@ -241,6 +246,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
         >
           <MessageSquare className="w-6 h-6 text-cyan-400 group-hover:scale-110 transition-transform animate-pulse" />
           
+          {/* 🎯 Badge real: solo aparece si unreadCount es mayor que 0 */}
           {unreadCount > 0 && (
             <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white font-mono text-[9px] font-black min-w-[20px] h-[20px] px-1 rounded-full flex items-center justify-center shadow-[0_0_10px_#ef4444] border-2 border-black animate-bounce">
               {unreadCount > 99 ? '99+' : unreadCount}
@@ -560,3 +566,5 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     </div>
   );
 };
+
+export default ChatSystem;

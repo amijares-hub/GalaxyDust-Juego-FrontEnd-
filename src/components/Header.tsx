@@ -42,17 +42,31 @@ export const Header: React.FC<HeaderProps> = ({
     setOpenDropdown(prev => (prev === type ? null : type));
   };
 
+  // 🌐 TODAS LAS MONEDAS EXISTENTES EN EL JUEGO
   const currencies = [
     { label: 'GD COIN', value: userProfile?.gd_coin || 0, color: 'text-amber-300' },
     { label: 'QUANTUM CREDIT', value: userProfile?.quantum_credit || 0, color: 'text-cyan-300' },
     { label: 'PHANTOM COIN', value: userProfile?.phantom_coin || 0, color: 'text-purple-300' },
+    { label: 'HALLOWEEN COIN', value: userProfile?.halloween_coin || 0, color: 'text-orange-400' },
+    { label: 'XMAS COIN', value: userProfile?.xmas_coin || 0, color: 'text-red-400' },
+    { label: 'VALENTINE COIN', value: userProfile?.valentine_coin || 0, color: 'text-pink-400' }
   ];
 
+  // 🌐 TODOS LOS RECURSOS EXISTENTES EN EL JUEGO
   const resources = [
     { label: 'METAL', value: userProfile?.metal || 0, color: 'text-cyan-200' },
     { label: 'CRISTAL', value: userProfile?.crystal || 0, color: 'text-purple-200' },
     { label: 'DEUTERIO', value: userProfile?.deuterium || 0, color: 'text-blue-300' },
     { label: 'MATERIA OSCURA', value: userProfile?.dark_matter || 0, color: 'text-indigo-400' },
+    { label: 'OMNIPLATE', value: userProfile?.omniplate || 0, color: 'text-emerald-300' },
+    { label: 'ORICHALTRON', value: userProfile?.orichaltron || 0, color: 'text-yellow-300' },
+    { label: 'LUNAR FIBER', value: userProfile?.lunar_fiber || 0, color: 'text-slate-200' },
+    { label: 'INFINITE CORE', value: userProfile?.infinite_core || 0, color: 'text-teal-300' },
+    { label: 'PRIMAL TOKEN', value: userProfile?.primal_token || 0, color: 'text-amber-400' },
+    { label: 'XENOPLASM', value: userProfile?.xenoplasm || 0, color: 'text-green-400' },
+    { label: 'ORGANIUM', value: userProfile?.organium || 0, color: 'text-lime-300' },
+    { label: 'MANA', value: userProfile?.mana || 0, color: 'text-blue-400' },
+    { label: 'WOOD', value: userProfile?.wood || 0, color: 'text-amber-600' }
   ];
 
   const tabs = [
@@ -68,7 +82,7 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="w-full bg-[#05080c]/98 border-b border-cyan-500/40 px-2 sm:px-3 py-1 flex items-center justify-between gap-1 sm:gap-2 shrink-0 select-none z-50 font-mono backdrop-blur-md sticky top-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)]">
       
-      {/* ─── 1. ESQUINA IZQUIERDA: PERFIL CON IMAGEN REAL DEL AVATAR ─── */}
+      {/* 1. PERFIL / AVATAR */}
       <div
         className="flex items-center gap-1.5 shrink-0 cursor-pointer group"
         onClick={() => onOpenProfile && onOpenProfile()}
@@ -91,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* ─── 2. CENTRO: PESTAÑAS ─── */}
+      {/* 2. PESTAÑAS NAVEGACIÓN */}
       <div className="flex-1 flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none px-1 py-0.5 min-w-0">
         {tabs.map(tab => {
           const isActive = activeTab === tab.id;
@@ -111,7 +125,7 @@ export const Header: React.FC<HeaderProps> = ({
         })}
       </div>
 
-      {/* ─── 3. DERECHA: MONEDA Y RECURSOS ─── */}
+      {/* 3. DESPLEGABLES DERECHA */}
       <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
         
         {/* DROPDOWN MONEDA */}
@@ -128,13 +142,10 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {openDropdown === 'MONEDA' && (
-            <div className="absolute right-0 mt-1.5 w-44 sm:w-56 bg-[#05080c]/98 border border-amber-500/50 rounded-xl p-2 shadow-[0_0_20px_rgba(0,0,0,0.9)] z-50 backdrop-blur-md space-y-1.5">
-              <span className="text-[7px] text-amber-400/80 font-black uppercase tracking-widest block pb-1 border-b border-amber-900/40 text-left px-1">
-                // SALDO DE MONEDAS
-              </span>
-              <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
+            <div className="absolute right-0 mt-1.5 w-48 sm:w-60 bg-[#05080c]/98 border border-amber-500/50 rounded-xl p-2 shadow-[0_0_20px_rgba(0,0,0,0.9)] z-50 backdrop-blur-md space-y-1">
+              <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
                 {currencies.map((curr, idx) => (
-                  <div key={idx} className="flex justify-between items-center px-1.5 py-0.5 bg-black/60 rounded border border-amber-950/60 text-[8px] sm:text-[9px]">
+                  <div key={idx} className="flex justify-between items-center px-2 py-1 bg-black/60 rounded border border-amber-950/60 text-[8.5px] sm:text-[9.5px]">
                     <span className="text-zinc-400 uppercase font-bold">{curr.label}</span>
                     <span className={`font-mono font-bold ${curr.color}`}>{(curr.value || 0).toLocaleString()}</span>
                   </div>
@@ -158,13 +169,10 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {openDropdown === 'RECURSOS' && (
-            <div className="absolute right-0 mt-1.5 w-48 sm:w-60 bg-[#05080c]/98 border border-cyan-500/50 rounded-xl p-2 shadow-[0_0_20px_rgba(0,0,0,0.9)] z-50 backdrop-blur-md space-y-1.5">
-              <span className="text-[7px] text-cyan-400/80 font-black uppercase tracking-widest block pb-1 border-b border-cyan-900/40 text-left px-1">
-                // RESERVA DE RECURSOS
-              </span>
-              <div className="space-y-1 max-h-52 overflow-y-auto custom-scrollbar">
+            <div className="absolute right-0 mt-1.5 w-52 sm:w-64 bg-[#05080c]/98 border border-cyan-500/50 rounded-xl p-2 shadow-[0_0_20px_rgba(0,0,0,0.9)] z-50 backdrop-blur-md space-y-1">
+              <div className="space-y-1 max-h-64 overflow-y-auto custom-scrollbar">
                 {resources.map((res, idx) => (
-                  <div key={idx} className="flex justify-between items-center px-1.5 py-0.5 bg-black/60 rounded border border-cyan-950/60 text-[8px] sm:text-[9px]">
+                  <div key={idx} className="flex justify-between items-center px-2 py-1 bg-black/60 rounded border border-cyan-950/60 text-[8.5px] sm:text-[9.5px]">
                     <span className="text-zinc-400 uppercase font-bold">{res.label}</span>
                     <span className={`font-mono font-bold ${res.color}`}>{(res.value || 0).toLocaleString()}</span>
                   </div>
