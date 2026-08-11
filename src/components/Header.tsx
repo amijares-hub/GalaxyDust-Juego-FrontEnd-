@@ -184,28 +184,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        {/* NOTIFICACIONES */}
-        <button
-          onClick={onOpenNotifications}
-          className="relative p-1.5 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-800 text-cyan-300 rounded-md transition-all cursor-pointer"
-          title="Notificaciones"
-        >
-          <Bell className="w-3.5 h-3.5 text-cyan-300" />
-          {unreadNotificationsCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[7px] font-black w-3.5 h-3.5 rounded-full border border-black flex items-center justify-center animate-pulse">
-              {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
-            </span>
-          )}
-        </button>
 
-        {/* AJUSTES */}
-        <button
-          onClick={onOpenSettings}
-          className="p-1.5 bg-black/60 hover:bg-cyan-950 border border-cyan-900 text-zinc-400 hover:text-white rounded-md transition-all cursor-pointer"
-          title="Ajustes"
-        >
-          <Settings className="w-3.5 h-3.5" />
-        </button>
 
       </div>
 
