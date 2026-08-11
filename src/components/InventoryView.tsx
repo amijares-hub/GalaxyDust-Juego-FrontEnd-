@@ -59,6 +59,134 @@ interface InventoryViewProps {
   onBack: () => void;
 }
 
+// 🎯 FUNCIÓN DE NORMALIZACIÓN Y FILTRADO ESTRICTO DE CATEGORÍAS EN EL INVENTARIO
+const matchInventoryCategory = (itemCategory: string, selectedSidebarKey: string): boolean => {
+  if (!selectedSidebarKey || selectedSidebarKey === "All") return true;
+  if (selectedSidebarKey === "Favorites") return true;
+  if (selectedSidebarKey === "Fleets") return itemCategory === "Fleets";
+
+  const normItem = (itemCategory || "").toLowerCase().trim();
+  const normKey = selectedSidebarKey.toLowerCase().trim();
+
+  // SPACESHIPS / NAVES
+  if (normKey === "spaceships" || normKey === "ships" || normKey === "naves") {
+    return (
+      normItem === "spaceships" ||
+      normItem === "ships" ||
+      normItem === "ship" ||
+      normItem === "spaceship" ||
+      normItem === "nave" ||
+      normItem === "naves"
+    );
+  }
+
+  // TECNOLOGÍA
+  if (
+    normKey === "tecnology" ||
+    normKey === "technology" ||
+    normKey === "tech" ||
+    normKey === "tecnologia"
+  ) {
+    return (
+      normItem === "tecnology" ||
+      normItem === "technology" ||
+      normItem === "tech" ||
+      normItem === "tecnología" ||
+      normItem === "tecnologia"
+    );
+  }
+
+  // DEFENSAS
+  if (normKey === "defense" || normKey === "defenses" || normKey === "defensa") {
+    return (
+      normItem === "defense" ||
+      normItem === "defenses" ||
+      normItem === "defensa" ||
+      normItem === "defensas"
+    );
+  }
+
+  // ESTRUCTURAS
+  if (normKey === "structures" || normKey === "structure" || normKey === "estructuras") {
+    return (
+      normItem === "structures" ||
+      normItem === "structure" ||
+      normItem === "estructura" ||
+      normItem === "estructuras"
+    );
+  }
+
+  // ASTROBOTS
+  if (normKey === "astrobots" || normKey === "astrobot" || normKey === "robots") {
+    return (
+      normItem === "astrobots" ||
+      normItem === "astrobot" ||
+      normItem === "robot" ||
+      normItem === "robots"
+    );
+  }
+
+  // BLUEPRINTS / PLANOS
+  if (normKey === "blueprints" || normKey === "blueprint" || normKey === "planos") {
+    return (
+      normItem === "blueprints" ||
+      normItem === "blueprint" ||
+      normItem === "plano" ||
+      normItem === "planos"
+    );
+  }
+
+  // BADGES / INSIGNIAS
+  if (normKey === "badges" || normKey === "badge" || normKey === "insignias") {
+    return (
+      normItem === "badges" ||
+      normItem === "badge" ||
+      normItem === "insignia" ||
+      normItem === "insignias"
+    );
+  }
+
+  // LICENCIAS
+  if (
+    normKey === "licencia" ||
+    normKey === "licenses" ||
+    normKey === "license" ||
+    normKey === "licencias"
+  ) {
+    return (
+      normItem === "licencia" ||
+      normItem === "license" ||
+      normItem === "licenses" ||
+      normItem === "licencias"
+    );
+  }
+
+  // HERRAMIENTAS / TOOLS
+  if (normKey === "tools" || normKey === "tool" || normKey === "herramientas") {
+    return (
+      normItem === "tools" ||
+      normItem === "tool" ||
+      normItem === "herramienta" ||
+      normItem === "herramientas"
+    );
+  }
+
+  // CONSUMIBLES
+  if (
+    normKey === "consumibles" ||
+    normKey === "consumables" ||
+    normKey === "consumable"
+  ) {
+    return (
+      normItem === "consumibles" ||
+      normItem === "consumables" ||
+      normItem === "consumable"
+    );
+  }
+
+  return normItem === normKey;
+};
+
 export const InventoryView: React.FC<InventoryViewProps> = ({
   playerGems,
   setPlayerGems,
@@ -131,11 +259,25 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           const { data: seedRows } = await supabase.from(seedTable).select('*');
           if (!seedRows || seedRows.length === 0) return;
 
-          const seedMap = new Map(seedRows.map((s: any) => [s[pkSeedCol]?.toString(), s]));
+          // Mapa multiclave para evitar pérdidas por inconsistencias de IDs
+          const seedMap = new Map();
+          seedRows.forEach((s: any) => {
+            if (s[pkSeedCol]) seedMap.set(s[pkSeedCol].toString(), s);
+            if (s.id) seedMap.set(s.id.toString(), s);
+            if (s.ship_id) seedMap.set(s.ship_id.toString(), s);
+            if (s.structure_id) seedMap.set(s.structure_id.toString(), s);
+            if (s.technology_id) seedMap.set(s.technology_id.toString(), s);
+            if (s.tool_id) seedMap.set(s.tool_id.toString(), s);
+            if (s.astrobot_id) seedMap.set(s.astrobot_id.toString(), s);
+            if (s.defense_id) seedMap.set(s.defense_id.toString(), s);
+            if (s.blueprint_id) seedMap.set(s.blueprint_id.toString(), s);
+          });
 
           userRows.forEach((row: any) => {
             let targetId: string | null = null;
-            for (const col of possibleFkCols) {
+            const searchCols = [...possibleFkCols, 'ship_id', 'structure_id', 'technology_id', 'tool_id', 'astrobot_id', 'defense_id', 'blueprint_id', 'consumable_id', 'license_id', 'badge_id', 'seed_id', 'id'];
+            
+            for (const col of searchCols) {
               if (row[col]) {
                 targetId = row[col].toString();
                 break;
@@ -166,7 +308,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               id: row.id?.toString() || targetId,
               name: realName,
               fullname: realName,
-              category: categoryName,
+              category: categoryName, // Asignación estricta de la categoría de carga
               rarity: seed.rarity || 'Common',
               faction: seed.company || seed.collection || seed.series || 'GD',
               avatar_url: imageUrl,
@@ -253,42 +395,28 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     } catch (ignore) { }
   };
 
+  // 🎯 FILTRADO UNIFICADO Y EXACTO CON NORMALIZACIÓN
   const getFilteredCharacters = useMemo(() => {
     let list = [...characters];
 
     if (activeSidebarCategory === "Favorites") {
       list = list.filter((c) => c.favorite);
     } else if (activeSidebarCategory !== "All") {
-      const categoryMap: Record<string, string> = {
-        "Ships": "Spaceships",
-        "Spaceships": "Spaceships",
-        "Structures": "Structures",
-        "Tecnology": "Tecnology",
-        "Defense": "Defense",
-        "Astrobots": "Astrobots",
-        "Blueprints": "Blueprints",
-        "Badges": "Badges",
-        "Licencia": "Licencia",
-        "Tools": "Tools",
-        "Consumibles": "Consumibles",
-        "Fleets": "Fleets",
-      };
-      const dbCat = categoryMap[activeSidebarCategory] || activeSidebarCategory;
-      list = list.filter((c) => c.category === dbCat);
+      list = list.filter((c) => matchInventoryCategory(c.category, activeSidebarCategory));
     }
 
     if (filterDropdown1 !== "ALL CLASES") {
-      const cls = filterDropdown1.replace("CLASES: ", "");
-      list = list.filter((c) => c.rarity && c.rarity.toUpperCase() === cls.toUpperCase());
+      const cls = filterDropdown1.replace("CLASES: ", "").trim().toUpperCase();
+      list = list.filter((c) => c.rarity && c.rarity.trim().toUpperCase() === cls);
     }
 
     if (filterDropdown2 !== "TODOS LOS FILTROS") {
-      const fac = filterDropdown2.replace("FACCIÓN: ", "");
-      list = list.filter((c) => c.faction && c.faction.toUpperCase() === fac.toUpperCase());
+      const fac = filterDropdown2.replace("FACCIÓN: ", "").trim().toUpperCase();
+      list = list.filter((c) => c.faction && c.faction.trim().toUpperCase() === fac);
     }
 
     if (searchQuery.trim() !== "") {
-      const query = searchQuery.toLowerCase();
+      const query = searchQuery.toLowerCase().trim();
       list = list.filter(
         (c) =>
           c.name.toLowerCase().includes(query) ||
@@ -313,7 +441,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setCharacters(updated);
   };
 
+  // 🎯 SUB-SECCIONES DEL SIDEBAR CON "ALL" INCLUIDO PARA VER TODO
   const subSections = [
+    { key: "All", label: "TODOS LOS ACTIVOS", locked: false },
     { key: "Fleets", label: "FLEETS", locked: false },
     { key: "Spaceships", label: "SPACESHIPS", locked: false },
     { key: "Structures", label: "STRUCTURES", locked: false },
@@ -335,7 +465,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       <div className="absolute top-0 right-0 w-80 h-80 bg-red-600/[0.04] rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-80 h-80 bg-cyan-600/[0.04] rounded-full blur-3xl pointer-events-none" />
 
-      {/* HEADER COMPACTO (LIMPIO SIN BADGE NI SUBTÍTULO) */}
+      {/* HEADER COMPACTO */}
       <div className="flex flex-col md:flex-row items-center justify-between border-b border-cyan-800/25 pb-1.5 mb-1.5 gap-2 relative shrink-0">
         <div className="flex items-center gap-2">
           <button
@@ -359,7 +489,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       </div>
 
-      {/* FILTROS SUPERIORES COMPACTOS (shrink-0) */}
+      {/* FILTROS SUPERIORES COMPACTOS */}
       <div className="flex flex-wrap items-center justify-between gap-2 bg-[#0a0f14]/85 border border-cyan-900/35 px-2.5 py-1.5 rounded-xl mb-2 relative shrink-0">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
@@ -431,15 +561,22 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       </div>
 
-      {/* CUERPO PRINCIPAL FLEXIBLE (flex-1 min-h-0) */}
+      {/* CUERPO PRINCIPAL FLEXIBLE */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start flex-1 min-h-0 h-full overflow-hidden">
 
-        {/* MENU LATERAL */}
+        {/* MENU LATERAL CON CATEGORÍAS */}
         <div className="lg:col-span-3 flex flex-col gap-1 relative h-full overflow-y-auto custom-scrollbar pr-1 shrink-0">
           {subSections.map(({ key, label, locked }) => (
             <button
               key={key}
-              onClick={() => { if (!locked) { setActiveSidebarCategory(key); playSfx("laser_success"); } else { triggerNotification(`🔒 ${label}: PRÓXIMAMENTE EN GALAXYDUST`); } }}
+              onClick={() => { 
+                if (!locked) { 
+                  setActiveSidebarCategory(key); 
+                  playSfx("laser_success"); 
+                } else { 
+                  triggerNotification(`🔒 ${label}: PRÓXIMAMENTE EN GALAXYDUST`); 
+                } 
+              }}
               className={`w-full py-1.5 px-2.5 text-left font-sans text-[9px] font-extrabold uppercase tracking-widest rounded-xl transition-all border flex items-center justify-between ${
                 activeSidebarCategory === key
                   ? "bg-gradient-to-r from-red-950/50 to-[#ca421e]/20 border-red-500/60 text-white shadow-[0_0_15px_rgba(239,68,68,0.2)]"
@@ -626,7 +763,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     </div>
 
                     {/* STATS CONDICIONALES POR CATEGORÍA */}
-                    {selectedChar.category === "Spaceships" ? (
+                    {matchInventoryCategory(selectedChar.category, 'Spaceships') ? (
                       <>
                         {/* Naves: Matriz Ofensiva */}
                         <div className="bg-black/40 border border-red-900/40 p-2.5 rounded-xl">
@@ -728,7 +865,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     [SKILLS]
                   </button>
 
-                  {selectedChar.category === "Spaceships" && showSubModal === null && (
+                  {matchInventoryCategory(selectedChar.category, 'Spaceships') && showSubModal === null && (
                     <button
                       onClick={() => setShowSubModal("fleet")}
                       className="px-3.5 py-1.5 bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-500/50 text-cyan-300 rounded-xl text-[8.5px] font-mono font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5"

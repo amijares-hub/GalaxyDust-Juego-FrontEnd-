@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShoppingBag,
@@ -267,15 +267,37 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
     }
   };
 
-  // Comprar Oferta Directa
-  const handleBuyDirect = (item: MarketListing) => {
+  // Comprar Oferta Directa (Sincronizado con Supabase)
+  const handleBuyDirect = async (item: MarketListing) => {
     if (playerGold < item.price) {
-      if (triggerNotification) triggerNotification("⚠️ FONDOS INSUFICIENTES PARA ESTA COMPRA");
+      if (triggerNotification) triggerNotification("⚠️ FONDOS INSUFFICIENTES PARA ESTA COMPRA");
       return;
     }
 
+    const newGold = playerGold - item.price;
+
     if (setPlayerGold) {
       setPlayerGold((prev: number) => prev - item.price);
+    }
+
+    // Persistir reducción de GD COIN en Supabase
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error: err1 } = await supabase
+          .from('user_profiles')
+          .update({ gd_coin: newGold })
+          .eq('user_id', user.id);
+
+        if (err1) {
+          await supabase
+            .from('user_profiles')
+            .update({ gd_coin: newGold })
+            .eq('id', user.id);
+        }
+      }
+    } catch (err) {
+      console.error("Error al actualizar GD Coin en Supabase:", err);
     }
 
     setMarketListings((prev) => prev.filter((l) => l.id !== item.id));
@@ -286,13 +308,39 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
     }
   };
 
-  // Pujar en Subasta
-  const handleBidAuction = (item: MarketListing) => {
+  // Pujar en Subasta (Sincronizado con Supabase)
+  const handleBidAuction = async (item: MarketListing) => {
     const minBid = (item.current_bid || item.price) + 250;
 
     if (playerGold < minBid) {
-      if (triggerNotification) triggerNotification("⚠️ FONDOS INSUFICIENTES PARA REALIZAR ESTA PUJA");
+      if (triggerNotification) triggerNotification("⚠️ FONDOS INSUFFICIENTES PARA REALIZAR ESTA PUJA");
       return;
+    }
+
+    const newGold = playerGold - minBid;
+
+    if (setPlayerGold) {
+      setPlayerGold((prev: number) => prev - minBid);
+    }
+
+    // Persistir reducción de GD COIN en Supabase
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error: err1 } = await supabase
+          .from('user_profiles')
+          .update({ gd_coin: newGold })
+          .eq('user_id', user.id);
+
+        if (err1) {
+          await supabase
+            .from('user_profiles')
+            .update({ gd_coin: newGold })
+            .eq('id', user.id);
+        }
+      }
+    } catch (err) {
+      console.error("Error al actualizar GD Coin en Supabase:", err);
     }
 
     setMarketListings((prev) =>
