@@ -18,6 +18,7 @@ import {
   Award
 } from "lucide-react";
 import { Button } from "./ui/joly-button";
+import { supabase } from "../lib/supabase";
 
 interface Member {
   id: string;
@@ -57,6 +58,7 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
   const [allianceTechLevel, setAllianceTechLevel] = useState(4);
   const [techProgress, setTechProgress] = useState(45);
   const [chatInput, setChatInput] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string>("");
 
   const [members, setMembers] = useState<Member[]>([
     {
@@ -109,10 +111,46 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
   const [logs, setLogs] = useState<LogEntry[]>([
     { id: 1, author: "SYSTEM", message: "Red criptográfica asegurada. Enlace Q-12 establecido.", type: "system", time: "08:00" },
     { id: 2, author: "DarthVader_99", message: "Pilotos, prepárense para la incursión de gremio a las 18:00.", type: "chat", time: "08:15" },
-    { id: 3, author: "SYSTEM", message: "StarKillerBase ha donado 50K Madera al núcleo.", type: "system", time: "09:30" },
+    { id: 3, author: "SYSTEM", message: "StarKillerBase ha aportado al desarrollo del núcleo.", type: "system", time: "09:30" },
     { id: 4, author: "SYSTEM", message: "Incursión del Sector Alpha completada con éxito.", type: "combat", time: "10:45" },
     { id: 5, author: "EchoPilot", message: "Recibido, comandante. Mis interceptores están listos.", type: "chat", time: "11:00" },
   ]);
+
+  // Carga e inicialización de usuario real en Supabase
+  useEffect(() => {
+    async function initAllianceData() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        setCurrentUserId(user.id);
+
+        // Cargar perfiles reales para alimentar lista de miembros
+        const { data: profiles } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .limit(10);
+
+        if (profiles && profiles.length > 0) {
+          const loadedMembers: Member[] = profiles.map((p: any, idx: number) => ({
+            id: p.id,
+            name: p.username || p.display_name || `COMANDANTE_${idx + 1}`,
+            role: idx === 0 ? "Comandante" : idx < 3 ? "Oficial" : "Piloto",
+            level: p.level || 50,
+            power: p.power_score || p.galactic_power_score || (idx === 0 ? 4500000 : 850000),
+            status: idx % 2 === 0 ? "online" : "offline",
+            avatar: p.avatar_url || p.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150"
+          }));
+
+          setMembers(loadedMembers);
+        }
+      } catch (err) {
+        console.error("Error al cargar datos de la alianza:", err);
+      }
+    }
+
+    initAllianceData();
+  }, []);
 
   const playSfxTone = (type: "click" | "success" | "msg") => {
     try {
@@ -149,33 +187,56 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
     } catch (err) {}
   };
 
-  const handleDonateTech = (e: React.MouseEvent) => {
+  // 🎯 MECANISMO DE DONACIÓN TECNOLÓGICA (50 CRISTALES -> +15% PROGRESO + 5,000 POW)
+  const handleDonateTech = async (e: React.MouseEvent) => {
     if (playerGems < 50) {
       triggerNotification("⚠️ CRISTALES INSUFICIENTES (REQUERIDO: 50💎)", e);
       playSfxTone("click");
       return;
     }
-    setPlayerGems(prev => prev - 50);
+
+    const newGems = Math.max(0, playerGems - 50);
+    const newPower = playerPower + 5000;
+
+    // Actualización local
+    setPlayerGems(newGems);
+    setPlayerPower(newPower);
+
+    // Persistencia en Supabase
+    if (currentUserId) {
+      try {
+        await supabase
+          .from('user_profiles')
+          .update({
+            crystal: newGems,
+            power_score: newPower,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentUserId);
+      } catch (err) {
+        console.error("Error al guardar donación en Supabase:", err);
+      }
+    }
+
     setTechProgress(prev => {
       const next = prev + 15;
       if (next >= 100) {
         setAllianceTechLevel(l => l + 1);
-        triggerNotification(`🚀 ¡NIVEL DE TECNOLOGÍA DE ALIANZA AUMENTADO!`, e);
+        triggerNotification(`🚀 ¡DESARROLLO DE ALIANZA SUBIÓ DE NIVEL! BONO +5,000 POW APLICADO`, e);
         playSfxTone("success");
-        setPlayerPower(p => p + 5000); // Alliance bonus
         
         // Push system log
         setLogs(prevLogs => [...prevLogs, {
           id: Date.now(),
           author: "SYSTEM",
-          message: `Nivel del Núcleo incrementado a ${allianceTechLevel + 1}`,
+          message: `Nivel del Núcleo incrementado a Nivel ${allianceTechLevel + 1}. Bono +5,000 POW Otorgado.`,
           type: "system",
           time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
         }]);
         
         return next - 100;
       }
-      triggerNotification("🔋 APORTE TECNOLÓGICO REGISTRADO", e);
+      triggerNotification("🔋 APORTE TECNOLÓGICO REGISTRADO (+15% PROGRESO | +5,000 POW)", e);
       playSfxTone("success");
       return next;
     });
@@ -203,7 +264,7 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
           variant="secondary" 
           size="sm" 
           onClick={onBack}
-          className="text-[8.5px] font-mono tracking-widest border border-white/10 hover:border-[#E53E3E]/40 text-white/75 hover:text-[#E53E3E] px-3 py-1.5 rounded-lg transition-colors"
+          className="text-[8.5px] font-mono tracking-widest border border-white/10 hover:border-[#E53E3E]/40 text-white/75 hover:text-[#E53E3E] px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
         >
           <RotateCcw className="w-3 h-3 mr-1" />
           REGRESAR A BASE
@@ -253,7 +314,7 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
             {/* Tech Contribution section */}
             <div className="mt-4 sm:mt-0 flex flex-col items-center sm:items-end w-full sm:w-auto z-10">
               <span className="text-[8px] font-mono tracking-widest text-white/50 uppercase mb-1.5">
-                PROGRESO TECNOLÓGICO
+                PROGRESO TECNOLÓGICO (+15%)
               </span>
               <div className="w-full sm:w-40 h-2 bg-black/60 border border-white/10 rounded-full overflow-hidden mb-2">
                 <div 
@@ -263,7 +324,7 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
               </div>
               <button 
                 onClick={handleDonateTech}
-                className="flex items-center gap-1.5 bg-[#E53E3E]/10 hover:bg-[#E53E3E]/20 border border-[#E53E3E]/40 text-[#E53E3E] hover:text-white px-3 py-1.5 rounded transition-all text-[9px] font-mono font-bold tracking-widest"
+                className="flex items-center gap-1.5 bg-[#E53E3E]/10 hover:bg-[#E53E3E]/20 border border-[#E53E3E]/40 text-[#E53E3E] hover:text-white px-3 py-1.5 rounded transition-all text-[9px] font-mono font-bold tracking-widest cursor-pointer active:scale-95"
               >
                 <ArrowUpCircle className="w-3.5 h-3.5" />
                 DONAR (50💎)
@@ -289,7 +350,7 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
                       <img src={member.avatar} alt={member.name} className="w-10 h-10 rounded-full object-cover border border-white/10" />
                       <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#08090b] ${member.status === 'online' ? 'bg-emerald-500' : 'bg-neutral-600'}`} />
                     </div>
-                    <div className="flex flex-col">
+                    <div className="flex flex-col text-left">
                       <span className="text-[11px] font-bold text-white font-sans">{member.name}</span>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={`text-[8.5px] font-mono px-1.5 py-0.5 rounded border ${
@@ -309,7 +370,7 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
                       <span className="text-[7.5px] font-mono text-white/30 tracking-widest uppercase">Poder Táctico</span>
                       <span className="text-[10px] font-mono text-cyan-400 font-bold">{member.power.toLocaleString()}</span>
                     </div>
-                    <button className="p-1.5 rounded bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-colors border border-white/5">
+                    <button className="p-1.5 rounded bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-colors border border-white/5 cursor-pointer">
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -369,13 +430,13 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   placeholder="Transmitir mensaje..." 
-                  className="w-full bg-[#121315] border border-white/10 rounded-lg py-2 pl-8 pr-3 text-[10px] font-mono text-white placeholder-white/30 focus:outline-none focus:border-[#E53E3E]/50 transition-colors"
+                  className="w-full bg-[#121315] border border-white/10 rounded-lg py-2 pl-8 pr-3 text-[10px] font-mono text-white placeholder-white/30 focus:outline-none focus:border-[#E53E3E]/50 transition-colors uppercase"
                 />
               </div>
               <button 
                 type="submit"
                 disabled={!chatInput.trim()}
-                className="bg-[#E53E3E] hover:bg-red-500 disabled:opacity-50 disabled:bg-neutral-800 text-white p-2 rounded-lg transition-colors border border-transparent disabled:border-white/10"
+                className="bg-[#E53E3E] hover:bg-red-500 disabled:opacity-50 disabled:bg-neutral-800 text-white p-2 rounded-lg transition-colors border border-transparent disabled:border-white/10 cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />
               </button>

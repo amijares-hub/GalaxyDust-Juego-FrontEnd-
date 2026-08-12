@@ -35,7 +35,44 @@ interface DmPartner {
   role?: string;
 }
 
+interface UserProfileData {
+  avatar_url?: string;
+  avatar?: string;
+  username?: string;
+  role?: string;
+}
+
 const QUICK_EMOJIS = ['🚀', '⚔️', '🛡️', '💎', '🔥', '👑', '🌌', '💥', '🛸', '⭐', '😎', '👍', '🎯', '⚡', '🏆', '👽'];
+
+const DEFAULT_COMMANDER_AVATAR = "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Avatares%20de%20Comandantes/1.png";
+
+// Helper robusto para resolver URLs de avatar oficial de Supabase
+const resolveAvatarUrl = (url?: string | null): string => {
+  if (!url || typeof url !== 'string' || url.trim() === '') {
+    return DEFAULT_COMMANDER_AVATAR;
+  }
+  const clean = url.trim();
+
+  // Filtrar avatares obsoletos, demos o degradados antiguos de Unsplash/Mixkit
+  if (
+    clean.includes('unsplash.com') ||
+    clean.includes('mixkit') ||
+    clean.includes('ui-avatars') ||
+    clean.includes('photo-') ||
+    clean.includes('svg')
+  ) {
+    return DEFAULT_COMMANDER_AVATAR;
+  }
+
+  // URL completa válida
+  if (clean.startsWith('http://') || clean.startsWith('https://')) {
+    return clean;
+  }
+
+  // Nombres cortos como "1", "10", "11", "12", "13" o "1.png"
+  const fileName = clean.endsWith('.png') ? clean : `${clean}.png`;
+  return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Avatares%20de%20Comandantes/${fileName}`;
+};
 
 export const ChatSystem: React.FC<ChatSystemProps> = ({
   userAllianceName = 'NO ALLIANCE',
@@ -49,10 +86,13 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
   const [inputContent, setInputContent] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // 🎯 Estado de combate activo del usuario (Realtime / Supabase)
+  // 🎯 Mapa reactivo de perfiles reales para renderizar avatares actualizados
+  const [profilesMap, setProfilesMap] = useState<Record<string, UserProfileData>>({});
+
+  // Estado de combate activo
   const [hasActiveCombat, setHasActiveCombat] = useState<boolean>(false);
 
-  // 🎯 Notificaciones reales de mensajes no leídos
+  // Notificaciones de mensajes no leídos
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Anti-Spam / Rate Limiting Ref
@@ -61,15 +101,16 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
   // Sistema de DM Privado
   const [activeDmPartner, setActiveDmPartner] = useState<DmPartner | null>(null);
   const [recentDmPartners, setRecentDmPartners] = useState<DmPartner[]>([
-    { id: 'usr-demo-1', name: 'COMANDANTE_KRONOS', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', role: 'LÍDER' },
-    { id: 'usr-demo-2', name: 'PILOTO_VANGUARD', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', role: 'OFICIAL' }
+    { id: 'usr-demo-1', name: 'COMANDANTE_KRONOS', avatar: '1.png', role: 'LÍDER' },
+    { id: 'usr-demo-2', name: 'PILOTO_VANGUARD', avatar: '10.png', role: 'OFICIAL' }
   ]);
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [currentUserName, setCurrentUserName] = useState<string>('');
 
   // Selector de Emojis
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
-  // Menú contextual vinculado por ID único de mensaje
+  // Menú contextual
   const [activeUserMenu, setActiveUserMenu] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -84,10 +125,113 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     });
   }, []);
 
-  // 🔍 Verificar en Supabase si el usuario tiene un combate activo
+  // 🔍 Cargar perfiles de user_profiles con mapeo multiclave
+  const fetchAllUserProfiles = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const newMap: Record<string, UserProfileData> = {};
+
+      if (user) {
+        setCurrentUserId(user.id);
+        const savedAvatar = localStorage.getItem(`user_avatar_${user.id}`) || localStorage.getItem('user_avatar');
+        const authAvatar = user.user_metadata?.avatar_url || user.user_metadata?.avatar || savedAvatar;
+        const authName = user.user_metadata?.username || user.user_metadata?.display_name || user.email?.split('@')[0];
+        
+        if (authName) setCurrentUserName(authName);
+
+        const profileData: UserProfileData = {
+          avatar_url: savedAvatar || authAvatar || undefined,
+          username: authName || undefined,
+          role: 'PILOTO'
+        };
+        newMap[user.id] = profileData;
+        if (authName) newMap[authName.toString().toLowerCase()] = profileData;
+      }
+
+      // Consulta de user_profiles
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*');
+
+      if (!error && data && data.length > 0) {
+        data.forEach((p: any) => {
+          const rawAv = p.avatar_url || p.avatar || p.avatar_id || p.image_url;
+          const rawName = p.username || p.display_name || p.name || p.full_name;
+          const rawRole = p.role || p.user_role;
+
+          const profileData: UserProfileData = {
+            avatar_url: rawAv || undefined,
+            avatar: rawAv || undefined,
+            username: rawName || undefined,
+            role: rawRole || undefined
+          };
+
+          if (p.id) newMap[p.id] = profileData;
+          if (p.user_id) newMap[p.user_id] = profileData;
+          if (rawName) newMap[rawName.toString().toLowerCase()] = profileData;
+        });
+      }
+
+      setProfilesMap((prev) => ({ ...prev, ...newMap }));
+    } catch (err) {
+      console.error("Error al sincronizar perfiles en chat:", err);
+    }
+  };
+
+  // 🎯 ESCUCHAR EVENTO 'profile_updated' DESDE PROFILEVIEW
+  useEffect(() => {
+    const handleProfileUpdateEvent = (e: any) => {
+      const customAvatar = e?.detail?.avatar_url;
+      if (customAvatar && currentUserId) {
+        setProfilesMap((prev) => ({
+          ...prev,
+          [currentUserId]: {
+            ...prev[currentUserId],
+            avatar_url: customAvatar
+          },
+          ...(currentUserName ? {
+            [currentUserName.toLowerCase()]: {
+              ...prev[currentUserName.toLowerCase()],
+              avatar_url: customAvatar
+            }
+          } : {})
+        }));
+      }
+      fetchAllUserProfiles();
+    };
+
+    window.addEventListener('profile_updated', handleProfileUpdateEvent);
+    return () => {
+      window.removeEventListener('profile_updated', handleProfileUpdateEvent);
+    };
+  }, [currentUserId, currentUserName]);
+
+  useEffect(() => {
+    fetchAllUserProfiles();
+
+    const channel = supabase
+      .channel('public_user_profiles_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_profiles' },
+        () => {
+          fetchAllUserProfiles();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    fetchAllUserProfiles();
+  }, [messages.length, isOpen]);
+
+  // Verificar combate activo
   const checkActiveCombat = async (userId: string) => {
     try {
-      // Consulta si el usuario está involucrado en una batalla activa/logs recientes de combate
       const { data: combatData } = await supabase
         .from('combat_logs')
         .select('id')
@@ -105,7 +249,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     }
   };
 
-  // Mapeo dinámico de Canales (Global, Alianza, Mercado, Combate Temporal, Privado)
+  // Mapeo dinámico de Canales
   useEffect(() => {
     if (activeChannel === 'PRIVADO') {
       if (activeDmPartner && currentUserId) {
@@ -125,7 +269,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     }
   }, [activeChannel, activeDmPartner, currentUserId, userAllianceName]);
 
-  // Cargar Historial (últimos 100 mensajes) y Suscribir
+  // Cargar Historial y Suscribir
   useEffect(() => {
     if (channelId === 'dm-none') {
       setMessages([]);
@@ -159,7 +303,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Enviar Mensaje con Rate Limiting / Anti-Spam
+  // Enviar Mensaje
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputContent.trim()) return;
@@ -212,7 +356,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     if (triggerNotification) triggerNotification(`💬 CANAL PRIVADO CON ${partner.name} ESTABLECIDO`);
   };
 
-  // Eliminar Chat Privado Reciente
+  // Eliminar Chat Privado
   const handleDeleteDmConversation = (partnerId: string, partnerName: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setRecentDmPartners((prev) => prev.filter((p) => p.id !== partnerId));
@@ -222,14 +366,12 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     if (triggerNotification) triggerNotification(`🗑️ CONVERSACIÓN PRIVADA CON ${partnerName} ELIMINADA`);
   };
 
-  // Mención de usuario
   const handleMentionUser = (userName: string) => {
     setInputContent((prev) => `${prev} @${userName} `);
     setActiveUserMenu(null);
     inputRef.current?.focus();
   };
 
-  // Bloquear usuario
   const handleBlockUser = async (userId: string, userName: string) => {
     await chatService.blockUser(userId);
     setMessages((prev) => prev.filter((m) => m.user_id !== userId));
@@ -247,7 +389,6 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     }
   };
 
-  // Borrar Mensaje
   const handleDeleteMessage = async (messageId: string) => {
     try {
       await chatService.deleteMessage(messageId);
@@ -267,10 +408,11 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
   const filteredMessages = messages.filter((m) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
-    return m.content.toLowerCase().includes(q) || m.user_name.toLowerCase().includes(q);
+    const userProf = profilesMap[m.user_id] || (m.user_name ? profilesMap[m.user_name.toLowerCase()] : undefined);
+    const nameToFilter = userProf?.username || m.user_name;
+    return m.content.toLowerCase().includes(q) || nameToFilter.toLowerCase().includes(q);
   });
 
-  // 🎯 Lista dinámica de canales (Sólo muestra COMBATE si hasActiveCombat === true)
   const availableChannels = [
     { id: 'GLOBAL', label: 'GLOBAL', icon: Globe },
     { id: 'ALLIANCE', label: 'ALIANZA', icon: Shield },
@@ -316,7 +458,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
             transition={{ duration: 0.2 }}
             className="w-[calc(100vw-2rem)] max-w-[360px] sm:max-w-[460px] h-[520px] max-h-[85dvh] bg-[#06080b]/95 border-2 border-cyan-500/40 rounded-2xl shadow-[0_0_40px_rgba(6,182,212,0.25)] backdrop-blur-xl flex flex-col overflow-hidden text-left"
           >
-            {/* PESTAÑAS DE CANALES FILTRADAS DINÁMICAMENTE */}
+            {/* PESTAÑAS DE CANALES */}
             <div className="flex items-center justify-between px-3 py-2 bg-black/90 border-b border-cyan-900/50 font-mono text-[8.5px] uppercase font-bold shrink-0">
               <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
                 {availableChannels.map((ch) => {
@@ -360,10 +502,22 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
                     <ChevronLeft className="w-3.5 h-3.5" />
                   </button>
                   <div className="w-5 h-5 rounded-full border border-cyan-400 overflow-hidden shrink-0">
-                    <img src={activeDmPartner.avatar} alt={activeDmPartner.name} className="w-full h-full object-cover" />
+                    <img 
+                      src={resolveAvatarUrl(
+                        profilesMap[activeDmPartner.id]?.avatar_url || 
+                        profilesMap[activeDmPartner.id]?.avatar || 
+                        profilesMap[activeDmPartner.name.toLowerCase()]?.avatar_url || 
+                        profilesMap[activeDmPartner.name.toLowerCase()]?.avatar || 
+                        activeDmPartner.avatar
+                      )} 
+                      alt={activeDmPartner.name} 
+                      className="w-full h-full object-cover" 
+                    />
                   </div>
                   <div className="flex flex-col text-left">
-                    <span className="text-[9px] font-bold text-white uppercase">{activeDmPartner.name}</span>
+                    <span className="text-[9px] font-bold text-white uppercase">
+                      {profilesMap[activeDmPartner.id]?.username || profilesMap[activeDmPartner.name.toLowerCase()]?.username || activeDmPartner.name}
+                    </span>
                     <span className="text-[7px] text-cyan-400 uppercase font-mono">CANAL PRIVADO SEGURO</span>
                   </div>
                 </div>
@@ -400,141 +554,167 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
                       NO TIENES CONVERSACIONES PRIVADAS ACTIVAS
                     </div>
                   ) : (
-                    recentDmPartners.map((partner) => (
-                      <div
-                        key={partner.id}
-                        onClick={() => handleStartPrivateChat(partner)}
-                        className="p-2.5 bg-black/60 hover:bg-cyan-950/50 border border-cyan-950 hover:border-cyan-500/40 rounded-xl flex items-center justify-between cursor-pointer transition-colors group"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full border border-cyan-400/60 overflow-hidden shrink-0">
-                            <img src={partner.avatar} alt={partner.name} className="w-full h-full object-cover" />
-                          </div>
-                          <div className="flex flex-col text-left">
-                            <span className="text-white font-bold uppercase group-hover:text-cyan-300 text-[9.5px]">{partner.name}</span>
-                            <span className="text-zinc-500 text-[7.5px] uppercase">{partner.role || 'COMANDANTE'}</span>
-                          </div>
-                        </div>
+                    recentDmPartners.map((partner) => {
+                      const partnerProf = profilesMap[partner.id] || profilesMap[partner.name.toLowerCase()];
+                      const realPartnerAvatar = resolveAvatarUrl(partnerProf?.avatar_url || partnerProf?.avatar || partner.avatar);
+                      const realPartnerName = partnerProf?.username || partner.name;
 
-                        <div className="flex items-center gap-1.5">
-                          <button 
-                            onClick={() => handleStartPrivateChat(partner)}
-                            className="px-2.5 py-1 bg-cyan-950 group-hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 text-[7.5px] font-bold uppercase rounded cursor-pointer"
-                          >
-                            ABRIR DM
-                          </button>
-                          <button
-                            onClick={(e) => handleDeleteDmConversation(partner.id, partner.name, e)}
-                            className="p-1 bg-red-950/40 hover:bg-red-600 border border-red-500/40 text-red-400 hover:text-white rounded cursor-pointer transition-colors"
-                            title="Eliminar conversación privada"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                      return (
+                        <div
+                          key={partner.id}
+                          onClick={() => handleStartPrivateChat(partner)}
+                          className="p-2.5 bg-black/60 hover:bg-cyan-950/50 border border-cyan-950 hover:border-cyan-500/40 rounded-xl flex items-center justify-between cursor-pointer transition-colors group"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full border border-cyan-400/60 overflow-hidden shrink-0 bg-neutral-900">
+                              <img src={realPartnerAvatar} alt={realPartnerName} className="w-full h-full object-cover" />
+                            </div>
+                            <div className="flex flex-col text-left">
+                              <span className="text-white font-bold uppercase group-hover:text-cyan-300 text-[9.5px]">{realPartnerName}</span>
+                              <span className="text-zinc-500 text-[7.5px] uppercase">{partner.role || 'COMANDANTE'}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <button 
+                              onClick={() => handleStartPrivateChat(partner)}
+                              className="px-2.5 py-1 bg-cyan-950 group-hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 text-[7.5px] font-bold uppercase rounded cursor-pointer"
+                            >
+                              ABRIR DM
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteDmConversation(partner.id, partner.name, e)}
+                              className="p-1 bg-red-950/40 hover:bg-red-600 border border-red-500/40 text-red-400 hover:text-white rounded cursor-pointer transition-colors"
+                              title="Eliminar conversación privada"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               ) : (
-                /* VISTA B: FEED REGULAR DE MENSAJES */
+                /* VISTA B: FEED REGULAR DE MENSAJES CON AVATARES REALES SINCRO CON USER_PROFILES */
                 filteredMessages.length === 0 ? (
                   <div className="text-center text-zinc-600 uppercase text-[8px] py-12 tracking-widest">
                     {activeChannel === 'PRIVADO' ? 'INICIA LA TRANSMISIÓN PRIVADA CON ESTE PILOTO' : 'SIN TRANSMISIONES ACTIVAS EN ESTE CANAL'}
                   </div>
                 ) : (
-                  filteredMessages.map((msg) => (
-                    <div key={msg.id} className="flex gap-2.5 items-start group text-left relative">
-                      {/* Avatar */}
-                      <div className="w-7 h-7 rounded-full border border-cyan-500/40 bg-neutral-900 overflow-hidden shrink-0 mt-0.5">
-                        {msg.user_avatar ? (
-                          <img src={msg.user_avatar} alt={msg.user_name} className="w-full h-full object-cover" />
-                        ) : (
-                          <User className="w-3.5 h-3.5 text-cyan-400 m-auto mt-1.5" />
-                        )}
-                      </div>
+                  filteredMessages.map((msg) => {
+                    // 🎯 RESOLUCIÓN DE AVATAR CON PRIORIDAD PARA EL USUARIO ACTUAL
+                    const isMyMessage = msg.user_id === currentUserId || 
+                                        (currentUserName && msg.user_name && msg.user_name.toLowerCase() === currentUserName.toLowerCase());
 
-                      {/* Mensaje */}
-                      <div className="flex-1 overflow-hidden">
-                        <div className="flex items-center justify-between gap-1 mb-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              onClick={() => setActiveUserMenu(activeUserMenu === msg.id ? null : msg.id)}
-                              className="font-bold text-white hover:text-cyan-300 cursor-pointer uppercase text-[9px] transition-colors"
-                            >
-                              {msg.user_name}
-                            </span>
-                            <span className="text-[7px] bg-cyan-950 text-cyan-400 border border-cyan-800/40 px-1 rounded font-black uppercase">
-                              {msg.user_role}
-                            </span>
-                          </div>
-                          <span className="text-[7.5px] text-zinc-600">
-                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
+                    const savedLocalAvatar = currentUserId ? (localStorage.getItem(`user_avatar_${currentUserId}`) || localStorage.getItem('user_avatar')) : null;
+
+                    const userProf = profilesMap[msg.user_id] || 
+                                     (msg.user_name ? profilesMap[msg.user_name.toLowerCase()] : undefined) ||
+                                     (isMyMessage ? profilesMap[currentUserId] : undefined);
+
+                    let rawAvatar = userProf?.avatar_url || userProf?.avatar;
+                    
+                    if (isMyMessage) {
+                      rawAvatar = savedLocalAvatar || rawAvatar || userProf?.avatar_url || msg.user_avatar;
+                    } else if (!rawAvatar) {
+                      rawAvatar = msg.user_avatar;
+                    }
+
+                    const realAvatar = resolveAvatarUrl(rawAvatar);
+                    const realName = userProf?.username || msg.user_name;
+                    const realRole = userProf?.role || msg.user_role;
+
+                    return (
+                      <div key={msg.id} className="flex gap-2.5 items-start group text-left relative">
+                        {/* Avatar Real Actualizado */}
+                        <div className="w-7 h-7 rounded-full border border-cyan-500/40 bg-neutral-900 overflow-hidden shrink-0 mt-0.5 shadow">
+                          <img src={realAvatar} alt={realName} className="w-full h-full object-cover" />
                         </div>
 
-                        {msg.message_type === 'SYSTEM' ? (
-                          <div className="p-2 bg-red-950/20 border border-red-500/30 text-red-300 rounded text-[8.5px] font-bold uppercase">
-                            📢 {msg.content}
+                        {/* Mensaje */}
+                        <div className="flex-1 overflow-hidden">
+                          <div className="flex items-center justify-between gap-1 mb-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                onClick={() => setActiveUserMenu(activeUserMenu === msg.id ? null : msg.id)}
+                                className="font-bold text-white hover:text-cyan-300 cursor-pointer uppercase text-[9px] transition-colors"
+                              >
+                                {realName}
+                              </span>
+                              <span className="text-[7px] bg-cyan-950 text-cyan-400 border border-cyan-800/40 px-1 rounded font-black uppercase">
+                                {realRole}
+                              </span>
+                            </div>
+                            <span className="text-[7.5px] text-zinc-600">
+                              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
                           </div>
-                        ) : (
-                          <p className="text-zinc-300 leading-relaxed break-words">
-                            {msg.content}
-                          </p>
-                        )}
-                      </div>
 
-                      {/* MENÚ DE OPCIONES */}
-                      {activeUserMenu === msg.id && (
-                        <div className="absolute right-0 top-6 bg-[#0c1017] border border-cyan-500/50 rounded-xl shadow-2xl p-1.5 z-50 flex flex-col gap-1 text-[8.5px] font-mono uppercase backdrop-blur-md">
-                          <button
-                            onClick={() => handleMentionUser(msg.user_name)}
-                            className="px-2.5 py-1.5 hover:bg-cyan-950 text-cyan-300 rounded-lg flex items-center gap-2 text-left cursor-pointer transition-colors"
-                          >
-                            <AtSign className="w-3.5 h-3.5 text-cyan-400" /> MENCIONAR
-                          </button>
-                          
-                          {msg.user_id !== currentUserId && (
-                            <button
-                              onClick={() => handleStartPrivateChat({
-                                id: msg.user_id,
-                                name: msg.user_name,
-                                avatar: msg.user_avatar,
-                                role: msg.user_role
-                              })}
-                              className="px-2.5 py-1.5 hover:bg-cyan-950 text-emerald-400 rounded-lg flex items-center gap-2 text-left cursor-pointer font-bold transition-colors"
-                            >
-                              <MessageCircle className="w-3.5 h-3.5 text-emerald-400" /> MENSAJE PRIVADO
-                            </button>
-                          )}
-
-                          <button
-                            onClick={() => handleDeleteMessage(msg.id)}
-                            className="px-2.5 py-1.5 hover:bg-red-950/80 text-red-400 rounded-lg flex items-center gap-2 text-left cursor-pointer font-bold transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-red-400" /> BORRAR MENSAJE
-                          </button>
-
-                          {msg.user_id !== currentUserId && (
-                            <button
-                              onClick={() => handleBlockUser(msg.user_id, msg.user_name)}
-                              className="px-2.5 py-1.5 hover:bg-red-950/80 text-red-400 rounded-lg flex items-center gap-2 text-left cursor-pointer transition-colors"
-                            >
-                              <Ban className="w-3.5 h-3.5 text-red-400" /> BLOQUEAR
-                            </button>
-                          )}
-                          
-                          {msg.user_id !== currentUserId && (
-                            <button
-                              onClick={() => handleReportUser(msg.user_id, msg.user_name)}
-                              className="px-2.5 py-1.5 hover:bg-amber-950/80 text-amber-400 rounded-lg flex items-center gap-2 text-left cursor-pointer transition-colors"
-                            >
-                              <Flag className="w-3.5 h-3.5 text-amber-400" /> REPORTAR USUARIO
-                            </button>
+                          {msg.message_type === 'SYSTEM' ? (
+                            <div className="p-2 bg-red-950/20 border border-red-500/30 text-red-300 rounded text-[8.5px] font-bold uppercase">
+                              📢 {msg.content}
+                            </div>
+                          ) : (
+                            <p className="text-zinc-300 leading-relaxed break-words">
+                              {msg.content}
+                            </p>
                           )}
                         </div>
-                      )}
-                    </div>
-                  ))
+
+                        {/* MENÚ DE OPCIONES */}
+                        {activeUserMenu === msg.id && (
+                          <div className="absolute right-0 top-6 bg-[#0c1017] border border-cyan-500/50 rounded-xl shadow-2xl p-1.5 z-50 flex flex-col gap-1 text-[8.5px] font-mono uppercase backdrop-blur-md">
+                            <button
+                              onClick={() => handleMentionUser(realName)}
+                              className="px-2.5 py-1.5 hover:bg-cyan-950 text-cyan-300 rounded-lg flex items-center gap-2 text-left cursor-pointer transition-colors"
+                            >
+                              <AtSign className="w-3.5 h-3.5 text-cyan-400" /> MENCIONAR
+                            </button>
+                            
+                            {msg.user_id !== currentUserId && (
+                              <button
+                                onClick={() => handleStartPrivateChat({
+                                  id: msg.user_id,
+                                  name: realName,
+                                  avatar: realAvatar,
+                                  role: realRole
+                                })}
+                                className="px-2.5 py-1.5 hover:bg-cyan-950 text-emerald-400 rounded-lg flex items-center gap-2 text-left cursor-pointer font-bold transition-colors"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5 text-emerald-400" /> MENSAJE PRIVADO
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              className="px-2.5 py-1.5 hover:bg-red-950/80 text-red-400 rounded-lg flex items-center gap-2 text-left cursor-pointer font-bold transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-red-400" /> BORRAR MENSAJE
+                            </button>
+
+                            {msg.user_id !== currentUserId && (
+                              <button
+                                onClick={() => handleBlockUser(msg.user_id, realName)}
+                                className="px-2.5 py-1.5 hover:bg-red-950/80 text-red-400 rounded-lg flex items-center gap-2 text-left cursor-pointer transition-colors"
+                              >
+                                <Ban className="w-3.5 h-3.5 text-red-400" /> BLOQUEAR
+                              </button>
+                            )}
+                            
+                            {msg.user_id !== currentUserId && (
+                              <button
+                                onClick={() => handleReportUser(msg.user_id, realName)}
+                                className="px-2.5 py-1.5 hover:bg-amber-950/80 text-amber-400 rounded-lg flex items-center gap-2 text-left cursor-pointer transition-colors"
+                              >
+                                <Flag className="w-3.5 h-3.5 text-amber-400" /> REPORTAR USUARIO
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
                 )
               )}
               <div ref={messagesEndRef} />
@@ -583,7 +763,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
                 type="text"
                 placeholder={
                   activeChannel === 'PRIVADO'
-                    ? activeDmPartner ? `DM A @${activeDmPartner.name}...` : "SELECCIONA UN PILOTO..."
+                    ? activeDmPartner ? `DM A @${profilesMap[activeDmPartner.id]?.username || profilesMap[activeDmPartner.name.toLowerCase()]?.username || activeDmPartner.name}...` : "SELECCIONA UN PILOTO..."
                     : `TRANSMITIR A #${activeChannel.toLowerCase()}...`
                 }
                 value={inputContent}
