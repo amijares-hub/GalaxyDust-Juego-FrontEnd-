@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   CornerUpLeft, X, Search, Rocket, Lock, MapPin, Plus, Trash2, 
   Sparkles, AlertTriangle, ShieldCheck, Box, Wrench, Bot, FileText, Package, Check, XCircle, Clock, Pickaxe, Radio
@@ -117,7 +117,7 @@ const isShipAsset = (type: string) => ['naves', 'ship', 'ships', 'nave'].include
 const isToolAsset = (type: string) => ['tools', 'tool', 'herramientas', 'herramienta'].includes(type.toLowerCase());
 const isLicenseAsset = (type: string) => ['licencia', 'license', 'licenses'].includes(type.toLowerCase());
 
-// 🌐 REGLAS TÁCTICAS DE CADA GALAXY CLUSTER (GC)
+// REGLAS TÁCTICAS DE CADA GALAXY CLUSTER (GC)
 interface GCRequirement {
   code: string;
   name: string;
@@ -271,7 +271,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     return parts.join(' > ') || 'SELECCIONA COORDENADAS GALÁCTICAS';
   };
 
-  // Temporizador para actualización en vivo cada segundo
   useEffect(() => {
     const timer = setInterval(() => {
       setNow(Date.now());
@@ -393,7 +392,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         setActiveExpeditions(expData);
       }
 
-      // 5. Cargar Logs / Eventos Reales de Expedición
+      // 5. Cargar Logs / Eventos Reales
       const { data: logsData } = await supabase
         .from('expedition_logs')
         .select('*')
@@ -421,7 +420,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     syncDatabaseData();
   }, []);
 
-  // Validaciones
   const checkGCRequirements = (gcCode: string): { allowed: boolean; reason?: string } => {
     const rule = GC_RULES[gcCode];
     if (!rule) return { allowed: true };
@@ -553,11 +551,9 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     }
   };
 
-  // ─── RECLAMO DE RECOMPENSAS + ACTUALIZACIÓN DE BILLETERA Y PLANETA ───
   const handleClaimExpeditionRewards = async (exp: Expedition) => {
     setClaimingExpeditionId(exp.id);
 
-    // 1. Calcular recursos reales según el tiempo transcurrido
     const launchMs = new Date(exp.launch_time).getTime();
     const returnMs = new Date(exp.estimated_return_time).getTime();
     const totalMs = Math.max(1000, returnMs - launchMs);
@@ -581,20 +577,17 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
       const userId = user?.id || '9abc737e-9c3d-4349-a976-59af24f51f4d';
 
       if (isValidUUID(exp.id)) {
-        // A. Marcar expedición como CLAIMED
         await supabase
           .from('active_expeditions')
           .update({ status: 'CLAIMED' })
           .eq('id', exp.id);
 
-        // B. Insertar en historial de expediciones completadas
         await supabase.from('expedition_history').insert({
           user_id: userId,
           galaxy_cluster: exp.galaxy_cluster || 'PELA',
           completed_at: new Date().toISOString()
         });
 
-        // C. ACTUALIZAR LA BILLETERA DE RECURSOS EN USER_PROFILES
         const { data: profile } = await supabase
           .from('user_profiles')
           .select('metal, crystal')
@@ -615,7 +608,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
             .eq('id', userId);
         }
 
-        // D. REGISTRAR PLANETA DESCUBIERTO EN BD
         const newStarId = isValidUUID(exp.id) ? exp.id : crypto.randomUUID();
         const planetName = exp.sector_name || "NUEVO PLANETA EXPLORADO";
 
@@ -693,7 +685,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     }
   };
 
-  // Diagnóstico de flota
   const currentGC = isAdrift ? "PELA" : (selectedGC || "PELA");
   const activeRule = GC_RULES[currentGC] || GC_RULES["PELA"];
   const hasShipInSelection = selectedAssets.some(a => isShipAsset(a.type)) || (selectedFleet?.ships && selectedFleet.ships.length > 0);
@@ -703,7 +694,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   // ─── RENDERIZADO VISTA VUELOS EN CURSO ───
   if (initialView === 'flights') {
     return (
-      <div className="w-full max-w-7xl mx-auto bg-[#080b0e] border border-cyan-500/30 p-5 rounded-2xl shadow-2xl relative overflow-hidden font-mono text-left select-none flex flex-col gap-4">
+      <div className="w-full max-w-7xl mx-auto bg-[#080b0e] border border-cyan-500/30 p-5 rounded-2xl shadow-2xl relative overflow-hidden font-mono text-left select-none flex flex-col gap-4 text-white">
         <div className="w-full bg-[#05070a] border border-cyan-500/30 p-3.5 rounded-xl flex justify-between items-center shrink-0">
           <div className="flex items-center gap-2.5">
             <h1 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
@@ -761,6 +752,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 const totalDurationMs = Math.max(1000, returnMs - launchMs);
                 const elapsedMs = Math.max(0, now - launchMs);
                 const remainingMs = Math.max(0, returnMs - now);
+                const timeLeftInSeconds = Math.max(0, Math.floor(remainingMs / 1000));
                 
                 const progressPct = Math.min(100, Math.max(0, (elapsedMs / totalDurationMs) * 100));
 
@@ -770,21 +762,47 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
                 const logsForExp = expeditionLogs[exp.id] || [];
 
+                let phaseLabel = "VIAJANDO AL CLUSTER...";
+                let phaseColor = "text-amber-400 border-amber-800 animate-pulse";
+
+                if (remainingMs === 0) {
+                  phaseLabel = "MISION FINALIZADA / C.A.N. READY";
+                  phaseColor = "bg-emerald-950 text-emerald-400 border-emerald-800";
+                } else if (progressPct > 70) {
+                  phaseLabel = "RETORNANDO A BASE C.A.N...";
+                  phaseColor = "bg-blue-950 text-blue-300 border-blue-800 animate-pulse";
+                } else if (progressPct > 35) {
+                  phaseLabel = "EXTRACCIÓN ACTIVA / EN ESTRELLA";
+                  phaseColor = "bg-purple-950 text-purple-300 border-purple-800 animate-pulse";
+                }
+
                 return (
-                  <div key={exp.id} className="p-3.5 rounded-xl border border-cyan-500/40 bg-[#050910] shadow-lg flex flex-col justify-between gap-2.5 relative">
-                    <div className="flex justify-between items-start">
+                  <div key={exp.id} className="p-3.5 rounded-xl border border-cyan-500/40 bg-[#050910] shadow-lg flex flex-col justify-between gap-2.5 relative overflow-hidden">
+                    
+                    {/* OVERLAY TÁCTICO ROJO "TRANSITANDO" */}
+                    {remainingMs > 0 && (
+                      <div className="absolute top-0 right-0 left-0 bg-red-950/40 border-b border-red-500/40 px-3 py-1 flex items-center justify-between z-10">
+                        <div className="flex items-center gap-2">
+                          <div className="w-12 h-0.5 bg-red-500 animate-[bounce_1.8s_infinite]" />
+                          <span className="text-[7.5px] font-black text-red-400 tracking-widest animate-pulse uppercase">
+                            TRANSITANDO
+                          </span>
+                        </div>
+                        <span className="text-[7px] text-red-300 font-mono font-bold">{timeLeftInSeconds}s REMAINING</span>
+                      </div>
+                    )}
+
+                    <div className={`flex justify-between items-start ${remainingMs > 0 ? 'pt-4' : ''}`}>
                       <div className="flex flex-col">
                         <span className="text-[10.5px] font-black text-white uppercase truncate">{exp.fleet_name}</span>
                         <span className="text-[8px] text-cyan-400 font-bold uppercase">{exp.galaxy_cluster} / {exp.sector_name}</span>
                       </div>
-                      <span className={`text-[7.5px] font-mono px-2 py-0.5 rounded font-black border ${
-                        remainingMs === 0 ? 'bg-emerald-950 text-emerald-400 border-emerald-800' : 'bg-amber-950 text-amber-400 border-amber-800 animate-pulse'
-                      }`}>
-                        {remainingMs === 0 ? 'COMPLETADO' : 'EN VUELO'}
+                      <span className={`text-[7.5px] font-mono px-2 py-0.5 rounded font-black border ${phaseColor}`}>
+                        {phaseLabel}
                       </span>
                     </div>
 
-                    {/* TIEMPO QUE LLEVA Y TIEMPO QUE FALTA */}
+                    {/* MONITOR TÁCTICO DE VUELO */}
                     <div className="grid grid-cols-2 gap-2 bg-black/60 p-2 rounded-lg border border-cyan-950 text-[8px]">
                       <div className="flex flex-col">
                         <span className="text-zinc-500 uppercase flex items-center gap-1">
@@ -794,10 +812,10 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                       </div>
                       <div className="flex flex-col">
                         <span className="text-zinc-500 uppercase flex items-center gap-1">
-                          <Clock className="w-2.5 h-2.5 text-amber-400" /> Tiempo Restante:
+                          <Clock className="w-2.5 h-2.5 text-amber-400" /> Cuenta Regresiva:
                         </span>
                         <span className="text-amber-300 font-bold font-mono">
-                          {remainingMs > 0 ? formatDuration(remainingMs) : '00h 00m 00s'}
+                          {remainingMs > 0 ? `${timeLeftInSeconds}s (${formatDuration(remainingMs)})` : '00h 00m 00s'}
                         </span>
                       </div>
                     </div>
@@ -813,7 +831,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                       </div>
                     </div>
 
-                    {/* EVENTOS REALES DE EXPEDICIÓN */}
+                    {/* EVENTOS REGISTRADOS */}
                     <div className="p-2 bg-black/40 border border-cyan-950 rounded-lg text-[7.5px] space-y-1">
                       <span className="text-cyan-400 font-bold uppercase tracking-wider block">EVENTOS REGISTRADOS EN MISIÓN:</span>
                       {logsForExp.length === 0 ? (
@@ -831,7 +849,9 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                     {/* BARRA DE PROGRESO */}
                     <div className="space-y-1">
                       <div className="flex justify-between text-[7.5px] text-zinc-400">
-                        <span>PROGRESO DE TELEMETRÍA</span>
+                        <span className="animate-pulse text-cyan-400 font-bold">
+                          {remainingMs > 0 ? "VIAJANDO AL CLUSTER..." : "DESTINO ALCANZADO"}
+                        </span>
                         <span className="text-cyan-400 font-bold">{progressPct.toFixed(1)}%</span>
                       </div>
                       <div className="w-full h-1.5 bg-neutral-900 rounded-full overflow-hidden p-0.5 border border-cyan-950">
@@ -839,7 +859,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                       </div>
                     </div>
 
-                    <button onClick={() => handleClaimExpeditionRewards(exp)} className="w-full py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-[9px] uppercase rounded-lg shadow cursor-pointer">
+                    <button onClick={() => handleClaimExpeditionRewards(exp)} className="w-full py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-[9px] uppercase rounded-lg shadow cursor-pointer hover:brightness-110 active:scale-95 transition-all">
                       CLAIM REWARDS
                     </button>
                   </div>
@@ -854,7 +874,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
   // ─── RENDERIZADO PRINCIPAL ───
   return (
-    <div className="w-full max-w-7xl mx-auto bg-[#080b0e] border border-cyan-500/30 p-2 sm:p-4 rounded-xl shadow-2xl relative font-mono text-left select-none flex flex-col gap-2 my-1">
+    <div className="w-full max-w-7xl mx-auto bg-[#080b0e] border border-cyan-500/30 p-2 sm:p-4 rounded-xl shadow-2xl relative font-mono text-left select-none flex flex-col gap-2 my-1 text-white">
 
       {/* NAVBAR SUPERIOR */}
       <div className="w-full bg-[#05070a] border border-cyan-500/30 p-3 rounded-xl flex justify-between items-center shrink-0">
@@ -1040,7 +1060,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                       <div
                         key={fleet.id}
                         onClick={() => setSelectedFleet(fleet)}
-                        className={`p-2 rounded-lg border cursor-pointer flex flex-col gap-1 ${
+                        className={`p-2 rounded-lg border cursor-pointer flex flex-col gap-1 relative overflow-hidden ${
                           selectedFleet?.id === fleet.id ? 'bg-cyan-950/80 border-cyan-400' : 'bg-[#050910] border-cyan-950'
                         }`}
                       >
@@ -1056,14 +1076,30 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 ) : (
                   filteredInventory.map(asset => {
                     const isSelected = selectedAssets.some(a => a.id === asset.id);
+                    const isAssetInFlight = activeExpeditions.some(exp => exp.status === 'LAUNCHED' && isShipAsset(asset.type));
+
                     return (
                       <div
                         key={asset.id}
-                        onClick={() => toggleAssetSelection(asset)}
-                        className={`p-2 rounded-lg border cursor-pointer flex items-center gap-2.5 transition-all ${
-                          isSelected ? 'bg-cyan-950/60 border-cyan-400 opacity-60' : 'bg-[#050910] border-cyan-950 hover:border-cyan-500'
+                        onClick={() => {
+                          if (!isAssetInFlight) toggleAssetSelection(asset);
+                        }}
+                        className={`p-2 rounded-lg border cursor-pointer flex items-center gap-2.5 transition-all relative overflow-hidden ${
+                          isAssetInFlight 
+                            ? 'bg-red-950/70 border-red-500/60 cursor-not-allowed' 
+                            : isSelected ? 'bg-cyan-950/60 border-cyan-400 opacity-60' : 'bg-[#050910] border-cyan-950 hover:border-cyan-500'
                         }`}
                       >
+                        {/* OVERLAY TÁCTICO ROJO "TRANSITANDO" */}
+                        {isAssetInFlight && (
+                          <div className="absolute inset-0 bg-red-950/85 backdrop-blur-[1px] border border-red-500 z-20 flex flex-col items-center justify-center p-1 text-center">
+                            <div className="w-full h-0.5 bg-red-500 animate-[bounce_1.8s_infinite] mb-1" />
+                            <span className="text-[7.5px] font-black text-red-400 tracking-widest animate-pulse uppercase">
+                              TRANSITANDO
+                            </span>
+                          </div>
+                        )}
+
                         <div className="w-8 h-8 rounded bg-black border border-cyan-950 shrink-0 overflow-hidden">
                           <img src={asset.image_url} className="w-full h-full object-cover brightness-90" alt="" />
                         </div>

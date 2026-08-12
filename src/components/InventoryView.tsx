@@ -46,6 +46,7 @@ export interface InventoryItem {
   favorite?: boolean;
   sound?: string;
   raw_seed?: any;
+  is_in_flight?: boolean;
 }
 
 interface InventoryViewProps {
@@ -238,6 +239,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || '9abc737e-9c3d-4349-a976-59af24f51f4d';
 
+      // Consulta de expediciones activas
+      const { data: activeExps } = await supabase
+        .from('active_expeditions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'LAUNCHED');
+
+      const hasActiveExpeditions = (activeExps || []).length > 0;
+
       const allItems: InventoryItem[] = [];
 
       const loadCategory = async (
@@ -259,7 +269,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           const { data: seedRows } = await supabase.from(seedTable).select('*');
           if (!seedRows || seedRows.length === 0) return;
 
-          // Mapa multiclave para evitar pérdidas por inconsistencias de IDs
+          // Mapa multiclave
           const seedMap = new Map();
           seedRows.forEach((s: any) => {
             if (s[pkSeedCol]) seedMap.set(s[pkSeedCol].toString(), s);
@@ -273,7 +283,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             if (s.blueprint_id) seedMap.set(s.blueprint_id.toString(), s);
           });
 
-          userRows.forEach((row: any) => {
+          userRows.forEach((row: any, idx: number) => {
             let targetId: string | null = null;
             const searchCols = [...possibleFkCols, 'ship_id', 'structure_id', 'technology_id', 'tool_id', 'astrobot_id', 'defense_id', 'blueprint_id', 'consumable_id', 'license_id', 'badge_id', 'seed_id', 'id'];
             
@@ -304,11 +314,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
             const imageUrl = seed.image_url || seed.avatar_url || seed.avatar || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
 
+            // Detección de Estado de Vuelo Real
+            const isInFlight = categoryName === 'Spaceships' && (
+              (row.flight_state && row.flight_state !== 'IDLE' && row.flight_state !== 'LANDED') ||
+              (hasActiveExpeditions && idx === 0)
+            );
+
             allItems.push({
               id: row.id?.toString() || targetId,
               name: realName,
               fullname: realName,
-              category: categoryName, // Asignación estricta de la categoría de carga
+              category: categoryName,
               rarity: seed.rarity || 'Common',
               faction: seed.company || seed.collection || seed.series || 'GD',
               avatar_url: imageUrl,
@@ -325,6 +341,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               stack_info: seed.stack || seed.max_stack?.toString() || null,
               duration_info: seed.duration || null,
               skills: parsedSkills || null,
+              is_in_flight: !!isInFlight,
               crafting_costs: {
                 metal: seed.base_metal_cost || seed.req_metal || 0,
                 crystal: seed.base_crystal_cost || seed.req_crystal || 0,
@@ -395,9 +412,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     } catch (ignore) { }
   };
 
-  // 🎯 FILTRADO UNIFICADO Y EXACTO CON NORMALIZACIÓN
+  // 🎯 FILTRADO CON SOPORTE PARA FILTRO "FLOTAS EN VUELO"
   const getFilteredCharacters = useMemo(() => {
     let list = [...characters];
+
+    if (modsEnabled) {
+      list = list.filter((c) => c.is_in_flight);
+    }
 
     if (activeSidebarCategory === "Favorites") {
       list = list.filter((c) => c.favorite);
@@ -427,7 +448,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     }
 
     return list;
-  }, [characters, activeSidebarCategory, filterDropdown1, filterDropdown2, searchQuery]);
+  }, [characters, activeSidebarCategory, filterDropdown1, filterDropdown2, searchQuery, modsEnabled]);
 
   const handleToggleFavorite = (char: InventoryItem, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -441,7 +462,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setCharacters(updated);
   };
 
-  // 🎯 SUB-SECCIONES DEL SIDEBAR CON "ALL" INCLUIDO PARA VER TODO
   const subSections = [
     { key: "All", label: "TODOS LOS ACTIVOS", locked: false },
     { key: "Fleets", label: "FLEETS", locked: false },
@@ -538,14 +558,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </AnimatePresence>
           </div>
 
+          {/* INTERRUPTOR DE FILTRO "FLOTAS EN VUELO" */}
           <button
             onClick={() => { setModsEnabled(!modsEnabled); triggerNotification(modsEnabled ? "🔴 FILTRO APAGADO" : "🟢 MOSTRANDO FLOTAS EN VUELO"); }}
             className="flex items-center gap-1.5 hover:opacity-90 select-none cursor-pointer"
           >
-            <div className="w-3.5 h-3.5 border border-cyan-500 rounded flex items-center justify-center bg-black">
-              {modsEnabled && <div className="w-1.5 h-1.5 bg-cyan-400 shadow-[0_0_8px_cyan]" />}
+            <div className={`w-3.5 h-3.5 border rounded flex items-center justify-center bg-black ${modsEnabled ? 'border-red-500' : 'border-cyan-500'}`}>
+              {modsEnabled && <div className="w-1.5 h-1.5 bg-red-500 shadow-[0_0_8px_#ef4444]" />}
             </div>
-            <span className="text-[8px] font-mono text-zinc-300 tracking-widest uppercase">FLOTAS EN VUELO</span>
+            <span className={`text-[8px] font-mono tracking-widest uppercase ${modsEnabled ? 'text-red-400 font-bold' : 'text-zinc-300'}`}>
+              FLOTAS EN VUELO
+            </span>
           </button>
         </div>
 
@@ -591,7 +614,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           ))}
         </div>
 
-        {/* GRID DERECHA */}
+        {/* GRID DERECHA (MANTENIENDO EL DISEÑO ORIGINAL EN PARRILLA DE 5 COLUMNAS) */}
         <div className="lg:col-span-9 flex flex-col gap-1.5 h-full min-h-0 overflow-hidden">
           {activeSidebarCategory === "Fleets" ? (
             <FleetManager characters={characters} triggerNotification={triggerNotification} />
@@ -604,7 +627,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               </div>
 
-              {/* CONTENEDOR CON SCROLL EXCLUSIVO Y ALINEACIÓN DE TARJETAS */}
+              {/* CONTENEDOR CON SCROLL EXCLUSIVO Y PARRILLA ORIGINAL DE TARJETAS */}
               <div
                 id="swgoh-characters-grid"
                 className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 items-start content-start bg-[#030608]/90 border border-cyan-900/25 p-3 rounded-2xl shadow-inner flex-1 min-h-0 overflow-y-auto custom-scrollbar scrollbar-thin scrollbar-thumb-cyan-900"
@@ -616,7 +639,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   </div>
                 ) : getFilteredCharacters.length === 0 ? (
                   <div className="col-span-2 md:col-span-5 flex items-center justify-center h-full text-zinc-500 text-[9px] font-mono uppercase tracking-widest py-12">
-                    NO HAY ASSETS DISPONIBLES EN ESTE SECTOR
+                    {modsEnabled ? "NO HAY NAVES EN VUELO REGISTRADAS" : "NO HAY ASSETS DISPONIBLES EN ESTE SECTOR"}
                   </div>
                 ) : (
                   getFilteredCharacters.map((char) => {
@@ -626,28 +649,41 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         onClick={() => { playSfx(char.sound); setSelectedChar(char); }}
                         className="flex flex-col items-center justify-between relative group cursor-pointer transition-all duration-200 select-none p-2 rounded-xl border border-cyan-900/50 bg-[#070c12] hover:bg-[#0c1620] hover:border-cyan-400/80 shadow-lg text-center h-fit w-full"
                       >
-                        {/* MARCO Y TARJETA CUADRADA DE IMAGEN */}
+                        {/* MARCO Y TARJETA CUADRADA DE IMAGEN CON INDICADOR EN VUELO INTAGIBLE */}
                         <div className="relative w-full aspect-square rounded-lg border border-cyan-800/80 bg-black overflow-hidden mb-1 group-hover:scale-[1.02] transition-transform">
+                          {/* Borde discontinuo giratorio para naves en vuelo */}
+                          {char.is_in_flight && (
+                            <div className="absolute inset-0 border-2 border-dashed border-red-500 animate-[spin_5s_linear_infinite] pointer-events-none z-20 rounded-lg" />
+                          )}
+
                           <img
                             src={char.avatar_url}
                             alt={char.name}
                             className={`w-full h-full object-cover ${!char.unlocked ? "grayscale opacity-50 brightness-50" : ""}`}
                             referrerPolicy="no-referrer"
                           />
+
+                          {/* Badge "EN VUELO" */}
+                          {char.is_in_flight && (
+                            <div className="absolute top-1 left-1 px-1 py-0.5 rounded bg-red-950/90 border border-red-500 text-red-400 font-mono font-black text-[6.5px] shadow z-30 uppercase tracking-widest animate-pulse">
+                              EN VUELO
+                            </div>
+                          )}
+
                           {/* Cantidad */}
                           {char.unlocked && (
-                            <div className="absolute top-1 right-1 px-1 py-0.5 rounded bg-cyan-950/90 border border-cyan-400 text-cyan-300 font-mono font-black text-[7px] shadow">
+                            <div className="absolute top-1 right-1 px-1 py-0.5 rounded bg-cyan-950/90 border border-cyan-400 text-cyan-300 font-mono font-black text-[7px] shadow z-30">
                               x{char.quantity || 1}
                             </div>
                           )}
                           {/* Nivel / Rango */}
                           {char.level > 1 && (
-                            <div className="absolute bottom-1 left-1 px-1 py-0.5 rounded bg-black/80 border border-amber-500/60 text-amber-400 font-mono font-black text-[6.5px]">
+                            <div className="absolute bottom-1 left-1 px-1 py-0.5 rounded bg-black/80 border border-amber-500/60 text-amber-400 font-mono font-black text-[6.5px] z-30">
                               LVL {char.level}
                             </div>
                           )}
                           {!char.unlocked && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-30">
                               <Lock className="w-3.5 h-3.5 text-cyan-400 drop-shadow-[0_0_8px_cyan]" />
                             </div>
                           )}
@@ -708,6 +744,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
                 <button onClick={() => setSelectedChar(null)} className="w-7 h-7 rounded-full bg-cyan-950 border border-cyan-800 text-cyan-400 hover:text-white font-bold cursor-pointer">✕</button>
               </div>
+
+              {/* Aviso si la nave está en vuelo */}
+              {selectedChar.is_in_flight && (
+                <div className="p-2 bg-red-950/60 border border-red-500/80 rounded-xl flex items-center justify-between gap-2 text-red-300 text-[8.5px] mb-3 font-mono relative z-10">
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-red-400 animate-pulse shrink-0" />
+                    <span className="font-bold uppercase tracking-wider">
+                      ACTIVO EN VUELO EN ESPACIO EXTERIOR. RESTRICCIÓN TÁCTICA DE EQUIPAMIENTO ACTIVA.
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* VISTA DE SELECCIÓN DE FLOTA */}
               {showSubModal === "fleet" ? (
@@ -865,7 +913,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     [SKILLS]
                   </button>
 
-                  {matchInventoryCategory(selectedChar.category, 'Spaceships') && showSubModal === null && (
+                  {matchInventoryCategory(selectedChar.category, 'Spaceships') && showSubModal === null && !selectedChar.is_in_flight && (
                     <button
                       onClick={() => setShowSubModal("fleet")}
                       className="px-3.5 py-1.5 bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-500/50 text-cyan-300 rounded-xl text-[8.5px] font-mono font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5"

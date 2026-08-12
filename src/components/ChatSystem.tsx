@@ -15,7 +15,8 @@ import {
   MessageCircle,
   ChevronLeft,
   Trash2,
-  Flag
+  Flag,
+  Swords
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { chatService, ChatMessage } from '../services/chatService';
@@ -25,7 +26,7 @@ interface ChatSystemProps {
   triggerNotification?: (text: string, e?: any) => void;
 }
 
-type ChannelType = 'GLOBAL' | 'ALLIANCE' | 'MARKET' | 'PRIVADO';
+type ChannelType = 'GLOBAL' | 'ALLIANCE' | 'MARKET' | 'COMBAT' | 'PRIVADO';
 
 interface DmPartner {
   id: string;
@@ -48,8 +49,14 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
   const [inputContent, setInputContent] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // 🎯 REAL Y CORREGIDO: Inicializa en 0 para no mostrar falsas notificaciones
+  // 🎯 Estado de combate activo del usuario (Realtime / Supabase)
+  const [hasActiveCombat, setHasActiveCombat] = useState<boolean>(false);
+
+  // 🎯 Notificaciones reales de mensajes no leídos
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Anti-Spam / Rate Limiting Ref
+  const lastSentTimeRef = useRef<number>(0);
 
   // Sistema de DM Privado
   const [activeDmPartner, setActiveDmPartner] = useState<DmPartner | null>(null);
@@ -70,11 +77,35 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (data?.user) setCurrentUserId(data.user.id);
+      if (data?.user) {
+        setCurrentUserId(data.user.id);
+        checkActiveCombat(data.user.id);
+      }
     });
   }, []);
 
-  // Mapeo dinámico de Canales
+  // 🔍 Verificar en Supabase si el usuario tiene un combate activo
+  const checkActiveCombat = async (userId: string) => {
+    try {
+      // Consulta si el usuario está involucrado en una batalla activa/logs recientes de combate
+      const { data: combatData } = await supabase
+        .from('combat_logs')
+        .select('id')
+        .or(`attacker_id.eq.${userId},defender_id.eq.${userId}`)
+        .limit(1);
+
+      const inCombat = !!(combatData && combatData.length > 0);
+      setHasActiveCombat(inCombat);
+
+      if (!inCombat && activeChannel === 'COMBAT') {
+        setActiveChannel('GLOBAL');
+      }
+    } catch (err) {
+      setHasActiveCombat(false);
+    }
+  };
+
+  // Mapeo dinámico de Canales (Global, Alianza, Mercado, Combate Temporal, Privado)
   useEffect(() => {
     if (activeChannel === 'PRIVADO') {
       if (activeDmPartner && currentUserId) {
@@ -87,12 +118,14 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
       setChannelId('global-main');
     } else if (activeChannel === 'MARKET') {
       setChannelId('market-main');
+    } else if (activeChannel === 'COMBAT') {
+      setChannelId('combat-temp-active');
     } else if (activeChannel === 'ALLIANCE') {
       setChannelId(`alliance-${userAllianceName.toLowerCase().replace(/\s+/g, '-')}`);
     }
   }, [activeChannel, activeDmPartner, currentUserId, userAllianceName]);
 
-  // Cargar Historial y Suscribir con conteo de no leídos real
+  // Cargar Historial (últimos 100 mensajes) y Suscribir
   useEffect(() => {
     if (channelId === 'dm-none') {
       setMessages([]);
@@ -103,12 +136,11 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
 
     async function initChat() {
       const history = await chatService.fetchHistory(channelId);
-      setMessages(history);
+      setMessages(history.slice(-100));
 
       unsubscribe = chatService.subscribeToChannel(channelId, (newMsg) => {
-        setMessages((prev) => [...prev, newMsg]);
+        setMessages((prev) => [...prev.slice(-99), newMsg]);
 
-        // 🎯 Aumenta la notificación SOLO si el chat está cerrado Y el mensaje es de otro jugador
         if (!isOpen && newMsg.user_id !== currentUserId) {
           setUnreadCount((prev) => prev + 1);
         }
@@ -127,10 +159,17 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Enviar Mensaje (Público, Alianza o DM Privado)
+  // Enviar Mensaje con Rate Limiting / Anti-Spam
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputContent.trim()) return;
+
+    const now = Date.now();
+    if (now - lastSentTimeRef.current < 1200) {
+      if (triggerNotification) triggerNotification('⚠️ CANAL SATURADO. ESPERA UN SEGUNDO ANTES DE REANUDAR TRANSMISIÓN.');
+      return;
+    }
+    lastSentTimeRef.current = now;
 
     if (activeChannel === 'PRIVADO' && !activeDmPartner) {
       if (triggerNotification) triggerNotification('⚠️ SELECCIONA UN PILOTO PARA TRANSMITIR EN PRIVADO');
@@ -148,7 +187,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
 
       setMessages((prev) => {
         if (prev.some((m) => m.id === sentMsg.id)) return prev;
-        return [...prev, sentMsg];
+        return [...prev.slice(-99), sentMsg];
       });
 
       setInputContent('');
@@ -173,7 +212,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     if (triggerNotification) triggerNotification(`💬 CANAL PRIVADO CON ${partner.name} ESTABLECIDO`);
   };
 
-  // Eliminar Chat Privado Reciente de la Lista
+  // Eliminar Chat Privado Reciente
   const handleDeleteDmConversation = (partnerId: string, partnerName: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setRecentDmPartners((prev) => prev.filter((p) => p.id !== partnerId));
@@ -208,7 +247,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     }
   };
 
-  // Borrar Mensaje individual en el Chat
+  // Borrar Mensaje
   const handleDeleteMessage = async (messageId: string) => {
     try {
       await chatService.deleteMessage(messageId);
@@ -221,7 +260,6 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     }
   };
 
-  // Insertar Emoji
   const handleAddEmoji = (emoji: string) => {
     setInputContent((prev) => prev + emoji);
   };
@@ -232,10 +270,19 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     return m.content.toLowerCase().includes(q) || m.user_name.toLowerCase().includes(q);
   });
 
+  // 🎯 Lista dinámica de canales (Sólo muestra COMBATE si hasActiveCombat === true)
+  const availableChannels = [
+    { id: 'GLOBAL', label: 'GLOBAL', icon: Globe },
+    { id: 'ALLIANCE', label: 'ALIANZA', icon: Shield },
+    { id: 'MARKET', label: 'MERCADO', icon: ShoppingBag },
+    ...(hasActiveCombat ? [{ id: 'COMBAT', label: 'COMBATE', icon: Swords }] : []),
+    { id: 'PRIVADO', label: 'PRIVADO', icon: MessageCircle }
+  ];
+
   return (
     <div className="fixed bottom-4 left-4 z-[9999] font-sans select-none">
       
-      {/* ─── 1. BOTÓN FLOTANTE HUD CIRCULAR SIN TEXTO CON BADGE DERECHO Y REAL ─── */}
+      {/* ─── 1. BOTÓN FLOTANTE HUD CIRCULAR ─── */}
       {!isOpen && (
         <motion.button
           initial={{ scale: 0.8, opacity: 0 }}
@@ -246,7 +293,6 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
         >
           <MessageSquare className="w-6 h-6 text-cyan-400 group-hover:scale-110 transition-transform animate-pulse" />
           
-          {/* 🎯 Badge real: solo aparece si unreadCount es mayor que 0 */}
           {unreadCount > 0 && (
             <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white font-mono text-[9px] font-black min-w-[20px] h-[20px] px-1 rounded-full flex items-center justify-center shadow-[0_0_10px_#ef4444] border-2 border-black animate-bounce">
               {unreadCount > 99 ? '99+' : unreadCount}
@@ -268,17 +314,12 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="w-[calc(100vw-2rem)] max-w-[360px] sm:max-w-[440px] h-[520px] max-h-[85dvh] bg-[#06080b]/95 border-2 border-cyan-500/40 rounded-2xl shadow-[0_0_40px_rgba(6,182,212,0.25)] backdrop-blur-xl flex flex-col overflow-hidden text-left"
+            className="w-[calc(100vw-2rem)] max-w-[360px] sm:max-w-[460px] h-[520px] max-h-[85dvh] bg-[#06080b]/95 border-2 border-cyan-500/40 rounded-2xl shadow-[0_0_40px_rgba(6,182,212,0.25)] backdrop-blur-xl flex flex-col overflow-hidden text-left"
           >
-            {/* PESTAÑAS DE CANALES Y BOTÓN (X) */}
+            {/* PESTAÑAS DE CANALES FILTRADAS DINÁMICAMENTE */}
             <div className="flex items-center justify-between px-3 py-2 bg-black/90 border-b border-cyan-900/50 font-mono text-[8.5px] uppercase font-bold shrink-0">
               <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
-                {[
-                  { id: 'GLOBAL', label: 'GLOBAL', icon: Globe },
-                  { id: 'ALLIANCE', label: 'ALIANZA', icon: Shield },
-                  { id: 'MARKET', label: 'MERCADO', icon: ShoppingBag },
-                  { id: 'PRIVADO', label: 'PRIVADO', icon: MessageCircle }
-                ].map((ch) => {
+                {availableChannels.map((ch) => {
                   const Icon = ch.icon;
                   const isActive = activeChannel === ch.id;
                   return (
@@ -300,7 +341,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
 
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-1 text-zinc-400 hover:text-red-400 hover:bg-red-950/40 border border-transparent hover:border-red-500/30 rounded-lg transition-colors cursor-pointer shrink-0 ml-2"
+                className="p-1 text-zinc-400 hover:text-red-400 hover:bg-red-950/40 border border-transparent hover:border-red-500/30 rounded-lg transition-colors cursor-pointer shrink-0 ml-1"
                 title="Cerrar Chat"
               >
                 <X className="w-4 h-4" />
@@ -442,7 +483,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
                         )}
                       </div>
 
-                      {/* MENÚ DE OPCIONES VINCULADO AL ID ÚNICO DE MENSAJE */}
+                      {/* MENÚ DE OPCIONES */}
                       {activeUserMenu === msg.id && (
                         <div className="absolute right-0 top-6 bg-[#0c1017] border border-cyan-500/50 rounded-xl shadow-2xl p-1.5 z-50 flex flex-col gap-1 text-[8.5px] font-mono uppercase backdrop-blur-md">
                           <button

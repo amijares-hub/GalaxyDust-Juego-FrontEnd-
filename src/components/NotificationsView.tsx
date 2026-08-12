@@ -11,7 +11,9 @@ import {
   Radio,
   ExternalLink,
   CheckCircle2,
-  Clock
+  Clock,
+  Rocket,
+  Skull
 } from "lucide-react";
 import { Button } from "./ui/joly-button";
 import { supabase } from "../lib/supabase";
@@ -42,7 +44,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   const [activeTab, setActiveTab] = useState<string>("ALL");
   const [filterRead, setFilterRead] = useState<"ALL" | "UNREAD">("ALL");
 
-  // ─── CARGA REAL DESDE SUPABASE ───
+  // ─── CARGA REAL DESDE SUPABASE + SUSCRIPCIÓN EN TIEMPO REAL ───
   const fetchNotifications = async () => {
     setIsLoading(true);
     try {
@@ -69,6 +71,36 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
   useEffect(() => {
     fetchNotifications();
+
+    // 🎯 Suscripción en tiempo real a nuevos hitos de expedición o alertas de vuelo
+    let channel: any = null;
+    supabase.auth.getUser().then(({ data }) => {
+      const userId = data?.user?.id || '9abc737e-9c3d-4349-a976-59af24f51f4d';
+
+      channel = supabase
+        .channel(`user_notifications_${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'user_notifications',
+            filter: `user_id=eq.${userId}`
+          },
+          (payload) => {
+            const newNotif = payload.new as NotificationRecord;
+            setNotifications((prev) => [newNotif, ...prev]);
+            if (triggerNotification) {
+              triggerNotification(`🔔 ${newNotif.title.toUpperCase()}`);
+            }
+          }
+        )
+        .subscribe();
+    });
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, []);
 
   // ─── MARCAR COMO LEÍDA ───
@@ -151,7 +183,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
     if (activeTab !== "ALL") {
       list = list.filter(
-        (n) => (n.box_type || n.category || "").toUpperCase() === activeTab.toUpperCase()
+        (n) => (n.box_type || n.category || "").toUpperCase().includes(activeTab.toUpperCase())
       );
     }
 
@@ -163,10 +195,18 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
     [notifications]
   );
 
-  const getCategoryIcon = (category: string, boxType: string) => {
+  const getCategoryIcon = (category: string, boxType: string, title?: string) => {
     const type = (boxType || category || "").toUpperCase();
+    const t = (title || "").toUpperCase();
+
+    if (t.includes("DESTRUIDA") || t.includes("DAÑO") || t.includes("ALERTA")) {
+      return <Skull className="w-4 h-4 text-red-500 animate-pulse" />;
+    }
     if (type.includes("SYSTEM")) return <Radio className="w-4 h-4 text-cyan-400" />;
-    if (type.includes("EXPEDITION")) return <Compass className="w-4 h-4 text-emerald-400" />;
+    if (type.includes("EXPEDITION") || type.includes("EXPEDICION")) {
+      if (t.includes("SALIDA") || t.includes("DESPLIEGUE")) return <Rocket className="w-4 h-4 text-cyan-400" />;
+      return <Compass className="w-4 h-4 text-emerald-400" />;
+    }
     if (type.includes("COMBAT") || type.includes("BATTLE")) return <ShieldAlert className="w-4 h-4 text-red-400" />;
     return <Inbox className="w-4 h-4 text-amber-400" />;
   };
@@ -306,7 +346,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                     ? "bg-cyan-950/80 border-cyan-400/60 shadow-[0_0_10px_rgba(34,211,238,0.2)]"
                     : "bg-black/50 border-cyan-950"
                 }`}>
-                  {getCategoryIcon(n.category, n.box_type)}
+                  {getCategoryIcon(n.category, n.box_type, n.title)}
                 </div>
 
                 <div className="flex-1 min-w-0 text-left">
