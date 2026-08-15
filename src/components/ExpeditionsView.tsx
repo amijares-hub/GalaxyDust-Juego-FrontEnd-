@@ -219,7 +219,17 @@ const GC_RULES: Record<string, GCRequirement> = {
   }
 };
 
-const DEFAULT_GC_LIST = ["PELA", "GC1", "GC2", "GC3", "GC4", "GC5", "GC6", "GC7", "GC8"];
+const DEFAULT_GC_LIST: { id: string; name: string }[] = [
+  { id: "PELA", name: "GC PELA - DERIVA / INICIO" },
+  { id: "GC1",  name: "GC1 - INARA ALPHA" },
+  { id: "GC2",  name: "GC2 - DUST CLUSTER" },
+  { id: "GC3",  name: "GC3 - NEBULA PRIME" },
+  { id: "GC4",  name: "GC4 - VOID CLUSTER" },
+  { id: "GC5",  name: "GC5 - TITAN CLUSTER" },
+  { id: "GC6",  name: "GC6 - HYPERION CORE" },
+  { id: "GC7",  name: "GC7 - PHANTOM EDGE" },
+  { id: "GC8",  name: "GC8 - OMEGA NEXUS" },
+];
 
 export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   initialView = 'selection',
@@ -227,14 +237,20 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   triggerNotification
 }) => {
   const [currentStep, setCurrentStep] = useState<SelectionStep>('GC');
-  const [selectedGC, setSelectedGC] = useState<string | null>("PELA");
+  const [selectedGC, setSelectedGC] = useState<string | null>(null);
   const [selectedGAL, setSelectedGAL] = useState<string | null>(null);
   const [selectedSC, setSelectedSC] = useState<string | null>(null);
   const [selectedSS, setSelectedSS] = useState<string | null>(null);
   const [selectedPlanet, setSelectedPlanet] = useState<DiscoveredStar | null>(null);
 
   const [completedCountsByGC, setCompletedCountsByGC] = useState<Record<string, number>>({});
-  const [gcList] = useState<string[]>(DEFAULT_GC_LIST);
+  
+  // ─── ESTADOS DINÁMICOS DE NAVEGACIÓN ESTELAR DESDE SUPABASE ───
+  const [gcList, setGcList] = useState<{ id: string; name: string }[]>(DEFAULT_GC_LIST);
+  const [dbGalaxies, setDbGalaxies] = useState<{ id: string; name: string }[]>([]);
+  const [dbStarClusters, setDbStarClusters] = useState<{ id: string; name: string }[]>([]);
+  const [dbStarSystems, setDbStarSystems] = useState<{ id: string; name: string }[]>([]);
+  const [dbPlanets, setDbPlanets] = useState<DiscoveredStar[]>([]);
 
   const [isDispatchPanelActive, setIsDispatchPanelActive] = useState(false);
   const [isAdrift, setIsAdrift] = useState(false);
@@ -267,7 +283,17 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   const leftMenuOptions: LeftMenuCategory[] = ['Fleets', 'Naves', 'Astrobots', 'Tools', 'Licencia', 'Consumibles'];
 
   const formatBreadcrumbText = () => {
-    const parts = [selectedGC, selectedGAL, selectedSC, selectedSS, selectedPlanet?.name].filter(Boolean);
+    const galObj = dbGalaxies.find(g => g.id === selectedGAL);
+    const scObj = dbStarClusters.find(s => s.id === selectedSC);
+    const ssObj = dbStarSystems.find(sys => sys.id === selectedSS);
+
+    const parts = [
+      selectedGC, 
+      galObj ? galObj.name : (selectedGAL ? 'GAL' : null), 
+      scObj ? scObj.name : (selectedSC ? 'SC' : null), 
+      ssObj ? ssObj.name : (selectedSS ? 'SS' : null), 
+      selectedPlanet?.name
+    ].filter(Boolean);
     return parts.join(' > ') || 'SELECCIONA COORDENADAS GALÁCTICAS';
   };
 
@@ -278,14 +304,137 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     return () => clearInterval(timer);
   }, []);
 
+  // ─── CARGA CASCADA EN TIEMPO REAL DESDE SUPABASE ───
+
+  // 1. Cargar Galaxias cuando cambia el Galaxy Cluster
+  useEffect(() => {
+    if (!selectedGC) { setDbGalaxies([]); return; }
+    const fetchGalaxies = async () => {
+      const { data } = await supabase
+        .from('seed_galaxies')
+        .select('id, galaxy_number')
+        .eq('cluster_id', selectedGC)
+        .order('galaxy_number', { ascending: true });
+
+      if (data && data.length > 0) {
+        setDbGalaxies(data.map((g: any) => ({ id: g.id, name: `GALAXY ${g.galaxy_number}` })));
+      } else {
+        setDbGalaxies([]);
+      }
+    };
+    fetchGalaxies();
+    setSelectedGAL(null);
+    setSelectedSC(null);
+    setSelectedSS(null);
+    setSelectedPlanet(null);
+  }, [selectedGC]);
+
+  // 2. Cargar Star Clusters cuando cambia la Galaxia
+  useEffect(() => {
+    if (!selectedGAL) { setDbStarClusters([]); return; }
+    const fetchStarClusters = async () => {
+      const { data } = await supabase
+        .from('seed_star_clusters')
+        .select('id, sc_number')
+        .eq('galaxy_id', selectedGAL)
+        .order('sc_number', { ascending: true });
+
+      if (data && data.length > 0) {
+        setDbStarClusters(data.map((sc: any) => ({ id: sc.id, name: `STARCLUSTER ${sc.sc_number}` })));
+      } else {
+        setDbStarClusters([]);
+      }
+    };
+    fetchStarClusters();
+    setSelectedSC(null);
+    setSelectedSS(null);
+    setSelectedPlanet(null);
+  }, [selectedGAL]);
+
+  // 3. Cargar Star Systems cuando cambia el Star Cluster
+  useEffect(() => {
+    if (!selectedSC) { setDbStarSystems([]); return; }
+    const fetchStarSystems = async () => {
+      const { data } = await supabase
+        .from('seed_star_systems')
+        .select('id, name_code')
+        .eq('sc_id', selectedSC);
+
+      if (data && data.length > 0) {
+        setDbStarSystems(data.map((sys: any) => ({ id: sys.id, name: sys.name_code || `SYS-${sys.id.substring(0, 4)}` })));
+      } else {
+        setDbStarSystems([]);
+      }
+    };
+    fetchStarSystems();
+    setSelectedSS(null);
+    setSelectedPlanet(null);
+  }, [selectedSC]);
+
+  // 4. Cargar Planetas cuando cambia el Star System
+  useEffect(() => {
+    if (!selectedSS) { setDbPlanets([]); return; }
+    const fetchPlanets = async () => {
+      const { data } = await supabase
+        .from('seed_locations')
+        .select('*')
+        .eq('system_id', selectedSS);
+
+      if (data && data.length > 0) {
+        setDbPlanets(data.map((loc: any) => ({
+          id: loc.id,
+          name: `PLANETA ${loc.planet_star_number}`,
+          type: loc.conditions?.body_type || 'planeta',
+          isDiscovered: true,
+          x: 0,
+          y: 0,
+          duration_hours: (loc.time_minutes || 60) / 60,
+          risk_factor: 15
+        })));
+      } else {
+        setDbPlanets([]);
+      }
+    };
+    fetchPlanets();
+    setSelectedPlanet(null);
+  }, [selectedSS]);
+
   // ─── CONEXIÓN A INVENTARIO Y EXPEDICIONES REALES DESDE SUPABASE ───
   const syncDatabaseData = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || '9abc737e-9c3d-4349-a976-59af24f51f4d';
+      const userId = user?.id || 'df7832b8-c085-4e05-90c1-541fab1c6c12';
 
-      // 1. Historial de Expediciones Completadas
+      // 1. Cargar lista real de Galaxy Clusters (id + name desde la BD)
+      const { data: realGCs } = await supabase.from('seed_galaxy_clusters').select('id, name');
+      if (realGCs && realGCs.length > 0) {
+        const gcObjects = realGCs.map((g: any) => ({ id: g.id, name: g.name || g.id }));
+        setGcList(gcObjects);
+        // Seleccionar el primer GC de la BD si aún no hay selección
+        setSelectedGC(prev => prev ?? gcObjects[0].id);
+      } else {
+        setGcList(DEFAULT_GC_LIST); // Fallback de seguridad
+        setSelectedGC(prev => prev ?? DEFAULT_GC_LIST[0].id);
+      }
+
+      // 2. Obtener legacy_id del usuario (busca por 'id', columna correcta de user_profiles)
+      let legacyUserId = 1623;
+      try {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('legacy_id')
+          .eq('id', userId) // 'id' es la columna correcta, NO 'user_id'
+          .single();
+
+        if (profile?.legacy_id) {
+          legacyUserId = profile.legacy_id;
+        }
+      } catch (errProfile) {
+        console.warn('No se pudo obtener legacy_id, usando fallback.', errProfile);
+      }
+
+      // 3. Historial de Expediciones Completadas
       const { data: historyRows } = await supabase
         .from('expedition_history')
         .select('galaxy_cluster')
@@ -298,18 +447,21 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
       });
       setCompletedCountsByGC(counts);
 
-      // 2. Helper genérico para cargar inventario real
+      // 4. Helper seguro para cargar inventario
       const loadCategoryAssets = async (
         userTable: string,
         seedTable: string,
         categoryType: Asset['type'],
         fkCol: string,
         seedPkCol: string = 'id',
-        nameCols: string[] = ['name', 'title']
+        nameCols: string[] = ['name', 'title'],
+        userFkCol: string = 'user_id',
+        userFkVal: any = userId
       ): Promise<Asset[]> => {
         try {
-          const { data: userRows } = await supabase.from(userTable).select('*').eq('user_id', userId);
-          if (!userRows || userRows.length === 0) return [];
+          if (!userFkVal) return [];
+          const { data: userRows, error: userErr } = await supabase.from(userTable).select('*').eq(userFkCol, userFkVal);
+          if (userErr || !userRows || userRows.length === 0) return [];
 
           const { data: seedRows } = await supabase.from(seedTable).select('*');
           if (!seedRows || seedRows.length === 0) return [];
@@ -322,31 +474,32 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
             if (!targetId) return;
 
             const seed = seedMap.get(targetId);
-            if (!seed) return;
 
-            let realName = 'ACTIVO';
-            for (const col of nameCols) {
-              if (seed[col]) {
-                realName = seed[col];
-                break;
+            let realName = row.custom_name || row.name_ship || 'ACTIVO';
+            if (seed) {
+              for (const col of nameCols) {
+                if (seed[col]) {
+                  realName = seed[col];
+                  break;
+                }
               }
             }
 
-            const rawImg = seed.image_url || seed.avatar_url || seed.avatar;
+            const rawImg = seed?.image_url || seed?.avatar_url || seed?.avatar;
 
             assets.push({
               id: row.id?.toString() || targetId,
               seed_id: targetId,
               name: realName,
               type: categoryType,
-              rarity: seed.rarity || 'Common',
-              collection: seed.company || seed.collection || 'GD',
-              is_nft: seed.is_nft || false,
-              engine: seed.engine || (realName.includes('HS') ? 'HS' : 'Impulse'),
+              rarity: seed?.rarity || 'Common',
+              collection: seed?.company || seed?.collection || 'GD',
+              is_nft: seed?.is_nft || false,
+              engine: seed?.engine || (realName.includes('HS') ? 'HS' : 'Impulse'),
               image_url: resolveImageUrl(rawImg, targetId),
               quantity: row.quantity || row.amount || 1,
               level: row.current_level || row.level || 1,
-              effect: seed.effect
+              effect: seed?.effect
             });
           });
 
@@ -357,17 +510,18 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         }
       };
 
+      // 5. Cargar todos los activos (¡NAVES USA EL LEGACY_ID!)
       const [ships, tools, astrobots, consumables, licenses] = await Promise.all([
-        loadCategoryAssets('user_ships', 'seed_ships', 'Naves', 'ship_id', 'ship_id', ['ship_name', 'name']),
-        loadCategoryAssets('user_tools', 'seed_tools', 'Tools', 'tool_id', 'id', ['name', 'title']),
-        loadCategoryAssets('user_astrobots', 'seed_astrobots', 'Astrobots', 'astrobot_id', 'id', ['name', 'title']),
-        loadCategoryAssets('user_consumibles', 'seed_consumables', 'Consumibles', 'consumable_id', 'id', ['name', 'title']),
-        loadCategoryAssets('user_licenses', 'seed_licenses', 'Licencia', 'license_id', 'id', ['name', 'title'])
+        loadCategoryAssets('user_ships', 'seed_ships', 'Naves', 'id_ship', 'id_ship', ['name_ship', 'ship_name', 'name'], 'id_user', legacyUserId),
+        loadCategoryAssets('user_tools', 'seed_tools', 'Tools', 'tool_id', 'id', ['name', 'title'], 'user_id', userId),
+        loadCategoryAssets('user_astrobots', 'seed_astrobots', 'Astrobots', 'astrobot_id', 'id', ['name', 'title'], 'user_id', userId),
+        loadCategoryAssets('user_consumibles', 'seed_consumables', 'Consumibles', 'consumable_id', 'id', ['name', 'title'], 'user_id', userId),
+        loadCategoryAssets('user_licenses', 'seed_licenses', 'Licencia', 'license_id', 'id', ['name', 'title'], 'user_id', userId)
       ]);
 
       setInventoryAssets([...ships, ...tools, ...astrobots, ...consumables, ...licenses]);
 
-      // 3. Cargar Flotas
+      // 6. Cargar Flotas
       const { data: fleetData } = await supabase.from('fleets').select('*').eq('user_id', userId);
       if (fleetData) {
         setFleets(fleetData.map((f: any) => ({
@@ -380,7 +534,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         })));
       }
 
-      // 4. Cargar Expediciones Activas
+      // 7. Cargar Expediciones Activas
       const { data: expData } = await supabase
         .from('active_expeditions')
         .select('*')
@@ -392,7 +546,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         setActiveExpeditions(expData);
       }
 
-      // 5. Cargar Logs / Eventos Reales
+      // 8. Cargar Logs / Eventos Reales
       const { data: logsData } = await supabase
         .from('expedition_logs')
         .select('*')
@@ -506,7 +660,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || '9abc737e-9c3d-4349-a976-59af24f51f4d';
+      const userId = user?.id || 'df7832b8-c085-4e05-90c1-541fab1c6c12';
 
       const duration = selectedPlanet?.duration_hours || 2;
       const launchTime = new Date();
@@ -574,7 +728,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || '9abc737e-9c3d-4349-a976-59af24f51f4d';
+      const userId = user?.id || 'df7832b8-c085-4e05-90c1-541fab1c6c12';
 
       if (isValidUUID(exp.id)) {
         await supabase
@@ -685,8 +839,8 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     }
   };
 
-  const currentGC = isAdrift ? "PELA" : (selectedGC || "PELA");
-  const activeRule = GC_RULES[currentGC] || GC_RULES["PELA"];
+  const currentGC = isAdrift ? (gcList[0]?.id ?? "PELA") : (selectedGC ?? gcList[0]?.id ?? "PELA");
+  const activeRule = GC_RULES[currentGC] ?? GC_RULES[Object.keys(GC_RULES)[0]];
   const hasShipInSelection = selectedAssets.some(a => isShipAsset(a.type)) || (selectedFleet?.ships && selectedFleet.ships.length > 0);
   const hasToolInSelection = selectedAssets.some(a => isToolAsset(a.type)) || (selectedFleet?.tools && selectedFleet.tools.length > 0);
   const hasLicenseInSelection = selectedAssets.some(a => isLicenseAsset(a.type)) || (selectedFleet?.licenses && selectedFleet.licenses.length > 0);
@@ -932,68 +1086,152 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 ))}
               </div>
 
+              {/* 🌐 LISTAS DINÁMICAS DESDE SUPABASE */}
               <div className="p-1 flex flex-col gap-1.5 max-h-[310px] overflow-y-auto pr-1">
-                {currentStep === 'GC' && gcList.map((gcCode) => {
-                  const reqCheck = checkGCRequirements(gcCode);
-                  const rule = GC_RULES[gcCode] || GC_RULES["PELA"];
-                  const isSelected = selectedGC === gcCode;
-
-                  return (
-                    <div
-                      key={gcCode}
-                      onClick={() => {
-                        if (reqCheck.allowed) {
-                          setSelectedGC(gcCode);
-                          setCurrentStep('GAL');
-                        } else if (triggerNotification) {
-                          triggerNotification(`🔒 ${reqCheck.reason}`);
-                        }
-                      }}
-                      className={`w-full p-2.5 rounded-lg border text-[9px] font-bold uppercase transition-all flex flex-col gap-1 cursor-pointer ${
-                        isSelected
-                          ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 shadow-lg'
-                          : reqCheck.allowed
-                          ? 'bg-[#0a0f14] text-zinc-300 border-cyan-950 hover:border-cyan-800'
-                          : 'bg-black/80 text-zinc-600 border-zinc-900 cursor-not-allowed'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-extrabold text-white">{rule.name}</span>
-                        {!reqCheck.allowed ? <Lock className="w-3 h-3 text-red-500 shrink-0" /> : <span className="text-[7.5px] bg-cyan-950 text-cyan-400 px-1.5 py-0.5 rounded font-black">OK</span>}
-                      </div>
-                      <div className="text-[7px] text-zinc-400 font-mono">
-                        {rule.prevGC && <p className={reqCheck.allowed ? "text-emerald-400" : "text-amber-400 font-bold"}>• Req: {rule.requiredPrevCount} exp. en {rule.prevGC} ({completedCountsByGC[rule.prevGC] || 0}/{rule.requiredPrevCount})</p>}
-                        <p>• Req: {rule.requireShip ? 'Nave ' : ''}{rule.requireTool ? '+ Tool ' : ''}{rule.requireLicense ? '+ Licencia' : ''}</p>
-                      </div>
+                {/* 🌐 GALAXY CLUSTERS DINÁMICOS DESDE SUPABASE */}
+                {currentStep === 'GC' && (
+                  gcList.length === 0 ? (
+                    <div className="p-4 text-center text-zinc-600 text-[9px] uppercase italic">
+                      No hay Galaxy Clusters registrados.
                     </div>
-                  );
-                })}
+                  ) : (
+                    gcList.map((gc) => {
+                      const reqCheck = checkGCRequirements(gc.id);
+                      // GC_RULES se usa SOLO para requisitos tácticos; el nombre viene de la BD
+                      const rule = GC_RULES[gc.id];
+                      const isSelected = selectedGC === gc.id;
 
-                {currentStep === 'GAL' && ["GALAXY FOUR", "GALAXY FIVE"].map((gal) => (
-                  <button key={gal} onClick={() => { setSelectedGAL(gal); setCurrentStep('SC'); }} className="w-full p-2.5 rounded-lg border bg-[#0a0f14] border-cyan-950 text-[9.5px] text-zinc-300 font-bold uppercase">{gal}</button>
-                ))}
+                      return (
+                        <div
+                          key={gc.id}
+                          onClick={() => {
+                            if (reqCheck.allowed) {
+                              setSelectedGC(gc.id);
+                              setCurrentStep('GAL');
+                            } else if (triggerNotification) {
+                              triggerNotification(`🔒 ${reqCheck.reason}`);
+                            }
+                          }}
+                          className={`w-full p-2.5 rounded-lg border text-[9px] font-bold uppercase transition-all flex flex-col gap-1 cursor-pointer ${
+                            isSelected
+                              ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 shadow-lg'
+                              : reqCheck.allowed
+                              ? 'bg-[#0a0f14] text-zinc-300 border-cyan-950 hover:border-cyan-800'
+                              : 'bg-black/80 text-zinc-600 border-zinc-900 cursor-not-allowed'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            {/* Nombre real de la BD — nunca de GC_RULES */}
+                            <span className="font-extrabold text-white">{gc.name}</span>
+                            {!reqCheck.allowed
+                              ? <Lock className="w-3 h-3 text-red-500 shrink-0" />
+                              : <span className="text-[7.5px] bg-cyan-950 text-cyan-400 px-1.5 py-0.5 rounded font-black">OK</span>
+                            }
+                          </div>
+                          <div className="text-[7px] text-zinc-400 font-mono">
+                            {rule?.prevGC && (
+                              <p className={reqCheck.allowed ? "text-emerald-400" : "text-amber-400 font-bold"}>
+                                • Req: {rule.requiredPrevCount} exp. en {rule.prevGC} ({completedCountsByGC[rule.prevGC] || 0}/{rule.requiredPrevCount})
+                              </p>
+                            )}
+                            <p>• Req: {rule?.requireShip ? 'Nave ' : ''}{rule?.requireTool ? '+ Tool ' : ''}{rule?.requireLicense ? '+ Licencia' : ''}</p>
+                            <p className="text-zinc-600">• ID: {gc.id}</p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )
+                )}
 
-                {currentStep === 'SC' && ["STARCLUSTER GOAL", "STARCLUSTER MACHINE"].map((sc) => (
-                  <button key={sc} onClick={() => { setSelectedSC(sc); setCurrentStep('SS'); }} className="w-full p-2.5 rounded-lg border bg-[#0a0f14] border-cyan-950 text-[9.5px] text-zinc-300 font-bold uppercase">{sc}</button>
-                ))}
+                {/* 🌀 GALAXIAS DESDE SUPABASE */}
+                {currentStep === 'GAL' && (
+                  dbGalaxies.length === 0 ? (
+                    <div className="p-4 text-center text-zinc-600 text-[9px] uppercase italic">No hay galaxias en este GC.</div>
+                  ) : (
+                    dbGalaxies.map((gal) => (
+                      <button 
+                        key={gal.id} 
+                        onClick={() => { setSelectedGAL(gal.id); setCurrentStep('SC'); }} 
+                        className={`w-full p-2.5 rounded-lg border text-[9.5px] font-bold uppercase cursor-pointer ${
+                          selectedGAL === gal.id ? 'bg-cyan-950 text-cyan-300 border-cyan-500' : 'bg-[#0a0f14] border-cyan-950 text-zinc-300 hover:border-cyan-800'
+                        }`}
+                      >
+                        {gal.name}
+                      </button>
+                    ))
+                  )
+                )}
 
-                {currentStep === 'SS' && ["SISTEMA ALFA-01", "SISTEMA OMEGA-09"].map((ss) => (
-                  <button key={ss} onClick={() => { setSelectedSS(ss); setCurrentStep('PLANETA'); }} className="w-full p-2.5 rounded-lg border bg-[#0a0f14] border-cyan-950 text-[9.5px] text-zinc-300 font-bold uppercase">{ss}</button>
-                ))}
+                {/* 🌟 STAR CLUSTERS DESDE SUPABASE */}
+                {currentStep === 'SC' && (
+                  dbStarClusters.length === 0 ? (
+                    <div className="p-4 text-center text-zinc-600 text-[9px] uppercase italic">No hay Star Clusters en esta galaxia.</div>
+                  ) : (
+                    dbStarClusters.map((sc) => (
+                      <button 
+                        key={sc.id} 
+                        onClick={() => { setSelectedSC(sc.id); setCurrentStep('SS'); }} 
+                        className={`w-full p-2.5 rounded-lg border text-[9.5px] font-bold uppercase cursor-pointer ${
+                          selectedSC === sc.id ? 'bg-cyan-950 text-cyan-300 border-cyan-500' : 'bg-[#0a0f14] border-cyan-950 text-zinc-300 hover:border-cyan-800'
+                        }`}
+                      >
+                        {sc.name}
+                      </button>
+                    ))
+                  )
+                )}
 
+                {/* 🪐 STAR SYSTEMS DESDE SUPABASE */}
+                {currentStep === 'SS' && (
+                  dbStarSystems.length === 0 ? (
+                    <div className="p-4 text-center text-zinc-600 text-[9px] uppercase italic">No hay sistemas solares en este SC.</div>
+                  ) : (
+                    dbStarSystems.map((ss) => (
+                      <button 
+                        key={ss.id} 
+                        onClick={() => { setSelectedSS(ss.id); setCurrentStep('PLANETA'); }} 
+                        className={`w-full p-2.5 rounded-lg border text-[9.5px] font-bold uppercase cursor-pointer ${
+                          selectedSS === ss.id ? 'bg-cyan-950 text-cyan-300 border-cyan-500' : 'bg-[#0a0f14] border-cyan-950 text-zinc-300 hover:border-cyan-800'
+                        }`}
+                      >
+                        {ss.name}
+                      </button>
+                    ))
+                  )
+                )}
+
+                {/* 🌍 PLANETAS DESDE SUPABASE */}
                 {currentStep === 'PLANETA' && (
-                  <div className="p-3 bg-cyan-950/20 border border-cyan-900/50 rounded-xl text-center space-y-2">
-                    <p className="text-[8px] text-zinc-400 uppercase">Configurar expedición en {selectedGC || "PELA"}.</p>
-                    <button onClick={() => { setIsAdrift(true); setIsDispatchPanelActive(true); }} className="w-full py-2 bg-gradient-to-r from-cyan-600 to-teal-600 text-white font-black text-[8.5px] uppercase rounded-lg shadow cursor-pointer">
-                      <Sparkles className="w-3 h-3 inline mr-1" /> CONFIGURAR FLOTA
-                    </button>
-                  </div>
+                  dbPlanets.length === 0 ? (
+                    <div className="p-3 bg-cyan-950/20 border border-cyan-900/50 rounded-xl text-center space-y-2">
+                      <p className="text-[8px] text-zinc-400 uppercase">Sin planetas registrados. Configurar expedición directa en {selectedGC || "PELA"}.</p>
+                      <button onClick={() => { setIsAdrift(true); setIsDispatchPanelActive(true); }} className="w-full py-2 bg-gradient-to-r from-cyan-600 to-teal-600 text-white font-black text-[8.5px] uppercase rounded-lg shadow cursor-pointer">
+                        <Sparkles className="w-3 h-3 inline mr-1" /> CONFIGURAR FLOTA
+                      </button>
+                    </div>
+                  ) : (
+                    dbPlanets.map((planet) => (
+                      <div 
+                        key={planet.id} 
+                        onClick={() => { setSelectedPlanet(planet); setIsAdrift(false); setIsDispatchPanelActive(true); }} 
+                        className={`p-2.5 rounded-lg border cursor-pointer text-left space-y-1 transition-all ${
+                          selectedPlanet?.id === planet.id ? 'bg-cyan-950 border-cyan-400' : 'bg-[#0a0f14] border-cyan-950 hover:border-cyan-800'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9.5px] font-extrabold text-white uppercase">{planet.name}</span>
+                          <span className="text-[7.5px] bg-cyan-950 text-cyan-400 px-1.5 py-0.5 rounded font-bold uppercase">{planet.type}</span>
+                        </div>
+                        <p className="text-[7.5px] text-zinc-400">⏱️ Tiempo: {planet.duration_hours || 2}h | ⚠️ Riesgo: {planet.risk_factor || 15}%</p>
+                      </div>
+                    ))
+                  )
                 )}
               </div>
             </div>
 
             <div className="p-2 border-t border-cyan-950 bg-black/60 rounded-lg text-[8.5px] text-zinc-500 font-bold uppercase">
-              <span>RUTA: {selectedGC || 'PELA'} {selectedGAL ? `> ${selectedGAL}` : ''}</span>
+              <span>RUTA: {formatBreadcrumbText()}</span>
             </div>
           </div>
 
@@ -1128,7 +1366,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 )}
               </div>
 
-              {activeRule.requireTool && (
+              {activeRule?.requireTool && (
                 <div className="flex items-center gap-1">
                   <span>TOOL:</span>
                   {hasToolInSelection ? (
@@ -1139,7 +1377,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 </div>
               )}
 
-              {activeRule.requireLicense && (
+              {activeRule?.requireLicense && (
                 <div className="flex items-center gap-1">
                   <span>LICENCIA:</span>
                   {hasLicenseInSelection ? (
