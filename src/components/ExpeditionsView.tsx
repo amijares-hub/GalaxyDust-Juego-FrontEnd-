@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   CornerUpLeft, X, Search, Rocket, Lock, MapPin, Plus, Trash2, 
-  Sparkles, AlertTriangle, ShieldCheck, Box, Wrench, Bot, FileText, Package, Check, XCircle, Clock, Pickaxe, Radio
+  Sparkles, AlertTriangle, ShieldCheck, Box, Wrench, Bot, FileText, Package, Check, XCircle, Clock, Pickaxe, Radio, Compass
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -18,7 +18,8 @@ export interface Asset {
   engine?: string;
   quantity?: number;
   level?: number;
-  effect?: string;
+  effect?: number;
+  skill_bonus?: number;
 }
 
 export interface Fleet {
@@ -48,6 +49,8 @@ export interface Expedition {
   sector_name: string;
   galaxy_cluster: string;
   star_cluster?: string;
+  sc_id?: string;
+  applied_success_rate?: number;
   progress?: number;
   status: 'LAUNCHED' | 'SUCCESS' | 'FAILED' | 'CLAIMED';
   estimated_return_time: string;
@@ -231,6 +234,8 @@ const DEFAULT_GC_LIST: { id: string; name: string }[] = [
   { id: "GC8",  name: "GC8 - OMEGA NEXUS" },
 ];
 
+const BASE_SUCCESS_RATE = 0.5; // Probabilidad Base Fija de 0.5%
+
 export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   initialView = 'selection',
   onBack,
@@ -281,6 +286,25 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   const [launchError, setLaunchError] = useState<string | null>(null);
 
   const leftMenuOptions: LeftMenuCategory[] = ['Fleets', 'Naves', 'Astrobots', 'Tools', 'Licencia', 'Consumibles'];
+
+  // 🎯 CÁLCULO EN VIVO DE PROBABILIDAD DE ÉXITO (0.5% Base + Bonos de Assets/Flota)
+  const totalExpeditionProbability = useMemo(() => {
+    let bonusSum = 0;
+    selectedAssets.forEach((asset: any) => {
+      if (asset.effect && typeof asset.effect === 'number') {
+        bonusSum += asset.effect;
+      } else if (asset.skill_bonus) {
+        bonusSum += Number(asset.skill_bonus);
+      }
+    });
+
+    if (selectedFleet) {
+      (selectedFleet.ships || []).forEach((s: any) => (bonusSum += Number(s.effect || 0.1)));
+      (selectedFleet.tools || []).forEach((t: any) => (bonusSum += Number(t.effect || 0.05)));
+    }
+
+    return Number((BASE_SUCCESS_RATE + bonusSum).toFixed(2));
+  }, [selectedAssets, selectedFleet]);
 
   const formatBreadcrumbText = () => {
     const galObj = dbGalaxies.find(g => g.id === selectedGAL);
@@ -411,20 +435,19 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
       if (realGCs && realGCs.length > 0) {
         const gcObjects = realGCs.map((g: any) => ({ id: g.id, name: g.name || g.id }));
         setGcList(gcObjects);
-        // Seleccionar el primer GC de la BD si aún no hay selección
         setSelectedGC(prev => prev ?? gcObjects[0].id);
       } else {
-        setGcList(DEFAULT_GC_LIST); // Fallback de seguridad
+        setGcList(DEFAULT_GC_LIST);
         setSelectedGC(prev => prev ?? DEFAULT_GC_LIST[0].id);
       }
 
-      // 2. Obtener legacy_id del usuario (busca por 'id', columna correcta de user_profiles)
+      // 2. Obtener legacy_id del usuario (columna 'id' de user_profiles)
       let legacyUserId = 1623;
       try {
         const { data: profile } = await supabase
           .from('user_profiles')
           .select('legacy_id')
-          .eq('id', userId) // 'id' es la columna correcta, NO 'user_id'
+          .eq('id', userId)
           .single();
 
         if (profile?.legacy_id) {
@@ -447,7 +470,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
       });
       setCompletedCountsByGC(counts);
 
-      // 4. Helper seguro para cargar inventario
+      // 4. Helper genérico para cargar inventario
       const loadCategoryAssets = async (
         userTable: string,
         seedTable: string,
@@ -499,7 +522,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               image_url: resolveImageUrl(rawImg, targetId),
               quantity: row.quantity || row.amount || 1,
               level: row.current_level || row.level || 1,
-              effect: seed?.effect
+              effect: seed?.effect || 0.2
             });
           });
 
@@ -510,7 +533,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         }
       };
 
-      // 5. Cargar todos los activos (¡NAVES USA EL LEGACY_ID!)
+      // 5. Cargar todos los activos (NAVES USA LEGACY_ID)
       const [ships, tools, astrobots, consumables, licenses] = await Promise.all([
         loadCategoryAssets('user_ships', 'seed_ships', 'Naves', 'id_ship', 'id_ship', ['name_ship', 'ship_name', 'name'], 'id_user', legacyUserId),
         loadCategoryAssets('user_tools', 'seed_tools', 'Tools', 'tool_id', 'id', ['name', 'title'], 'user_id', userId),
@@ -629,7 +652,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   };
 
   const handleOpenJourneyModal = () => {
-    const gcCode = isAdrift ? "PELA" : (selectedGC || "PELA");
+    const gcCode = isAdrift ? (gcList[0]?.id ?? "PELA") : (selectedGC || "PELA");
     const compValidation = validateFleetComposition(gcCode, selectedAssets, selectedFleet);
 
     if (!compValidation.valid) {
@@ -643,11 +666,12 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     setIsStartJourneyOpen(true);
   };
 
+  // 🚀 EJECUTA LANZAMIENTO A SC A LA NADA O A UN PLANETA ESPECÍFICO
   const executeLaunchTransaction = async () => {
     if (loading) return;
     setLaunchError(null);
 
-    const gcCode = isAdrift ? "PELA" : (selectedGC || "PELA");
+    const gcCode = isAdrift ? (gcList[0]?.id ?? "PELA") : (selectedGC || "PELA");
     const compValidation = validateFleetComposition(gcCode, selectedAssets, selectedFleet);
 
     if (!compValidation.valid) {
@@ -666,8 +690,13 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
       const launchTime = new Date();
       const returnTime = new Date(launchTime.getTime() + duration * 3600 * 1000);
 
+      const scObj = dbStarClusters.find(s => s.id === selectedSC);
       const fleetName = selectedFleet?.name || (selectedAssets.length > 0 ? selectedAssets[0].name : "FLOTA INDEPENDIENTE");
-      const sectorName = selectedPlanet ? selectedPlanet.name : "NUEVO SECTOR EN DERIVA";
+      
+      // Si seleccionó un planeta se usa ese nombre, si no, es una expedición de reconocimiento al SC
+      const sectorName = selectedPlanet 
+        ? selectedPlanet.name 
+        : (scObj ? `EXPEDICIÓN SC: ${scObj.name}` : "NUEVO SECTOR EN DERIVA");
 
       const { error } = await supabase
         .from('active_expeditions')
@@ -677,7 +706,9 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
           fleet_name: fleetName,
           sector_name: sectorName,
           galaxy_cluster: gcCode,
-          star_cluster: selectedSC || "STARCLUSTER GOAL",
+          star_cluster: scObj?.name || selectedSC || "STARCLUSTER GOAL",
+          sc_id: selectedSC || null,                          // UUID del Star Cluster
+          applied_success_rate: totalExpeditionProbability,  // 0.5% base + bonos acumulados
           duration_hours: duration,
           risk_factor: isAdrift ? 40 : (selectedPlanet?.risk_factor || 15),
           is_adrift: isAdrift,
@@ -696,7 +727,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
       syncDatabaseData();
 
-      if (triggerNotification) triggerNotification(`🚀 EXPEDICIÓN DESPLEGADA EN ${gcCode}`);
+      if (triggerNotification) triggerNotification(`🚀 EXPEDICIÓN DESPLEGADA EN ${gcCode} (${totalExpeditionProbability}% ÉXITO)`);
     } catch (err: any) {
       console.error("Error al desplegar expedición:", err);
       setLaunchError(err.message || "Error de comunicación");
@@ -1062,13 +1093,14 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 <span className="text-[11px] font-black tracking-widest text-white uppercase">SELECCIONA COORDENADAS GC</span>
               </div>
 
+              {/* 🧭 NAVEGACIÓN COMPLETA DE 5 PASOS CON DESBLOQUEO CONDICIONAL DE SS/PLANETAS */}
               <div className="grid grid-cols-5 gap-1 bg-black/60 p-1 rounded-lg border border-cyan-950 text-[8.5px] font-bold text-center uppercase">
                 {([
                   { id: 'GC', label: 'GC', isUnlocked: true },
                   { id: 'GAL', label: 'GAL', isUnlocked: selectedGC !== null },
                   { id: 'SC', label: 'SC', isUnlocked: selectedGAL !== null },
-                  { id: 'SS', label: 'SS', isUnlocked: selectedSC !== null },
-                  { id: 'PLANETA', label: 'PLANETA', isUnlocked: selectedSS !== null }
+                  { id: 'SS', label: 'SS', isUnlocked: selectedSC !== null && dbStarSystems.length > 0 },
+                  { id: 'PLANETA', label: 'PLANETA', isUnlocked: selectedSS !== null && dbPlanets.length > 0 }
                 ] as const).map((tab) => (
                   <button
                     key={tab.id}
@@ -1088,7 +1120,8 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
               {/* 🌐 LISTAS DINÁMICAS DESDE SUPABASE */}
               <div className="p-1 flex flex-col gap-1.5 max-h-[310px] overflow-y-auto pr-1">
-                {/* 🌐 GALAXY CLUSTERS DINÁMICOS DESDE SUPABASE */}
+                
+                {/* 🌌 GALAXY CLUSTERS DINÁMICOS DESDE SUPABASE */}
                 {currentStep === 'GC' && (
                   gcList.length === 0 ? (
                     <div className="p-4 text-center text-zinc-600 text-[9px] uppercase italic">
@@ -1097,7 +1130,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                   ) : (
                     gcList.map((gc) => {
                       const reqCheck = checkGCRequirements(gc.id);
-                      // GC_RULES se usa SOLO para requisitos tácticos; el nombre viene de la BD
                       const rule = GC_RULES[gc.id];
                       const isSelected = selectedGC === gc.id;
 
@@ -1121,7 +1153,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            {/* Nombre real de la BD — nunca de GC_RULES */}
                             <span className="font-extrabold text-white">{gc.name}</span>
                             {!reqCheck.allowed
                               ? <Lock className="w-3 h-3 text-red-500 shrink-0" />
@@ -1152,7 +1183,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                       <button 
                         key={gal.id} 
                         onClick={() => { setSelectedGAL(gal.id); setCurrentStep('SC'); }} 
-                        className={`w-full p-2.5 rounded-lg border text-[9.5px] font-bold uppercase cursor-pointer ${
+                        className={`w-full p-2.5 rounded-lg border text-[9.5px] font-bold uppercase cursor-pointer text-left ${
                           selectedGAL === gal.id ? 'bg-cyan-950 text-cyan-300 border-cyan-500' : 'bg-[#0a0f14] border-cyan-950 text-zinc-300 hover:border-cyan-800'
                         }`}
                       >
@@ -1167,30 +1198,76 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                   dbStarClusters.length === 0 ? (
                     <div className="p-4 text-center text-zinc-600 text-[9px] uppercase italic">No hay Star Clusters en esta galaxia.</div>
                   ) : (
-                    dbStarClusters.map((sc) => (
-                      <button 
-                        key={sc.id} 
-                        onClick={() => { setSelectedSC(sc.id); setCurrentStep('SS'); }} 
-                        className={`w-full p-2.5 rounded-lg border text-[9.5px] font-bold uppercase cursor-pointer ${
-                          selectedSC === sc.id ? 'bg-cyan-950 text-cyan-300 border-cyan-500' : 'bg-[#0a0f14] border-cyan-950 text-zinc-300 hover:border-cyan-800'
-                        }`}
-                      >
-                        {sc.name}
-                      </button>
-                    ))
+                    dbStarClusters.map((sc) => {
+                      const isSelected = selectedSC === sc.id;
+                      return (
+                        <button 
+                          key={sc.id} 
+                          onClick={() => {
+                            setSelectedSC(sc.id);
+                          }} 
+                          className={`w-full p-2.5 rounded-lg border text-[9.5px] font-bold uppercase cursor-pointer text-left transition-all ${
+                            isSelected ? 'bg-cyan-950 text-cyan-300 border-cyan-500 shadow-md' : 'bg-[#0a0f14] border-cyan-950 text-zinc-300 hover:border-cyan-800'
+                          }`}
+                        >
+                          {sc.name}
+                        </button>
+                      );
+                    })
                   )
                 )}
 
-                {/* 🪐 STAR SYSTEMS DESDE SUPABASE */}
+                {/* 🚀 PANEL DE ACCIONES AL SELECCIONAR UN SC */}
+                {currentStep === 'SC' && selectedSC && (
+                  <div className="bg-[#05070a] border border-cyan-500/40 p-3 rounded-xl flex flex-col items-center gap-2 mt-1">
+                    <div className="text-center">
+                      <p className="text-[10px] text-amber-400 font-bold">
+                        🎯 PROBABILIDAD RECONOCIMIENTO SC: {totalExpeditionProbability}%
+                      </p>
+                      <p className="text-[7.5px] text-zinc-500 mt-0.5">
+                        (0.5% Base + {(totalExpeditionProbability - BASE_SUCCESS_RATE).toFixed(2)}% Bonos de Flota)
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setIsAdrift(false);
+                        setIsDispatchPanelActive(true);
+                      }}
+                      className="w-full py-2 bg-gradient-to-r from-cyan-600 to-teal-600 border border-cyan-400 text-white text-[9.5px] font-black uppercase rounded-lg shadow-lg cursor-pointer hover:brightness-110 flex items-center justify-center gap-1.5"
+                    >
+                      <Compass className="w-3.5 h-3.5" /> LANZAR MISIÓN RECONOCIMIENTO AL SC
+                    </button>
+
+                    {dbStarSystems.length > 0 && (
+                      <button
+                        onClick={() => setCurrentStep('SS')}
+                        className="w-full py-1.5 bg-[#0a0f18] border border-cyan-800 text-cyan-300 text-[8.5px] font-bold uppercase rounded-lg hover:border-cyan-500 cursor-pointer"
+                      >
+                        🔎 VER SISTEMAS SOLARES DESCUBIERTOS ({dbStarSystems.length})
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* 🪐 STAR SYSTEMS DESDE SUPABASE (SI EXISTEN EN EL SC) */}
                 {currentStep === 'SS' && (
                   dbStarSystems.length === 0 ? (
-                    <div className="p-4 text-center text-zinc-600 text-[9px] uppercase italic">No hay sistemas solares en este SC.</div>
+                    <div className="p-4 text-center text-zinc-600 text-[9px] uppercase italic space-y-2">
+                      <p>No se han descubierto sistemas solares en este SC.</p>
+                      <button
+                        onClick={() => setCurrentStep('SC')}
+                        className="px-3 py-1 bg-cyan-950 border border-cyan-800 text-cyan-300 text-[8px] font-bold rounded"
+                      >
+                        ← Volver a SC y Enviar Expedición
+                      </button>
+                    </div>
                   ) : (
                     dbStarSystems.map((ss) => (
                       <button 
                         key={ss.id} 
                         onClick={() => { setSelectedSS(ss.id); setCurrentStep('PLANETA'); }} 
-                        className={`w-full p-2.5 rounded-lg border text-[9.5px] font-bold uppercase cursor-pointer ${
+                        className={`w-full p-2.5 rounded-lg border text-[9.5px] font-bold uppercase cursor-pointer text-left ${
                           selectedSS === ss.id ? 'bg-cyan-950 text-cyan-300 border-cyan-500' : 'bg-[#0a0f14] border-cyan-950 text-zinc-300 hover:border-cyan-800'
                         }`}
                       >
@@ -1200,13 +1277,13 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                   )
                 )}
 
-                {/* 🌍 PLANETAS DESDE SUPABASE */}
+                {/* 🌍 PLANETAS DESDE SUPABASE (SI EXISTEN EN EL SS) */}
                 {currentStep === 'PLANETA' && (
                   dbPlanets.length === 0 ? (
                     <div className="p-3 bg-cyan-950/20 border border-cyan-900/50 rounded-xl text-center space-y-2">
-                      <p className="text-[8px] text-zinc-400 uppercase">Sin planetas registrados. Configurar expedición directa en {selectedGC || "PELA"}.</p>
+                      <p className="text-[8px] text-zinc-400 uppercase">Sin planetas registrados en este sistema.</p>
                       <button onClick={() => { setIsAdrift(true); setIsDispatchPanelActive(true); }} className="w-full py-2 bg-gradient-to-r from-cyan-600 to-teal-600 text-white font-black text-[8.5px] uppercase rounded-lg shadow cursor-pointer">
-                        <Sparkles className="w-3 h-3 inline mr-1" /> CONFIGURAR FLOTA
+                        <Sparkles className="w-3 h-3 inline mr-1" /> CONFIGURAR FLOTA EN DERIVA
                       </button>
                     </div>
                   ) : (
@@ -1235,204 +1312,114 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
             </div>
           </div>
 
-          {/* MAPA ESTELAR */}
-          <div className="flex-1 border border-cyan-500/30 bg-[#05070a] rounded-xl relative overflow-hidden flex flex-col justify-between shadow-2xl h-[480px]">
-            <div className="w-full h-full flex flex-col items-center justify-center p-12 text-center relative bg-cover bg-center">
-              <div className="absolute inset-0 bg-[#05070a]/90" />
-              <div className="relative z-10 flex flex-col items-center gap-4 max-w-md">
-                <span className="text-[9px] text-cyan-400 font-bold uppercase">SECTOR SELECCIONADO: {selectedGC || "PELA"}</span>
+          {/* MAPA ESTELAR CON CÁLCULO DE PROBABILIDAD Y OPCIÓN DE DESPLIEGUE */}
+          <div className="flex-1 border border-cyan-500/30 bg-[#05070a] rounded-xl relative overflow-hidden flex flex-col justify-center items-center shadow-2xl h-full p-6 text-center">
+            {selectedSC ? (
+              <div className="flex flex-col items-center gap-4 max-w-md bg-[#0a0f18] p-6 border border-cyan-500/40 rounded-2xl shadow-xl">
+                <Rocket className="w-10 h-10 text-cyan-400 animate-bounce" />
+                
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase">
+                    DESTINO: {selectedPlanet ? selectedPlanet.name : `STAR CLUSTER [${dbStarClusters.find(s => s.id === selectedSC)?.name || selectedSC}]`}
+                  </h3>
+                  <p className="text-[11px] text-amber-400 font-extrabold mt-2">
+                    🎯 PROBABILIDAD DE ÉXITO / RECONOCIMIENTO: {totalExpeditionProbability}%
+                  </p>
+                  <p className="text-[8.5px] text-zinc-500 mt-0.5">
+                    (0.5% Base + {(totalExpeditionProbability - BASE_SUCCESS_RATE).toFixed(2)}% Bonos de Flota/Assets)
+                  </p>
+                </div>
+
                 <button
-                  onClick={() => { setIsAdrift(false); setIsDispatchPanelActive(true); }}
-                  className="px-6 py-2.5 bg-gradient-to-r from-cyan-600 to-teal-600 border border-cyan-400 text-white text-[10.5px] font-black tracking-widest uppercase rounded-lg shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                  onClick={() => setIsDispatchPanelActive(true)}
+                  className="px-6 py-3 bg-gradient-to-r from-cyan-600 to-teal-600 border border-cyan-400 text-white text-[11px] font-black uppercase rounded-lg shadow-lg cursor-pointer hover:brightness-110 active:scale-95 transition-all"
                 >
-                  <Rocket className="w-4 h-4" /> DESPLEGAR MISIÓN EN {selectedGC || "PELA"}
+                  🚀 EQUIPAR Y DESPLEGAR MISIÓN
                 </button>
               </div>
-            </div>
+            ) : (
+              <div className="text-zinc-600 text-xs font-bold uppercase tracking-widest">
+                SELECCIONA UN STAR CLUSTER (SC) PARA PREPARAR LA MISIÓN
+              </div>
+            )}
           </div>
 
         </div>
       ) : (
-        /* VISTA 2: DISPATCH PANEL */
-        <div className="w-full flex-1 flex flex-col md:flex-row gap-3.5 overflow-hidden h-[480px]">
+        /* VISTA DISPATCH PANEL (EQUIPAR NAVES) */
+        <div className="w-full flex-1 flex flex-col md:flex-row gap-3.5 h-[480px]">
           <div className="w-full md:w-[260px] border border-cyan-500/20 bg-[#05070a] rounded-xl shrink-0 p-3 flex flex-col justify-between h-full">
             <div className="flex flex-col gap-1">
-              <span className="text-[8px] font-bold text-zinc-400 uppercase px-1 pb-1 border-b border-cyan-950">CATEGORÍAS DE ACTIVOS</span>
+              <span className="text-[8px] font-bold text-zinc-400 uppercase px-1 pb-1 border-b border-cyan-950">ACTIVOS DISPONIBLES</span>
               {leftMenuOptions.map((opt) => (
                 <button
                   key={opt}
                   onClick={() => setCurrentLeftCategory(opt as LeftMenuCategory)}
                   className={`w-full text-left px-3 py-2 rounded-lg text-[9.5px] font-bold uppercase border cursor-pointer flex items-center gap-2 ${
-                    currentLeftCategory === opt ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black shadow-md' : 'bg-[#0a0f14] text-zinc-400 border-transparent hover:text-zinc-200'
+                    currentLeftCategory === opt ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black' : 'bg-[#0a0f14] text-zinc-400 border-transparent hover:text-zinc-200'
                   }`}
                 >
                   {getCategoryIcon(opt as LeftMenuCategory)}
                   <span>{opt}</span>
-                  <span className="ml-auto text-[7.5px] font-mono text-zinc-500">
-                    ({opt === 'Fleets' ? fleets.length : inventoryAssets.filter(a => a.type.toLowerCase() === opt.toLowerCase()).length})
-                  </span>
                 </button>
               ))}
             </div>
 
             <button
               onClick={handleOpenJourneyModal}
-              className="w-full py-3 bg-gradient-to-r from-cyan-600 to-teal-600 text-white font-black text-[11px] uppercase rounded-lg border border-cyan-400 shadow-lg cursor-pointer mt-auto hover:brightness-110 active:scale-95 transition-all"
+              className="w-full py-3 bg-gradient-to-r from-cyan-600 to-teal-600 text-white font-black text-[11px] uppercase rounded-lg border border-cyan-400 shadow-lg cursor-pointer mt-auto"
             >
-              INICIAR DESPLIEGUE
+              CONFIRMAR LANZAMIENTO ({totalExpeditionProbability}%)
             </button>
           </div>
 
-          <div className="flex-1 border border-cyan-500/20 bg-[#05070a] p-3 rounded-xl flex flex-col justify-between gap-3 h-full overflow-hidden">
-            
-            {/* INVENTARIO COMPLETO DINÁMICO */}
-            <div className="flex flex-col gap-1.5 flex-1 min-h-0">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 overflow-y-auto max-h-[220px] pr-1">
-                {currentLeftCategory === 'Fleets' ? (
-                  fleets.length === 0 ? (
-                    <div className="col-span-full p-8 text-center text-zinc-600 text-[9px] uppercase tracking-widest">
-                      NO TIENES FLOTAS REGISTRADAS
+          <div className="flex-1 border border-cyan-500/20 bg-[#05070a] p-3 rounded-xl flex flex-col justify-between gap-3 h-full">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 overflow-y-auto max-h-[300px] pr-1">
+              {inventoryAssets.map(asset => {
+                const isSelected = selectedAssets.some(a => a.id === asset.id);
+                return (
+                  <div
+                    key={asset.id}
+                    onClick={() => toggleAssetSelection(asset)}
+                    className={`p-2 rounded-lg border cursor-pointer flex items-center gap-2 transition-all ${
+                      isSelected ? 'bg-cyan-950/80 border-cyan-400' : 'bg-[#050910] border-cyan-950'
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded bg-black border border-cyan-950 shrink-0 overflow-hidden">
+                      <img src={asset.image_url} className="w-full h-full object-cover" alt="" />
                     </div>
-                  ) : (
-                    fleets.map(fleet => (
-                      <div
-                        key={fleet.id}
-                        onClick={() => setSelectedFleet(fleet)}
-                        className={`p-2 rounded-lg border cursor-pointer flex flex-col gap-1 relative overflow-hidden ${
-                          selectedFleet?.id === fleet.id ? 'bg-cyan-950/80 border-cyan-400' : 'bg-[#050910] border-cyan-950'
-                        }`}
-                      >
-                        <span className="text-[9px] font-black text-white uppercase truncate">{fleet.name}</span>
-                        <span className="text-[7.5px] text-cyan-400 font-mono">POW: {fleet.total_power_score}</span>
-                      </div>
-                    ))
-                  )
-                ) : filteredInventory.length === 0 ? (
-                  <div className="col-span-full p-8 text-center text-zinc-600 text-[9px] uppercase tracking-widest">
-                    NO HAY ACTIVOS REGISTRADOS EN {currentLeftCategory.toUpperCase()}
+                    <div className="flex flex-col text-left overflow-hidden">
+                      <span className="text-[8.5px] font-black text-white truncate">{asset.name}</span>
+                      <span className="text-[7px] text-cyan-400 font-mono">BONO: +{asset.effect || 0.2}%</span>
+                    </div>
                   </div>
-                ) : (
-                  filteredInventory.map(asset => {
-                    const isSelected = selectedAssets.some(a => a.id === asset.id);
-                    const isAssetInFlight = activeExpeditions.some(exp => exp.status === 'LAUNCHED' && isShipAsset(asset.type));
-
-                    return (
-                      <div
-                        key={asset.id}
-                        onClick={() => {
-                          if (!isAssetInFlight) toggleAssetSelection(asset);
-                        }}
-                        className={`p-2 rounded-lg border cursor-pointer flex items-center gap-2.5 transition-all relative overflow-hidden ${
-                          isAssetInFlight 
-                            ? 'bg-red-950/70 border-red-500/60 cursor-not-allowed' 
-                            : isSelected ? 'bg-cyan-950/60 border-cyan-400 opacity-60' : 'bg-[#050910] border-cyan-950 hover:border-cyan-500'
-                        }`}
-                      >
-                        {/* OVERLAY TÁCTICO ROJO "TRANSITANDO" */}
-                        {isAssetInFlight && (
-                          <div className="absolute inset-0 bg-red-950/85 backdrop-blur-[1px] border border-red-500 z-20 flex flex-col items-center justify-center p-1 text-center">
-                            <div className="w-full h-0.5 bg-red-500 animate-[bounce_1.8s_infinite] mb-1" />
-                            <span className="text-[7.5px] font-black text-red-400 tracking-widest animate-pulse uppercase">
-                              TRANSITANDO
-                            </span>
-                          </div>
-                        )}
-
-                        <div className="w-8 h-8 rounded bg-black border border-cyan-950 shrink-0 overflow-hidden">
-                          <img src={asset.image_url} className="w-full h-full object-cover brightness-90" alt="" />
-                        </div>
-                        <div className="flex flex-col text-left overflow-hidden">
-                          <span className="text-[8.5px] font-black text-white truncate">{asset.name}</span>
-                          <span className="text-[7px] text-cyan-400 font-mono uppercase">{asset.rarity}</span>
-                        </div>
-                        {isSelected ? <Lock className="ml-auto w-3.5 h-3.5 text-cyan-400" /> : <Plus className="ml-auto w-3.5 h-3.5 text-zinc-500 hover:text-cyan-400" />}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+                );
+              })}
             </div>
 
-            {/* DIAGNÓSTICO EN TIEMPO REAL */}
-            <div className="p-2 bg-black/60 border border-cyan-950 rounded-lg flex flex-wrap gap-3 items-center text-[8px] font-mono shrink-0">
-              <span className="text-zinc-500 font-bold uppercase border-r border-cyan-950 pr-2">COMPONENTES {currentGC}:</span>
-              
-              <div className="flex items-center gap-1">
-                <span>NAVE:</span>
-                {hasShipInSelection ? (
-                  <span className="text-emerald-400 font-bold flex items-center gap-0.5"><Check className="w-3 h-3" /> OK</span>
-                ) : (
-                  <span className="text-red-400 font-bold flex items-center gap-0.5"><XCircle className="w-3 h-3" /> REQUERIDA</span>
-                )}
-              </div>
-
-              {activeRule?.requireTool && (
-                <div className="flex items-center gap-1">
-                  <span>TOOL:</span>
-                  {hasToolInSelection ? (
-                    <span className="text-emerald-400 font-bold flex items-center gap-0.5"><Check className="w-3 h-3" /> OK</span>
-                  ) : (
-                    <span className="text-red-400 font-bold flex items-center gap-0.5"><XCircle className="w-3 h-3" /> REQUERIDA</span>
-                  )}
-                </div>
-              )}
-
-              {activeRule?.requireLicense && (
-                <div className="flex items-center gap-1">
-                  <span>LICENCIA:</span>
-                  {hasLicenseInSelection ? (
-                    <span className="text-emerald-400 font-bold flex items-center gap-0.5"><Check className="w-3 h-3" /> OK</span>
-                  ) : (
-                    <span className="text-red-400 font-bold flex items-center gap-0.5"><XCircle className="w-3 h-3" /> REQUERIDA</span>
-                  )}
-                </div>
-              )}
+            <div className="p-3 bg-black/60 border border-cyan-950 rounded-lg flex justify-between items-center text-[10px]">
+              <span className="text-zinc-400 uppercase">PROBABILIDAD FINAL DE ÉXITO:</span>
+              <span className="text-amber-400 font-black text-xs">{totalExpeditionProbability}%</span>
             </div>
-
-            {/* ACTIVOS SELECCIONADOS */}
-            <div className="flex-1 border border-cyan-950 bg-[#020305] rounded-lg p-2.5 overflow-y-auto max-h-[140px]">
-              {selectedAssets.length === 0 && !selectedFleet ? (
-                <div className="w-full h-full flex items-center justify-center text-zinc-600 text-[9px] uppercase tracking-widest font-bold">
-                  SELECCIONA ACTIVOS O FLOTAS DEL PANEL SUPERIOR
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {selectedFleet && (
-                    <div className="flex items-center justify-between p-2 bg-cyan-950/80 border border-cyan-500/50 rounded-lg">
-                      <span className="text-[8.5px] font-black text-cyan-300 uppercase truncate">FLOTA: {selectedFleet.name}</span>
-                      <button onClick={() => setSelectedFleet(null)} className="p-1 text-zinc-400 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
-                  )}
-                  {selectedAssets.map(asset => (
-                    <div key={asset.id} className="flex items-center justify-between p-2 bg-[#050910] border border-cyan-500/30 rounded-lg">
-                      <div className="flex items-center gap-1.5 truncate">
-                        {getCategoryIcon(asset.type as LeftMenuCategory)}
-                        <span className="text-[8.5px] font-black text-white uppercase truncate">{asset.name}</span>
-                      </div>
-                      <button onClick={() => toggleAssetSelection(asset)} className="p-1 text-zinc-500 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
           </div>
         </div>
       )}
 
-      {/* MODAL CONFIRMACIÓN */}
+      {/* MODAL FINAL DE CONFIRMACIÓN */}
       {isStartJourneyOpen && (
         <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 font-mono">
           <div className="w-full max-w-md bg-[#080b0e] border border-cyan-500/40 rounded-2xl p-6 text-center space-y-4">
             <Rocket className="w-12 h-12 text-cyan-400 mx-auto animate-bounce" />
-            <h3 className="text-lg font-black text-white uppercase">¿INICIAR EXPEDICIÓN EN {selectedGC || "PELA"}?</h3>
+            <h3 className="text-lg font-black text-white uppercase">¿INICIAR EXPEDICIÓN EN STAR CLUSTER?</h3>
+            <p className="text-xs text-amber-400 font-bold">PROBABILIDAD ESTIMADA: {totalExpeditionProbability}%</p>
+            
             {launchError && (
-              <div className="p-3 bg-red-950/80 border border-red-500 text-red-300 text-[9px] uppercase font-bold rounded-lg flex items-center gap-2 text-left">
-                <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
-                <span>{launchError}</span>
+              <div className="p-3 bg-red-950/80 border border-red-500 text-red-300 text-[9px] uppercase font-bold rounded-lg">
+                {launchError}
               </div>
             )}
-            <div className="grid grid-cols-2 gap-3 pt-4">
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
               <button onClick={executeLaunchTransaction} disabled={loading} className="py-2.5 bg-cyan-950 border border-cyan-500 text-cyan-300 text-[10px] font-black uppercase rounded-lg hover:bg-cyan-900 cursor-pointer">CONFIRMAR VIAJE</button>
               <button onClick={() => setIsStartJourneyOpen(false)} className="py-2.5 bg-black border border-zinc-800 text-zinc-500 text-[10px] font-black uppercase rounded-lg hover:bg-zinc-900 cursor-pointer">CANCELAR</button>
             </div>
