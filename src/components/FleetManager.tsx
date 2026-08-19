@@ -9,7 +9,7 @@ export interface SasoriFleet {
   id: string;
   name: string;
   total_power_score: number;
-  ships: any[];
+  ships?: any[];
 }
 
 type FleetViewMode = "LIST" | "CREATE_WIZARD";
@@ -58,8 +58,25 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
   const loadFleets = async () => {
     if (!userId) return;
     setLoadingFleets(true);
-    const { data } = await supabase.from("sasori_fleets").select("*").eq("user_id", userId).order("created_at", { ascending: false });
-    setFleets((data || []) as SasoriFleet[]);
+    
+    // Consulta unificada a la tabla de flotas
+    const { data, error } = await supabase
+      .from("fleets")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error || !data || data.length === 0) {
+      const { data: fallbackData } = await supabase
+        .from("sasori_fleets")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+      setFleets((fallbackData || []) as SasoriFleet[]);
+    } else {
+      setFleets(data as SasoriFleet[]);
+    }
+
     setLoadingFleets(false);
   };
 
@@ -118,55 +135,67 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
     }
   };
 
+  // 🛡️ SUBMISIÓN DE FLOTA ZERO-TRUST VIA RPC
   const handleSubmitFleet = async (e: React.MouseEvent) => {
     if (!userId) return;
     setIsSubmitting(true);
     playSfx(440);
 
-    const allSelected = [...selectedShips, ...selectedAstrobots, ...selectedTools, ...selectedConsumables];
-    const totalPower = allSelected.reduce((acc, curr) => acc + (curr.power || 0), 0);
-    const shipsJson = allSelected.map(i => ({ id: i.id, name: i.name, type: i.category, power: i.power }));
+    try {
+      const shipIds = selectedShips.map(s => s.id);
+      const astrobotIds = selectedAstrobots.map(a => a.id);
+      const toolIds = selectedTools.map(t => t.id);
+      const consumableIds = selectedConsumables.map(c => c.id);
 
-    const { data, error } = await supabase.rpc("create_custom_fleet", {
-      p_fleet_name: fleetName,
-      p_power_score: totalPower,
-      p_ships: selectedShips || [],
-      p_astrobots: selectedAstrobots || [],
-      p_tools: selectedTools || [],
-      p_consumables: selectedConsumables || [],
-      p_badges: []
-    });
+      // 🛡️ LLAMADA AL SERVIDOR PASANDO ÚNICAMENTE ARREGLOS DE ARRAYS
+      const { data, error } = await supabase.rpc("create_custom_fleet_secure", {
+        p_fleet_name: fleetName.trim(),
+        p_ship_ids: shipIds,
+        p_astrobot_ids: astrobotIds,
+        p_tool_ids: toolIds,
+        p_consumable_ids: consumableIds
+      });
 
-    setIsSubmitting(false);
+      if (error) throw error;
 
-    if (error) {
-      triggerNotification(`⚠️ ERROR DE SISTEMA: ${error.message}`, e);
-    } else if (data && !data.success) {
-      triggerNotification(`⚠️ TRANSACCIÓN RECHAZADA: ${data.error}`, e);
-    } else {
-      triggerNotification(`✅ FLOTA "${fleetName.toUpperCase()}" REGISTRADA EXITOSAMENTE`, e);
-      playSfx(1400);
-      setViewMode("LIST");
+      if (data && data.success) {
+        triggerNotification(`✅ FLOTA "${fleetName.toUpperCase()}" REGISTRADA EXITOSAMENTE (${data.total_power} POW)`, e);
+        playSfx(1400);
+        setViewMode("LIST");
+      } else {
+        throw new Error(data?.error || "Transacción rechazada por la red.");
+      }
+    } catch (err: any) {
+      console.error("Error al registrar flota:", err);
+      triggerNotification(`⚠️ ERROR AL REGISTRAR FLOTA: ${err.message}`, e);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Helper para obtener items filtrados por fase
   const getPhaseItems = () => {
     let category = "";
     if (wizardStep === 1) category = "Spaceships";
     else if (wizardStep === 2) category = "Astrobots";
     else if (wizardStep === 3) category = "Tools";
-    else if (wizardStep === 4) category = "Consumibles"; // Nota: si tu DB no tiene "Consumibles" se puede ajustar
+    else if (wizardStep === 4) category = "Consumibles";
 
-    let filtered = characters.filter(c => c.category === category && c.unlocked);
+    let filtered = characters.filter(c => {
+      const catLower = (c.category || '').toLowerCase();
+      if (wizardStep === 1) return catLower.includes('ship') || catLower.includes('nave') || catLower.includes('spaceships');
+      if (wizardStep === 2) return catLower.includes('astrobot');
+      if (wizardStep === 3) return catLower.includes('tool') || catLower.includes('herramienta');
+      if (wizardStep === 4) return catLower.includes('consumable') || catLower.includes('consumible');
+      return false;
+    });
 
     if (rarityFilter !== "ALL") {
-      filtered = filtered.filter(c => c.rarity.toUpperCase() === rarityFilter.toUpperCase());
+      filtered = filtered.filter(c => (c.rarity || '').toUpperCase() === rarityFilter.toUpperCase());
     }
 
     if (searchQuery.trim() !== "") {
       const sq = searchQuery.toLowerCase();
-      filtered = filtered.filter(c => c.name.toLowerCase().includes(sq) || c.fullname.toLowerCase().includes(sq));
+      filtered = filtered.filter(c => (c.name || '').toLowerCase().includes(sq) || (c.fullname || '').toLowerCase().includes(sq));
     }
 
     return filtered;
@@ -177,7 +206,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
   const renderSelectionGrid = (step: WizardStep) => {
     return (
       <div className="flex flex-col h-full gap-4">
-        {/* Filtros Neón */}
         <div className="flex flex-wrap items-center gap-3 bg-cyan-950/20 border border-cyan-900/40 p-3 rounded-xl">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-2 w-4 h-4 text-cyan-500" />
@@ -203,7 +231,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
           </select>
         </div>
 
-        {/* Grid de Items */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 overflow-y-auto max-h-[400px] scrollbar-thin scrollbar-thumb-cyan-900 p-1">
           {phaseItems.length === 0 ? (
             <div className="col-span-full text-center py-10 font-mono text-xs text-cyan-800/60 uppercase">No hay activos disponibles con estos filtros.</div>
@@ -241,7 +268,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
           )}
         </div>
 
-        {/* Footer */}
         <div className="mt-auto flex justify-between items-center border-t border-cyan-900/40 pt-4">
           <button 
             onClick={() => setWizardStep(prev => (prev - 1) as WizardStep)}
@@ -254,7 +280,7 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
              <button
               onClick={handleSubmitFleet}
               disabled={isSubmitting}
-              className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black text-[10px] uppercase tracking-[0.2em] px-6 py-2.5 rounded-lg transition-all shadow-[0_0_15px_rgba(239,68,68,0.4)] disabled:opacity-50"
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black text-[10px] uppercase tracking-[0.2em] px-6 py-2.5 rounded-lg transition-all shadow-[0_0_15px_rgba(239,68,68,0.4)] disabled:opacity-50 cursor-pointer"
              >
                {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
                COMPILAR Y FIRMAR FLOTA
@@ -262,7 +288,7 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
           ) : (
             <button 
               onClick={handleNextStep}
-              className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white font-black text-[10px] uppercase tracking-[0.2em] px-6 py-2.5 rounded-lg transition-all shadow-[0_0_15px_rgba(34,211,238,0.3)]"
+              className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white font-black text-[10px] uppercase tracking-[0.2em] px-6 py-2.5 rounded-lg transition-all shadow-[0_0_15px_rgba(34,211,238,0.3)] cursor-pointer"
             >
               {step > 1 &&
                ((step === 2 && selectedAstrobots.length === 0) ||
@@ -278,7 +304,7 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#030608]/90 border border-cyan-900/25 p-5 sm:p-7 rounded-2xl shadow-inner min-h-[420px]">
+    <div className="flex flex-col h-full bg-[#030608]/90 border border-cyan-900/25 p-5 sm:p-7 rounded-2xl shadow-inner min-h-[420px] text-white">
       
       {viewMode === "LIST" && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full">
@@ -290,7 +316,7 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
             {fleets.length > 0 && (
               <button 
                 onClick={handleStartWizard}
-                className="flex items-center gap-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-lg transition-all shadow-[0_0_15px_rgba(34,211,238,0.3)]"
+                className="flex items-center gap-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-lg transition-all shadow-[0_0_15px_rgba(34,211,238,0.3)] cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" /> CREAR FLOTA
               </button>
@@ -324,29 +350,15 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {fleets.map(fleet => (
-                <div key={fleet.id} className="bg-black/60 border border-cyan-900/40 rounded-xl p-4 flex flex-col gap-3 hover:border-cyan-700 transition-colors">
+                <div key={fleet.id} className="bg-black/60 border border-cyan-900/40 rounded-xl p-4 flex flex-col gap-3 hover:border-cyan-700 transition-colors text-left">
                   <div className="flex justify-between items-start">
                     <div>
                       <h4 className="text-xs font-black text-white uppercase tracking-wider">{fleet.name}</h4>
-                      <div className="text-[9px] font-mono text-cyan-500 mt-1">POWER: {fleet.total_power_score}</div>
+                      <div className="text-[9px] font-mono text-cyan-500 mt-1">POWER: {fleet.total_power_score?.toLocaleString()} POW</div>
                     </div>
                     <div className="bg-cyan-950/50 px-2 py-1 rounded text-[8px] font-mono text-cyan-300 border border-cyan-800/50">
-                      {fleet.ships?.length || 0} ASSETS
+                      FLOTA ACTIVA
                     </div>
-                  </div>
-                  <div className="flex gap-2 mt-2">
-                    {/* Mini icons preview */}
-                    {fleet.ships?.slice(0, 5).map((s: any, i: number) => (
-                      <div key={i} className="w-6 h-6 rounded bg-neutral-900 border border-cyan-900 flex items-center justify-center text-[7px] overflow-hidden">
-                        {/* Placeholder for avatar, we just show a square in this view */}
-                        <div className="w-full h-full bg-cyan-900/30"></div>
-                      </div>
-                    ))}
-                    {(fleet.ships?.length || 0) > 5 && (
-                      <div className="w-6 h-6 rounded bg-black border border-cyan-900 flex items-center justify-center text-[7px] text-cyan-500 font-mono">
-                        +{(fleet.ships?.length || 0) - 5}
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}
@@ -358,10 +370,10 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
       {viewMode === "CREATE_WIZARD" && (
         <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col h-full">
           <div className="flex items-center gap-3 mb-6 border-b border-cyan-900/40 pb-3">
-            <button onClick={() => setViewMode("LIST")} className="p-1.5 text-zinc-500 hover:text-white bg-black rounded-lg border border-cyan-900/50">
+            <button onClick={() => setViewMode("LIST")} className="p-1.5 text-zinc-500 hover:text-white bg-black rounded-lg border border-cyan-900/50 cursor-pointer">
               <ArrowLeft className="w-4 h-4" />
             </button>
-            <div>
+            <div className="text-left">
               <h3 className="text-sm font-sans font-black tracking-widest text-white uppercase">Asistente de Ensamblaje</h3>
               <p className="text-[10px] font-mono text-cyan-600 uppercase mt-1">
                 {wizardStep === 0 && "PASO 0: IDENTIFICADOR"}
@@ -388,7 +400,7 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
                 />
                 <button 
                   onClick={handleNextStep}
-                  className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white font-black text-[10px] uppercase tracking-[0.2em] px-8 py-3 rounded-xl transition-all shadow-[0_0_20px_rgba(34,211,238,0.3)]"
+                  className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white font-black text-[10px] uppercase tracking-[0.2em] px-8 py-3 rounded-xl transition-all shadow-[0_0_20px_rgba(34,211,238,0.3)] cursor-pointer"
                 >
                   INICIAR ENSAMBLAJE <ChevronRight className="w-4 h-4" />
                 </button>

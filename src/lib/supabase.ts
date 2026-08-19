@@ -21,9 +21,20 @@ export const supabase = createClient(
       autoRefreshToken: true,
       detectSessionInUrl: true,
       flowType: 'pkce' // Garantiza compatibilidad con flujos de autenticación modernos y seguros
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10
+      }
     }
   }
 );
+
+// 🔧 Aumentar límite de listeners para soporte de múltiples hooks con Realtime simultáneo
+// Evita MaxListenersExceededWarning cuando varios hooks suscriben canales en paralelo
+if (typeof process !== 'undefined' && process.setMaxListeners) {
+  process.setMaxListeners(50);
+}
 
 /**
  * 🛠️ HELPER: Validador de estado del canal de comunicación.

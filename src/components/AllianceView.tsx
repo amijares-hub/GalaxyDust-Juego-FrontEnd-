@@ -31,7 +31,7 @@ interface Member {
 }
 
 interface LogEntry {
-  id: number;
+  id: string | number;
   author: string;
   message: string;
   type: "chat" | "system" | "combat";
@@ -59,97 +59,108 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
   const [techProgress, setTechProgress] = useState(45);
   const [chatInput, setChatInput] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [allianceName, setAllianceName] = useState<string>("VANGUARDIA GALÁCTICA");
 
-  const [members, setMembers] = useState<Member[]>([
-    {
-      id: "m1",
-      name: "DarthVader_99",
-      role: "Comandante",
-      level: 85,
-      power: 4500000,
-      status: "online",
-      avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=150&auto=format&fit=crop"
-    },
-    {
-      id: "m2",
-      name: "StarKillerBase",
-      role: "Oficial",
-      level: 82,
-      power: 3200000,
-      status: "online",
-      avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=150&auto=format&fit=crop"
-    },
-    {
-      id: "m3",
-      name: "RogueOne_Lead",
-      role: "Oficial",
-      level: 79,
-      power: 2850000,
-      status: "offline",
-      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=150&auto=format&fit=crop"
-    },
-    {
-      id: "m4",
-      name: "EchoPilot",
-      role: "Piloto",
-      level: 45,
-      power: 850000,
-      status: "online",
-      avatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?q=80&w=150&auto=format&fit=crop"
-    },
-    {
-      id: "m5",
-      name: "NovaSeeker",
-      role: "Piloto",
-      level: 30,
-      power: 420000,
-      status: "offline",
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=150&auto=format&fit=crop"
-    }
-  ]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
 
-  const [logs, setLogs] = useState<LogEntry[]>([
-    { id: 1, author: "SYSTEM", message: "Red criptográfica asegurada. Enlace Q-12 establecido.", type: "system", time: "08:00" },
-    { id: 2, author: "DarthVader_99", message: "Pilotos, prepárense para la incursión de gremio a las 18:00.", type: "chat", time: "08:15" },
-    { id: 3, author: "SYSTEM", message: "StarKillerBase ha aportado al desarrollo del núcleo.", type: "system", time: "09:30" },
-    { id: 4, author: "SYSTEM", message: "Incursión del Sector Alpha completada con éxito.", type: "combat", time: "10:45" },
-    { id: 5, author: "EchoPilot", message: "Recibido, comandante. Mis interceptores están listos.", type: "chat", time: "11:00" },
-  ]);
+  // ─── CARGA REAL DE DATOS DE LA ALIANZA Y MIEMBROS DESDE SUPABASE ───
+  const fetchAllianceData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-  // Carga e inicialización de usuario real en Supabase
-  useEffect(() => {
-    async function initAllianceData() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+      setCurrentUserId(user.id);
 
-        setCurrentUserId(user.id);
+      // Obtener membresía del usuario
+      const { data: memberRecord } = await supabase
+        .from('alliance_members')
+        .select('alliance_id, role')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-        // Cargar perfiles reales para alimentar lista de miembros
+      let targetAllianceId = memberRecord?.alliance_id;
+
+      if (targetAllianceId) {
+        const { data: alliance } = await supabase
+          .from('alliances')
+          .select('*')
+          .eq('id', targetAllianceId)
+          .single();
+
+        if (alliance) {
+          setAllianceName(alliance.name || "VANGUARDIA GALÁCTICA");
+          setAllianceTechLevel(alliance.level || 1);
+        }
+
+        // Cargar miembros reales
+        const { data: teamData } = await supabase
+          .from('alliance_members')
+          .select(`
+            id, role, user_id,
+            user_profiles:user_id (id, username, level, power_score, avatar_url)
+          `)
+          .eq('alliance_id', targetAllianceId);
+
+        if (teamData && teamData.length > 0) {
+          const mappedMembers: Member[] = teamData.map((m: any) => {
+            const p = m.user_profiles || {};
+            return {
+              id: p.id || m.id,
+              name: p.username || 'Comandante',
+              role: m.role === 'LEADER' ? 'Comandante' : m.role === 'OFFICER' ? 'Oficial' : 'Piloto',
+              level: p.level || 1,
+              power: p.power_score || 0,
+              status: 'online',
+              avatar: p.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150"
+            };
+          });
+          setMembers(mappedMembers);
+        }
+      } else {
+        // Carga de contingencia de perfiles si el usuario no pertenece a un gremio
         const { data: profiles } = await supabase
           .from('user_profiles')
           .select('*')
-          .limit(10);
+          .limit(5);
 
-        if (profiles && profiles.length > 0) {
-          const loadedMembers: Member[] = profiles.map((p: any, idx: number) => ({
+        if (profiles) {
+          setMembers(profiles.map((p: any, idx: number) => ({
             id: p.id,
-            name: p.username || p.display_name || `COMANDANTE_${idx + 1}`,
-            role: idx === 0 ? "Comandante" : idx < 3 ? "Oficial" : "Piloto",
-            level: p.level || 50,
-            power: p.power_score || p.galactic_power_score || (idx === 0 ? 4500000 : 850000),
-            status: idx % 2 === 0 ? "online" : "offline",
-            avatar: p.avatar_url || p.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150"
-          }));
-
-          setMembers(loadedMembers);
+            name: p.username || `Piloto_${idx + 1}`,
+            role: idx === 0 ? "Comandante" : "Piloto",
+            level: p.level || 1,
+            power: p.power_score || 1000,
+            status: "online",
+            avatar: p.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150"
+          })));
         }
-      } catch (err) {
-        console.error("Error al cargar datos de la alianza:", err);
       }
-    }
 
-    initAllianceData();
+      // Cargar Chat de Alianza
+      const { data: chatData } = await supabase
+        .from('alliance_chat_messages')
+        .select('*')
+        .order('created_at', { ascending: true })
+        .limit(30);
+
+      if (chatData) {
+        setLogs(chatData.map((c: any) => ({
+          id: c.id,
+          author: c.author_name || 'SYSTEM',
+          message: c.message,
+          type: (c.message_type as any) || 'chat',
+          time: new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        })));
+      }
+
+    } catch (err) {
+      console.error("Error al cargar datos de la alianza:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllianceData();
   }, []);
 
   const playSfxTone = (type: "click" | "success" | "msg") => {
@@ -187,7 +198,7 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
     } catch (err) {}
   };
 
-  // 🎯 MECANISMO DE DONACIÓN TECNOLÓGICA (50 CRISTALES -> +15% PROGRESO + 5,000 POW)
+  // 🛡️ DONACIÓN TECNOLÓGICA SECURE (RPC)
   const handleDonateTech = async (e: React.MouseEvent) => {
     if (playerGems < 50) {
       triggerNotification("⚠️ CRISTALES INSUFICIENTES (REQUERIDO: 50💎)", e);
@@ -195,66 +206,63 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
       return;
     }
 
-    const newGems = Math.max(0, playerGems - 50);
-    const newPower = playerPower + 5000;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    // Actualización local
-    setPlayerGems(newGems);
-    setPlayerPower(newPower);
+      // 🛡️ LLAMADA ZERO-TRUST AL SERVIDOR
+      const { data, error } = await supabase.rpc('donate_alliance_tech_secure', {
+        p_user_id: user.id
+      });
 
-    // Persistencia en Supabase
-    if (currentUserId) {
-      try {
-        await supabase
-          .from('user_profiles')
-          .update({
-            crystal: newGems,
-            power_score: newPower,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', currentUserId);
-      } catch (err) {
-        console.error("Error al guardar donación en Supabase:", err);
-      }
-    }
+      if (error) throw error;
 
-    setTechProgress(prev => {
-      const next = prev + 15;
-      if (next >= 100) {
-        setAllianceTechLevel(l => l + 1);
-        triggerNotification(`🚀 ¡DESARROLLO DE ALIANZA SUBIÓ DE NIVEL! BONO +5,000 POW APLICADO`, e);
+      // Actualizar estado React usando datos validados por el servidor
+      setPlayerGems(data.new_crystals);
+      setPlayerPower(data.new_power);
+
+      setTechProgress(prev => {
+        const next = prev + 15;
+        if (next >= 100) {
+          setAllianceTechLevel(l => l + 1);
+          triggerNotification(`🚀 ¡NÚCLEO SUBIÓ DE NIVEL! BONO +5,000 POW APLICADO`, e);
+          playSfxTone("success");
+          return next - 100;
+        }
+        triggerNotification("🔋 APORTE TECNOLÓGICO REGISTRADO (+15% PROGRESO | +5,000 POW)", e);
         playSfxTone("success");
-        
-        // Push system log
-        setLogs(prevLogs => [...prevLogs, {
-          id: Date.now(),
-          author: "SYSTEM",
-          message: `Nivel del Núcleo incrementado a Nivel ${allianceTechLevel + 1}. Bono +5,000 POW Otorgado.`,
-          type: "system",
-          time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-        }]);
-        
-        return next - 100;
-      }
-      triggerNotification("🔋 APORTE TECNOLÓGICO REGISTRADO (+15% PROGRESO | +5,000 POW)", e);
-      playSfxTone("success");
-      return next;
-    });
+        return next;
+      });
+
+      fetchAllianceData();
+    } catch (err: any) {
+      console.error("Error durante donación:", err);
+      triggerNotification(`⛔ ERROR EN DONACIÓN: ${err.message}`, e);
+    }
   };
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  // 🛡️ CHAT SECURE (RPC)
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
 
-    setLogs(prev => [...prev, {
-      id: Date.now(),
-      author: "Tú",
-      message: chatInput.trim(),
-      type: "chat",
-      time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-    }]);
-    setChatInput("");
-    playSfxTone("msg");
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase.rpc('send_alliance_chat_secure', {
+        p_user_id: user.id,
+        p_message: chatInput.trim()
+      });
+
+      if (error) throw error;
+
+      setChatInput("");
+      playSfxTone("msg");
+      fetchAllianceData();
+    } catch (err) {
+      console.error("Error al enviar mensaje:", err);
+    }
   };
 
   return (
@@ -283,10 +291,9 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
 
       <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 mt-2 max-w-6xl mx-auto">
         
-        {/* LEFT COLUMN: ALLIANCE INFO AND MEMBERS */}
+        {/* COLUMNA IZQUIERDA: INFORMACIÓN Y MIEMBROS DE LA ALIANZA */}
         <div className="lg:col-span-8 flex flex-col gap-4">
           
-          {/* Alliance Header Stats Card */}
           <div className="bg-[#0b0c10]/80 border border-indigo-500/20 p-5 rounded-2xl backdrop-blur-md relative overflow-hidden flex flex-col sm:flex-row items-center justify-between shadow-[0_0_30px_rgba(99,102,241,0.05)]">
             <div className="absolute top-0 left-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[50px] pointer-events-none" />
             
@@ -296,7 +303,7 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
               </div>
               <div>
                 <h3 className="text-lg font-black tracking-widest text-white uppercase font-sans">
-                  VANGUARDIA GALÁCTICA
+                  {allianceName}
                 </h3>
                 <div className="flex items-center gap-3 mt-1">
                   <div className="flex items-center gap-1 text-[9px] font-mono text-indigo-300 bg-indigo-900/30 px-2 py-0.5 rounded border border-indigo-500/20">
@@ -311,7 +318,6 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
               </div>
             </div>
 
-            {/* Tech Contribution section */}
             <div className="mt-4 sm:mt-0 flex flex-col items-center sm:items-end w-full sm:w-auto z-10">
               <span className="text-[8px] font-mono tracking-widest text-white/50 uppercase mb-1.5">
                 PROGRESO TECNOLÓGICO (+15%)
@@ -332,7 +338,6 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
             </div>
           </div>
 
-          {/* Members List */}
           <div className="bg-[#08090b]/80 border border-white/5 p-4 rounded-2xl backdrop-blur-md flex-1 overflow-hidden flex flex-col min-h-[350px]">
             <h4 className="text-[10px] font-mono tracking-[0.2em] text-white/50 uppercase border-b border-white/5 pb-2 mb-3 flex items-center gap-2">
               <UserCheck className="w-3.5 h-3.5" />
@@ -380,12 +385,11 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
           </div>
         </div>
 
-        {/* RIGHT COLUMN: CHAT & LOGS TERMINAL */}
+        {/* COLUMNA DERECHA: CHAT Y LOGS DE TERMINAL */}
         <div className="lg:col-span-4 flex flex-col bg-[#050608]/90 border border-[#E53E3E]/20 rounded-2xl backdrop-blur-md overflow-hidden min-h-[400px] shadow-[0_0_20px_rgba(229,62,62,0.05)] relative">
           
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#E53E3E]/5 rounded-full blur-[40px] pointer-events-none" />
 
-          {/* Terminal Header */}
           <div className="px-4 py-3 border-b border-[#E53E3E]/20 bg-[#E53E3E]/5 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Wifi className="w-4 h-4 text-[#E53E3E] animate-pulse" />
@@ -396,31 +400,33 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
           </div>
 
-          {/* Logs Container */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-none flex flex-col font-mono text-[9.5px]">
-            {logs.map((log) => (
-              <div 
-                key={log.id} 
-                className={`p-2 rounded-lg border ${
-                  log.type === 'system' ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-200' :
-                  log.type === 'combat' ? 'bg-amber-500/10 border-amber-500/20 text-amber-200' :
-                  'bg-white/5 border-white/10 text-neutral-300'
-                }`}
-              >
-                <div className="flex justify-between items-start mb-1 opacity-60 text-[7.5px] uppercase tracking-wider">
-                  <span className={`font-black ${log.author === 'SYSTEM' ? 'text-indigo-400' : log.author === 'Tú' ? 'text-[#E53E3E]' : 'text-cyan-400'}`}>
-                    {log.author}
-                  </span>
-                  <span>{log.time}</span>
+            {logs.length === 0 ? (
+              <span className="text-zinc-600 italic text-[9px] text-center my-auto">Sin transmisiones recientes.</span>
+            ) : (
+              logs.map((log) => (
+                <div 
+                  key={log.id} 
+                  className={`p-2 rounded-lg border ${
+                    log.type === 'system' ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-200' :
+                    log.type === 'combat' ? 'bg-amber-500/10 border-amber-500/20 text-amber-200' :
+                    'bg-white/5 border-white/10 text-neutral-300'
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-1 opacity-60 text-[7.5px] uppercase tracking-wider">
+                    <span className={`font-black ${log.author === 'SYSTEM' ? 'text-indigo-400' : 'text-cyan-400'}`}>
+                      {log.author}
+                    </span>
+                    <span>{log.time}</span>
+                  </div>
+                  <div className="leading-relaxed">
+                    {log.message}
+                  </div>
                 </div>
-                <div className="leading-relaxed">
-                  {log.message}
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
-          {/* Chat Input form */}
           <div className="p-3 border-t border-[#E53E3E]/20 bg-black/40 relative z-10">
             <form onSubmit={handleSendMessage} className="flex gap-2">
               <div className="relative flex-1">

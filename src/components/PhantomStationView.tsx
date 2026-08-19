@@ -1,15 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ShoppingBag, Clock } from 'lucide-react';
+import { ChevronLeft, ShoppingBag, Clock, RefreshCw } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { useAudioEngine } from '../hooks/useAudioEngine';
 
 const PHANTOM_COIN_ASSET = "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/Phantom%20Coin.png";
 
 interface PhantomStationViewProps {
-  playerGems?: number;
-  setPlayerGems?: (v: any) => void;
-  playerPower?: number;
-  setPlayerPower?: (v: any) => void;
-  playerGold?: number;
-  setPlayerGold?: (v: any) => void;
   onBack: () => void;
   triggerNotification?: (text: string, e?: any) => void;
 }
@@ -28,10 +24,10 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
   onBack,
   triggerNotification
 }) => {
-  // Estado para el contador cíclico de 3 horas
+  const { playSfx } = useAudioEngine();
   const [refreshCountdown, setRefreshCountdown] = useState<string>('03:00:00');
+  const [purchasingId, setPurchasingId] = useState<string | null>(null);
 
-  // Catálogo de 8 Activos Exclusivos de la Phantom Station
   const [blueprints] = useState<PhantomBlueprint[]>([
     {
       id: 'PH-01',
@@ -107,7 +103,6 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
     }
   ]);
 
-  // Lógica del contador regresivo de 3 horas
   useEffect(() => {
     const updateCountdown = () => {
       const now = Date.now();
@@ -127,21 +122,45 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  const handleAcquireBlueprint = (bp: PhantomBlueprint) => {
-    if (triggerNotification) {
-      triggerNotification(`📜 ACTIVO VOID ADQUIRIDO: ${bp.name}`);
+  const handleAcquireBlueprint = async (bp: PhantomBlueprint) => {
+    if (purchasingId) return;
+    setPurchasingId(bp.id);
+    playSfx(880);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Sesión no autenticada.");
+
+      const { error } = await supabase.rpc('acquire_phantom_station_item_secure', {
+        p_item_id: bp.id,
+        p_item_name: bp.name,
+        p_category: bp.category,
+        p_price_ph: bp.pricePH
+      });
+
+      if (error) throw error;
+
+      playSfx(1200);
+      if (triggerNotification) {
+        triggerNotification(`📜 ACTIVO VOID ADQUIRIDO: ${bp.name}`);
+      }
+    } catch (err: any) {
+      console.error("Error al adquirir activo en Phantom Station:", err);
+      playSfx(300);
+      if (triggerNotification) {
+        triggerNotification(`⛔ TRANSACCIÓN FALLIDA: ${err.message}`);
+      }
+    } finally {
+      setPurchasingId(null);
     }
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto bg-[#080b0e] border border-cyan-500/30 p-3 rounded-2xl shadow-2xl relative overflow-hidden font-mono text-left select-none">
-      
+    <div className="w-full max-w-7xl mx-auto bg-[#080b0e] border border-cyan-500/30 p-3 rounded-2xl shadow-2xl relative overflow-hidden font-mono text-left select-none text-white">
       <div className="w-full flex flex-col lg:flex-row gap-3 items-stretch">
         
-        {/* ─── 1. COLUMNA IZQUIERDA: HERO POSTER COMPACTO ─── */}
+        {/* HERO POSTER */}
         <div className="w-full lg:w-3/12 shrink-0 relative rounded-xl overflow-hidden border border-cyan-500/40 bg-[#05070a] flex flex-col justify-between p-3 min-h-[360px] shadow-2xl group">
-          
-          {/* Imagen de Fondo de la Phantom Station */}
           <div className="absolute inset-0 z-0">
             <img
               src="https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Phatom%20Station/Skin%20Original/phantom%20station.png"
@@ -152,10 +171,9 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
             <div className="absolute inset-0 bg-cyan-950/20 mix-blend-overlay z-10" />
           </div>
 
-          {/* Top Izquierdo: Botón Volver */}
           <div className="relative z-20 flex justify-between items-center">
             <button
-              onClick={onBack}
+              onClick={() => { playSfx(660); onBack(); }}
               className="p-1.5 bg-black/80 hover:bg-cyan-950 border border-cyan-500/40 text-cyan-300 rounded-lg transition-all cursor-pointer backdrop-blur-md flex items-center gap-1 text-[8px] font-bold uppercase shadow-lg"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
@@ -163,7 +181,6 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
             </button>
           </div>
 
-          {/* Bottom Izquierdo: Título, Descripción y Contador Discreto */}
           <div className="relative z-20 flex flex-col gap-1.5 mt-auto text-left">
             <h1 className="text-lg lg:text-xl font-black text-white uppercase tracking-widest drop-shadow-[0_0_12px_rgba(6,182,212,0.6)]">
               PHANTOM STATION
@@ -173,7 +190,6 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
               Estación espacial descentralizada para la adquisición de blueprints, prototipos de combate y tecnología coloidal.
             </p>
 
-            {/* Contador Discreto de 3 Horas para Refresco de Inventario */}
             <div className="flex items-center gap-1.5 mt-1 bg-black/80 border border-cyan-500/40 px-2.5 py-1 rounded-lg backdrop-blur-md w-fit">
               <Clock className="w-3 h-3 text-cyan-400 animate-pulse shrink-0" />
               <div className="flex items-center gap-1 text-[7.5px] font-mono uppercase">
@@ -182,20 +198,16 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
               </div>
             </div>
           </div>
-
         </div>
 
-        {/* ─── 2. COLUMNA DERECHA: GRID DE 8 ITEMS EN MATRIZ 4x2 ─── */}
+        {/* GRID DE ITEMS */}
         <div className="flex-1 w-full lg:w-9/12 bg-[#05070a] border border-cyan-500/20 p-2.5 rounded-xl flex flex-col justify-between">
-          
-          {/* Grilla 4 Columnas x 2 Filas (8 Items Simultáneos) */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full h-full">
             {blueprints.map((bp) => (
               <div
                 key={bp.id}
                 className="bg-[#050910] border border-cyan-500/30 hover:border-cyan-400 p-2 rounded-lg shadow-xl flex flex-col justify-between gap-1.5 transition-all relative group"
               >
-                {/* Categoría y Rareza */}
                 <div className="flex justify-between items-center border-b border-cyan-950 pb-1">
                   <span className="text-[6.5px] text-cyan-400/80 font-bold uppercase truncate max-w-[70px]">{bp.category}</span>
                   <span className={`px-1.5 py-0.2 rounded text-[6px] font-black uppercase border shrink-0 ${
@@ -207,7 +219,6 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
                   </span>
                 </div>
 
-                {/* Imagen e Info del Activo */}
                 <div className="flex flex-col gap-1">
                   <div className="w-full h-16 bg-black border border-cyan-950 rounded p-0.5 overflow-hidden flex items-center justify-center">
                     <img
@@ -221,7 +232,6 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
                   <p className="text-[7.5px] text-zinc-400 font-sans normal-case line-clamp-1 leading-tight">{bp.description}</p>
                 </div>
 
-                {/* Bloque de Precio Exclusivo con Icono de Phantom Coin */}
                 <div className="bg-[#020305] border border-cyan-950 p-1 rounded flex justify-between items-center text-[7.5px]">
                   <span className="text-[6.5px] text-zinc-500 uppercase font-bold">PRECIO</span>
                   <div className="flex items-center gap-1">
@@ -230,24 +240,30 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
                   </div>
                 </div>
 
-                {/* Botón Adquirir */}
                 <button
                   onClick={() => handleAcquireBlueprint(bp)}
-                  className="w-full py-1 bg-gradient-to-r from-cyan-600 to-teal-600 hover:brightness-110 text-white font-black text-[7.5px] uppercase rounded transition-all cursor-pointer flex items-center justify-center gap-1 shadow-[0_0_6px_rgba(6,182,212,0.3)]"
+                  disabled={purchasingId === bp.id}
+                  className="w-full py-1 bg-gradient-to-r from-cyan-600 to-teal-600 hover:brightness-110 text-white font-black text-[7.5px] uppercase rounded transition-all cursor-pointer flex items-center justify-center gap-1 shadow-[0_0_6px_rgba(6,182,212,0.3)] disabled:opacity-50"
                 >
-                  <ShoppingBag className="w-3 h-3" />
-                  <span>ADQUIRIR ({bp.pricePH}</span>
-                  <img src={PHANTOM_COIN_ASSET} alt="Phantom Coin" className="w-3 h-3 object-contain" />
-                  <span>)</span>
+                  {purchasingId === bp.id ? (
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <>
+                      <ShoppingBag className="w-3 h-3" />
+                      <span>ADQUIRIR ({bp.pricePH}</span>
+                      <img src={PHANTOM_COIN_ASSET} alt="Phantom Coin" className="w-3 h-3 object-contain" />
+                      <span>)</span>
+                    </>
+                  )}
                 </button>
               </div>
             ))}
           </div>
-
         </div>
 
       </div>
-
     </div>
   );
 };
+
+export default PhantomStationView;

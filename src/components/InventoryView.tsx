@@ -19,35 +19,10 @@ import { Button } from "./ui/joly-button";
 import { FleetManager } from "./FleetManager";
 import { Scroller } from "./ui/Scroller";
 import { supabase } from "../lib/supabase";
+import { useInventory, type InventoryItem } from "../hooks/useInventory";
+import { useAudioEngine } from "../hooks/useAudioEngine";
+export type { InventoryItem } from "../hooks/useInventory";
 
-export interface InventoryItem {
-  id: string;
-  name: string;
-  fullname: string;
-  category: string;
-  rarity: string;
-  faction?: string;
-  avatar_url: string;
-  unlocked: boolean;
-  quantity: number;
-  level: number;
-  stars: number;
-  blueprints_owned: number;
-  blueprints_required: number;
-  crafting_costs?: any;
-  tactical_stats?: any;
-  skills?: any;
-  set_skills?: string;
-  effect?: string;
-  stack_info?: string;
-  duration_info?: string;
-  power_score?: number;
-  description?: string;
-  favorite?: boolean;
-  sound?: string;
-  raw_seed?: any;
-  is_in_flight?: boolean;
-}
 
 interface InventoryViewProps {
   playerGems: number;
@@ -60,7 +35,6 @@ interface InventoryViewProps {
   onBack: () => void;
 }
 
-// 🎯 FUNCIÓN DE NORMALIZACIÓN Y FILTRADO ESTRICTO DE CATEGORÍAS EN EL INVENTARIO
 const matchInventoryCategory = (itemCategory: string, selectedSidebarKey: string): boolean => {
   if (!selectedSidebarKey || selectedSidebarKey === "All") return true;
   if (selectedSidebarKey === "Favorites") return true;
@@ -69,120 +43,44 @@ const matchInventoryCategory = (itemCategory: string, selectedSidebarKey: string
   const normItem = (itemCategory || "").toLowerCase().trim();
   const normKey = selectedSidebarKey.toLowerCase().trim();
 
-  // SPACESHIPS / NAVES
   if (normKey === "spaceships" || normKey === "ships" || normKey === "naves") {
-    return (
-      normItem === "spaceships" ||
-      normItem === "ships" ||
-      normItem === "ship" ||
-      normItem === "spaceship" ||
-      normItem === "nave" ||
-      normItem === "naves"
-    );
+    return ["spaceships", "ships", "ship", "spaceship", "nave", "naves"].includes(normItem);
   }
 
-  // TECNOLOGÍA
-  if (
-    normKey === "tecnology" ||
-    normKey === "technology" ||
-    normKey === "tech" ||
-    normKey === "tecnologia"
-  ) {
-    return (
-      normItem === "tecnology" ||
-      normItem === "technology" ||
-      normItem === "tech" ||
-      normItem === "tecnología" ||
-      normItem === "tecnologia"
-    );
+  if (["tecnology", "technology", "tech", "tecnologia"].includes(normKey)) {
+    return ["tecnology", "technology", "tech", "tecnología", "tecnologia"].includes(normItem);
   }
 
-  // DEFENSAS
-  if (normKey === "defense" || normKey === "defenses" || normKey === "defensa") {
-    return (
-      normItem === "defense" ||
-      normItem === "defenses" ||
-      normItem === "defensa" ||
-      normItem === "defensas"
-    );
+  if (["defense", "defenses", "defensa"].includes(normKey)) {
+    return ["defense", "defenses", "defensa", "defensas"].includes(normItem);
   }
 
-  // ESTRUCTURAS
-  if (normKey === "structures" || normKey === "structure" || normKey === "estructuras") {
-    return (
-      normItem === "structures" ||
-      normItem === "structure" ||
-      normItem === "estructura" ||
-      normItem === "estructuras"
-    );
+  if (["structures", "structure", "estructuras"].includes(normKey)) {
+    return ["structures", "structure", "estructura", "estructuras"].includes(normItem);
   }
 
-  // ASTROBOTS
-  if (normKey === "astrobots" || normKey === "astrobot" || normKey === "robots") {
-    return (
-      normItem === "astrobots" ||
-      normItem === "astrobot" ||
-      normItem === "robot" ||
-      normItem === "robots"
-    );
+  if (["astrobots", "astrobot", "robots"].includes(normKey)) {
+    return ["astrobots", "astrobot", "robot", "robots"].includes(normItem);
   }
 
-  // BLUEPRINTS / PLANOS
-  if (normKey === "blueprints" || normKey === "blueprint" || normKey === "planos") {
-    return (
-      normItem === "blueprints" ||
-      normItem === "blueprint" ||
-      normItem === "plano" ||
-      normItem === "planos"
-    );
+  if (["blueprints", "blueprint", "planos"].includes(normKey)) {
+    return ["blueprints", "blueprint", "plano", "planos"].includes(normItem);
   }
 
-  // BADGES / INSIGNIAS
-  if (normKey === "badges" || normKey === "badge" || normKey === "insignias") {
-    return (
-      normItem === "badges" ||
-      normItem === "badge" ||
-      normItem === "insignia" ||
-      normItem === "insignias"
-    );
+  if (["badges", "badge", "insignias"].includes(normKey)) {
+    return ["badges", "badge", "insignia", "insignias"].includes(normItem);
   }
 
-  // LICENCIAS
-  if (
-    normKey === "licencia" ||
-    normKey === "licenses" ||
-    normKey === "license" ||
-    normKey === "licencias"
-  ) {
-    return (
-      normItem === "licencia" ||
-      normItem === "license" ||
-      normItem === "licenses" ||
-      normItem === "licencias"
-    );
+  if (["licencia", "licenses", "license", "licencias"].includes(normKey)) {
+    return ["licencia", "license", "licenses", "licencias"].includes(normItem);
   }
 
-  // HERRAMIENTAS / TOOLS
-  if (normKey === "tools" || normKey === "tool" || normKey === "herramientas") {
-    return (
-      normItem === "tools" ||
-      normItem === "tool" ||
-      normItem === "herramienta" ||
-      normItem === "herramientas"
-    );
+  if (["tools", "tool", "herramientas"].includes(normKey)) {
+    return ["tools", "tool", "herramienta", "herramientas"].includes(normItem);
   }
 
-  // CONSUMIBLES
-  if (
-    normKey === "consumibles" ||
-    normKey === "consumables" ||
-    normKey === "consumable"
-  ) {
-    return (
-      normItem === "consumibles" ||
-      normItem === "consumables" ||
-      normItem === "consumable"
-    );
+  if (["consumibles", "consumables", "consumable"].includes(normKey)) {
+    return ["consumibles", "consumables", "consumable"].includes(normItem);
   }
 
   return normItem === normKey;
@@ -198,6 +96,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   triggerNotification,
   onBack
 }) => {
+  const { items: characters, loading: isLoading, refreshInventory, toggleFavorite: toggleFav } = useInventory();
+  const { playSfx } = useAudioEngine();
+
   const [activeSidebarCategory, setActiveSidebarCategory] = useState<string>("All");
 
   const [filterDropdown1, setFilterDropdown1] = useState<string>("ALL CLASES");
@@ -209,13 +110,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [showFilter2Modal, setShowFilter2Modal] = useState(false);
 
   const [selectedChar, setSelectedChar] = useState<InventoryItem | null>(null);
-  const [characters, setCharacters] = useState<InventoryItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Modales
   const [showSubModal, setShowSubModal] = useState<"fleet" | null>(null);
   const [showSkillsPopup, setShowSkillsPopup] = useState(false);
-  const [fleets, setFleets] = useState<any[]>([]);
+  const [fleets, setFleets] = useState<any[]>([])
 
   useEffect(() => {
     if (!selectedChar) {
@@ -226,193 +124,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   useEffect(() => {
     if (showSubModal === "fleet") {
-      supabase.from("fleets").select("*").then(({ data }) => {
-        if (data) setFleets(data);
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!user) return;
+        supabase.from("fleets").select("*").eq("user_id", user.id).then(({ data }) => {
+          if (data) setFleets(data);
+        });
       });
     }
   }, [showSubModal]);
 
-  // ─── CARGA INTEGRAL DESDE LAS TABLAS SEED Y USER DE SUPABASE ───
-  const fetchUserAssetsFromSupabase = async () => {
-    setIsLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || '9abc737e-9c3d-4349-a976-59af24f51f4d';
 
-      // Consulta de expediciones activas
-      const { data: activeExps } = await supabase
-        .from('active_expeditions')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('status', 'LAUNCHED');
 
-      const hasActiveExpeditions = (activeExps || []).length > 0;
 
-      const allItems: InventoryItem[] = [];
-
-      const loadCategory = async (
-        userTable: string,
-        seedTable: string,
-        categoryName: string,
-        possibleFkCols: string[],
-        pkSeedCol: string = 'id',
-        nameCols: string[] = ['name', 'title']
-      ) => {
-        try {
-          const { data: userRows } = await supabase
-            .from(userTable)
-            .select('*')
-            .eq('user_id', userId);
-
-          if (!userRows || userRows.length === 0) return;
-
-          const { data: seedRows } = await supabase.from(seedTable).select('*');
-          if (!seedRows || seedRows.length === 0) return;
-
-          // Mapa multiclave
-          const seedMap = new Map();
-          seedRows.forEach((s: any) => {
-            if (s[pkSeedCol]) seedMap.set(s[pkSeedCol].toString(), s);
-            if (s.id) seedMap.set(s.id.toString(), s);
-            if (s.ship_id) seedMap.set(s.ship_id.toString(), s);
-            if (s.structure_id) seedMap.set(s.structure_id.toString(), s);
-            if (s.technology_id) seedMap.set(s.technology_id.toString(), s);
-            if (s.tool_id) seedMap.set(s.tool_id.toString(), s);
-            if (s.astrobot_id) seedMap.set(s.astrobot_id.toString(), s);
-            if (s.defense_id) seedMap.set(s.defense_id.toString(), s);
-            if (s.blueprint_id) seedMap.set(s.blueprint_id.toString(), s);
-          });
-
-          userRows.forEach((row: any, idx: number) => {
-            let targetId: string | null = null;
-            const searchCols = [...possibleFkCols, 'ship_id', 'structure_id', 'technology_id', 'tool_id', 'astrobot_id', 'defense_id', 'blueprint_id', 'consumable_id', 'license_id', 'badge_id', 'seed_id', 'id'];
-            
-            for (const col of searchCols) {
-              if (row[col]) {
-                targetId = row[col].toString();
-                break;
-              }
-            }
-
-            if (!targetId) return;
-
-            const seed = seedMap.get(targetId);
-            if (!seed) return;
-
-            let realName = 'ACTIVO';
-            for (const col of nameCols) {
-              if (seed[col]) {
-                realName = seed[col];
-                break;
-              }
-            }
-
-            let parsedSkills = seed.skills;
-            if (typeof parsedSkills === 'string') {
-              try { parsedSkills = JSON.parse(parsedSkills); } catch (e) { }
-            }
-
-            const imageUrl = seed.image_url || seed.avatar_url || seed.avatar || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
-
-            // Detección de Estado de Vuelo Real
-            const isInFlight = categoryName === 'Spaceships' && (
-              (row.flight_state && row.flight_state !== 'IDLE' && row.flight_state !== 'LANDED') ||
-              (hasActiveExpeditions && idx === 0)
-            );
-
-            allItems.push({
-              id: row.id?.toString() || targetId,
-              name: realName,
-              fullname: realName,
-              category: categoryName,
-              rarity: seed.rarity || 'Common',
-              faction: seed.company || seed.collection || seed.series || 'GD',
-              avatar_url: imageUrl,
-              unlocked: true,
-              quantity: row.quantity || row.amount || 1,
-              level: row.current_level || row.level || 1,
-              stars: 3,
-              blueprints_owned: 1,
-              blueprints_required: 1,
-              description: seed.description || 'Sin descripción disponible en la base de datos.',
-              power_score: seed.power_score || 0,
-              effect: seed.effect || null,
-              set_skills: seed.set_skills || null,
-              stack_info: seed.stack || seed.max_stack?.toString() || null,
-              duration_info: seed.duration || null,
-              skills: parsedSkills || null,
-              is_in_flight: !!isInFlight,
-              crafting_costs: {
-                metal: seed.base_metal_cost || seed.req_metal || 0,
-                crystal: seed.base_crystal_cost || seed.req_crystal || 0,
-                deuterium: seed.req_deuterium || 0,
-                dark_matter: seed.req_dark_matter || 0,
-                gd_coins: seed.req_gd || 0
-              },
-              tactical_stats: {
-                hp: seed.resistance || seed.base_hp || 1000,
-                shield: seed.shield || 500,
-                defense: seed.defense || 100,
-                kinetic_attack: seed.attack_standard || 0,
-                laser_attack: seed.attack_laser || 0,
-                plasma_attack: seed.attack_plasma || 0,
-                ionic_attack: seed.attack_ionic || 0,
-                graviton_attack: seed.attack_graviton || 0,
-                travel_speed: seed.speed_boost || 50,
-                combat_speed: seed.speed_boost || 50,
-                speed_boost: seed.speed_boost || 0,
-                cargo_capacity: seed.cargo_capacity || 1000,
-                fleet_space: seed.fleet_slots || 1,
-                production: seed.production_min || 0,
-                max_uses: seed.max_uses || null,
-                total_existing: seed.total_existing || null,
-                total_used: seed.total_used || null
-              },
-              raw_seed: seed
-            });
-          });
-        } catch (catErr) {
-          console.warn(`Aviso al cargar categoría ${categoryName}:`, catErr);
-        }
-      };
-
-      await Promise.all([
-        loadCategory('user_ships', 'seed_ships', 'Spaceships', ['ship_id'], 'ship_id', ['ship_name', 'name']),
-        loadCategory('user_structures', 'seed_structures', 'Structures', ['structure_id', 'building_id'], 'id', ['name', 'title']),
-        loadCategory('user_technologies', 'seed_technologies', 'Tecnology', ['technology_id'], 'id', ['name', 'title']),
-        loadCategory('user_tools', 'seed_tools', 'Tools', ['tool_id'], 'id', ['name', 'title']),
-        loadCategory('user_astrobots', 'seed_astrobots', 'Astrobots', ['astrobot_id'], 'id', ['name', 'title']),
-        loadCategory('user_defenses', 'seed_defenses', 'Defense', ['defense_id'], 'defense_id', ['defense_name', 'name']),
-        loadCategory('user_blueprints', 'seed_blueprints', 'Blueprints', ['blueprint_id'], 'id', ['name', 'title']),
-        loadCategory('user_consumibles', 'seed_consumables', 'Consumibles', ['consumable_id'], 'id', ['name', 'title']),
-        loadCategory('user_licenses', 'seed_licenses', 'Licencia', ['license_id'], 'id', ['name', 'title']),
-        loadCategory('user_badges_unlocked', 'seed_badges', 'Badges', ['badge_id'], 'id', ['name', 'title'])
-      ]);
-
-      setCharacters(allItems);
-    } catch (error) {
-      triggerNotification("FALLO AL SINCRONIZAR NÚCLEO DE INVENTARIOS");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUserAssetsFromSupabase();
-  }, []);
-
-  const playSfx = (soundName?: string) => {
-    try {
-      const sfx = new Audio();
-      sfx.src = soundName === "heavy_laser"
-        ? "https://assets.mixkit.co/active_storage/sfx/2759/2759-84.wav"
-        : "https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav";
-      sfx.volume = 0.15;
-      sfx.play().catch(() => { });
-    } catch (ignore) { }
-  };
-
-  // 🎯 FILTRADO CON SOPORTE PARA FILTRO "FLOTAS EN VUELO"
   const getFilteredCharacters = useMemo(() => {
     let list = [...characters];
 
@@ -452,14 +175,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   const handleToggleFavorite = (char: InventoryItem, e: React.MouseEvent) => {
     e.stopPropagation();
-    const updated = characters.map((c) => {
-      if (c.id === char.id) {
-        triggerNotification(!c.favorite ? "⭐ INDEXADO A SECTOR DE ACCESO PRIORITARIO" : "⭐ ELIMINADO DE FAVORITOS", e);
-        return { ...c, favorite: !c.favorite };
-      }
-      return c;
-    });
-    setCharacters(updated);
+    triggerNotification(!char.favorite ? "⭐ INDEXADO A SECTOR DE ACCESO PRIORITARIO" : "⭐ ELIMINADO DE FAVORITOS", e);
+    toggleFav(char.id);
   };
 
   const subSections = [
@@ -527,7 +244,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 >
                   {["ALL CLASES", "CLASES: COMMON", "CLASES: UNCOMMON", "CLASES: RARE", "CLASES: EPIC", "CLASES: LEGENDARY"].map((opt) => (
                     <button key={opt} onClick={() => { setFilterDropdown1(opt); setShowFilter1Modal(false); playSfx("laser_success"); }}
-                      className="w-full text-left px-2.5 py-1.5 text-[8px] font-mono uppercase tracking-wider text-cyan-300 hover:bg-cyan-950/50 hover:text-white transition-colors"
+                      className="w-full text-left px-2.5 py-1.5 text-[8px] font-mono uppercase tracking-wider text-cyan-300 hover:bg-cyan-950/50 hover:text-white transition-colors cursor-pointer"
                     >{opt}</button>
                   ))}
                 </motion.div>
@@ -550,7 +267,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 >
                   {["TODOS LOS FILTROS", "FACCIÓN: NOVA", "FACCIÓN: GD I", "FACCIÓN: OSIRIS", "FACCIÓN: MYTON", "FACCIÓN: ALACRAN", "FACCIÓN: ZEPPELIN"].map((opt) => (
                     <button key={opt} onClick={() => { setFilterDropdown2(opt); setShowFilter2Modal(false); playSfx("laser_success"); }}
-                      className="w-full text-left px-2.5 py-1.5 text-[8px] font-mono uppercase tracking-wider text-cyan-300 hover:bg-cyan-950/50 hover:text-white transition-colors border-b border-cyan-900/40 last:border-0"
+                      className="w-full text-left px-2.5 py-1.5 text-[8px] font-mono uppercase tracking-wider text-cyan-300 hover:bg-cyan-950/50 hover:text-white transition-colors border-b border-cyan-900/40 last:border-0 cursor-pointer"
                     >{opt}</button>
                   ))}
                 </motion.div>
@@ -558,7 +275,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </AnimatePresence>
           </div>
 
-          {/* INTERRUPTOR DE FILTRO "FLOTAS EN VUELO" */}
           <button
             onClick={() => { setModsEnabled(!modsEnabled); triggerNotification(modsEnabled ? "🔴 FILTRO APAGADO" : "🟢 MOSTRANDO FLOTAS EN VUELO"); }}
             className="flex items-center gap-1.5 hover:opacity-90 select-none cursor-pointer"
@@ -587,7 +303,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       {/* CUERPO PRINCIPAL FLEXIBLE */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start flex-1 min-h-0 h-full overflow-hidden">
 
-        {/* MENU LATERAL CON CATEGORÍAS */}
+        {/* MENU LATERAL */}
         <div className="lg:col-span-3 flex flex-col gap-1 relative h-full overflow-y-auto custom-scrollbar pr-1 shrink-0">
           {subSections.map(({ key, label, locked }) => (
             <button
@@ -600,7 +316,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   triggerNotification(`🔒 ${label}: PRÓXIMAMENTE EN GALAXYDUST`); 
                 } 
               }}
-              className={`w-full py-1.5 px-2.5 text-left font-sans text-[9px] font-extrabold uppercase tracking-widest rounded-xl transition-all border flex items-center justify-between ${
+              className={`w-full py-1.5 px-2.5 text-left font-sans text-[9px] font-extrabold uppercase tracking-widest rounded-xl transition-all border flex items-center justify-between cursor-pointer ${
                 activeSidebarCategory === key
                   ? "bg-gradient-to-r from-red-950/50 to-[#ca421e]/20 border-red-500/60 text-white shadow-[0_0_15px_rgba(239,68,68,0.2)]"
                   : locked
@@ -614,7 +330,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           ))}
         </div>
 
-        {/* GRID DERECHA (MANTENIENDO EL DISEÑO ORIGINAL EN PARRILLA DE 5 COLUMNAS) */}
+        {/* GRID DERECHA */}
         <div className="lg:col-span-9 flex flex-col gap-1.5 h-full min-h-0 overflow-hidden">
           {activeSidebarCategory === "Fleets" ? (
             <FleetManager characters={characters} triggerNotification={triggerNotification} />
@@ -627,7 +343,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               </div>
 
-              {/* CONTENEDOR CON SCROLL EXCLUSIVO Y PARRILLA ORIGINAL DE TARJETAS */}
               <div
                 id="swgoh-characters-grid"
                 className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 items-start content-start bg-[#030608]/90 border border-cyan-900/25 p-3 rounded-2xl shadow-inner flex-1 min-h-0 overflow-y-auto custom-scrollbar scrollbar-thin scrollbar-thumb-cyan-900"
@@ -649,9 +364,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         onClick={() => { playSfx(char.sound); setSelectedChar(char); }}
                         className="flex flex-col items-center justify-between relative group cursor-pointer transition-all duration-200 select-none p-2 rounded-xl border border-cyan-900/50 bg-[#070c12] hover:bg-[#0c1620] hover:border-cyan-400/80 shadow-lg text-center h-fit w-full"
                       >
-                        {/* MARCO Y TARJETA CUADRADA DE IMAGEN CON INDICADOR EN VUELO INTAGIBLE */}
                         <div className="relative w-full aspect-square rounded-lg border border-cyan-800/80 bg-black overflow-hidden mb-1 group-hover:scale-[1.02] transition-transform">
-                          {/* Borde discontinuo giratorio para naves en vuelo */}
                           {char.is_in_flight && (
                             <div className="absolute inset-0 border-2 border-dashed border-red-500 animate-[spin_5s_linear_infinite] pointer-events-none z-20 rounded-lg" />
                           )}
@@ -663,20 +376,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                             referrerPolicy="no-referrer"
                           />
 
-                          {/* Badge "EN VUELO" */}
                           {char.is_in_flight && (
                             <div className="absolute top-1 left-1 px-1 py-0.5 rounded bg-red-950/90 border border-red-500 text-red-400 font-mono font-black text-[6.5px] shadow z-30 uppercase tracking-widest animate-pulse">
                               EN VUELO
                             </div>
                           )}
 
-                          {/* Cantidad */}
                           {char.unlocked && (
                             <div className="absolute top-1 right-1 px-1 py-0.5 rounded bg-cyan-950/90 border border-cyan-400 text-cyan-300 font-mono font-black text-[7px] shadow z-30">
                               x{char.quantity || 1}
                             </div>
                           )}
-                          {/* Nivel / Rango */}
                           {char.level > 1 && (
                             <div className="absolute bottom-1 left-1 px-1 py-0.5 rounded bg-black/80 border border-amber-500/60 text-amber-400 font-mono font-black text-[6.5px] z-30">
                               LVL {char.level}
@@ -689,13 +399,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           )}
                         </div>
 
-                        {/* Nombre del Activo */}
                         <div className="w-full truncate text-[9px] text-[#e8f1f5] font-extrabold uppercase mb-0.5 flex items-center justify-center gap-1">
                           <span className="truncate">{char.name}</span>
                           {char.favorite && <span className="text-amber-400 text-[8.5px] shrink-0">★</span>}
                         </div>
 
-                        {/* Etiqueta de Rareza */}
                         <div className="w-full flex items-center justify-center">
                           <span className={`text-[6.5px] font-mono font-black uppercase tracking-wider px-1 py-0.5 rounded border w-full truncate ${
                             char.rarity?.toUpperCase() === 'LEGENDARY' ? 'text-amber-400 border-amber-500/40 bg-amber-500/10' :
@@ -729,23 +437,21 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             >
               <div className="absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.015)_1px,transparent_1px)] bg-[size:18px_18px] pointer-events-none" />
 
-              {/* Encabezado Modal */}
               <div className="flex justify-between items-start border-b border-cyan-950 pb-3 mb-4 relative z-10">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-[7.5px] font-mono text-cyan-400 font-extrabold uppercase bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/40">
                       {selectedChar.category.toUpperCase()} ASSET
                     </span>
-                    <button onClick={(e) => handleToggleFavorite(selectedChar, e)} className="text-amber-400 hover:scale-110 transition-transform font-mono text-[9px] font-bold">
+                    <button onClick={(e) => handleToggleFavorite(selectedChar, e)} className="text-amber-400 hover:scale-110 transition-transform font-mono text-[9px] font-bold cursor-pointer">
                       {selectedChar.favorite ? "★ FAVORITO" : "☆ FAVORITO"}
                     </button>
                   </div>
                   <h3 className="text-md font-black text-white tracking-widest mt-1 uppercase">{selectedChar.name}</h3>
                 </div>
-                <button onClick={() => setSelectedChar(null)} className="w-7 h-7 rounded-full bg-cyan-950 border border-cyan-800 text-cyan-400 hover:text-white font-bold cursor-pointer">✕</button>
+                <button onClick={() => setSelectedChar(null)} className="w-7 h-7 rounded-full bg-cyan-950 border border-cyan-800 text-cyan-400 hover:text-white font-bold cursor-pointer flex items-center justify-center">✕</button>
               </div>
 
-              {/* Aviso si la nave está en vuelo */}
               {selectedChar.is_in_flight && (
                 <div className="p-2 bg-red-950/60 border border-red-500/80 rounded-xl flex items-center justify-between gap-2 text-red-300 text-[8.5px] mb-3 font-mono relative z-10">
                   <div className="flex items-center gap-2">
@@ -757,7 +463,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
               )}
 
-              {/* VISTA DE SELECCIÓN DE FLOTA */}
               {showSubModal === "fleet" ? (
                 <div className="relative z-10 space-y-4">
                   <h4 className="text-[10px] text-cyan-400 font-mono tracking-widest uppercase border-b border-cyan-900/50 pb-2">Seleccionar Flota Operativa</h4>
@@ -776,10 +481,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   )}
                 </div>
               ) : (
-                /* DETALLE COMPLETO Y ESTADÍSTICAS REALES */
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4 relative z-10">
-                  
-                  {/* Tarjeta Visual Cuadrada de Previsualización */}
                   <div className="md:col-span-4 flex flex-col items-center gap-3 bg-black/40 border border-cyan-950 p-3.5 rounded-2xl text-center h-fit">
                     <div className="relative w-24 h-28 aspect-square rounded-xl border-2 border-cyan-400 overflow-hidden shadow-[0_0_20px_rgba(34,211,238,0.25)]">
                       <img src={selectedChar.avatar_url} alt={selectedChar.name} className="w-full h-full object-cover" />
@@ -801,19 +503,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Panel de Atributos y Lore Real */}
                   <div className="md:col-span-8 flex flex-col justify-start gap-2.5 max-h-[340px] overflow-y-auto pr-2 custom-scrollbar">
-                    
-                    {/* Lore / Descripción Real */}
                     <div className="bg-black/50 border border-cyan-950 p-2.5 rounded-xl">
                       <span className="text-[7.5px] font-mono tracking-widest text-cyan-400 font-bold uppercase block mb-1">// DESCRIPCIÓN DEL ACTIVO</span>
                       <p className="text-[9px] font-sans text-zinc-300 leading-relaxed uppercase">{selectedChar.description || "Sin descripción disponible."}</p>
                     </div>
 
-                    {/* STATS CONDICIONALES POR CATEGORÍA */}
                     {matchInventoryCategory(selectedChar.category, 'Spaceships') ? (
                       <>
-                        {/* Naves: Matriz Ofensiva */}
                         <div className="bg-black/40 border border-red-900/40 p-2.5 rounded-xl">
                           <span className="text-[7.5px] text-red-400 font-bold tracking-widest uppercase block mb-1.5 border-b border-red-900/30 pb-1">Matriz Ofensiva</span>
                           <div className="grid grid-cols-2 gap-2 font-mono text-[8.5px]">
@@ -840,7 +537,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           </div>
                         </div>
 
-                        {/* Naves: Blindaje y Cinemática */}
                         <div className="bg-black/40 border border-cyan-900/40 p-2.5 rounded-xl">
                           <span className="text-[7.5px] text-cyan-400 font-bold tracking-widest uppercase block mb-1.5 border-b border-cyan-900/30 pb-1">Blindaje y Cinemática</span>
                           <div className="grid grid-cols-2 gap-2 font-mono text-[8.5px]">
@@ -864,7 +560,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         </div>
                       </>
                     ) : (
-                      /* Demás Categorías */
                       <div className="bg-black/40 border border-amber-900/40 p-2.5 rounded-xl font-mono text-[8.5px]">
                         <span className="text-[7.5px] text-amber-400 font-bold tracking-widest uppercase block mb-1.5 border-b border-amber-900/30 pb-1">Ficha Táctica de Módulo</span>
                         <div className="grid grid-cols-2 gap-2">
@@ -897,12 +592,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         </div>
                       </div>
                     )}
-
                   </div>
                 </div>
               )}
 
-              {/* Botonera de Acciones Tácticas */}
               <div className="border-t border-cyan-950/80 pt-3 mt-3 flex justify-between items-center gap-2.5 relative z-10">
                 <div className="flex gap-2">
                   <button
@@ -949,7 +642,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="w-full max-w-md bg-[#080d14] border-2 border-purple-500/60 rounded-3xl p-5 relative overflow-hidden shadow-[0_0_60px_rgba(168,85,247,0.3)] text-left font-mono"
+              className="w-full max-w-md bg-[#080d14] border-2 border-purple-500/60 rounded-3xl p-5 relative overflow-hidden shadow-[0_0_60px_rgba(168,85,247,0.3)] text-left font-mono text-white"
             >
               <div className="flex justify-between items-center border-b border-purple-900/50 pb-2.5 mb-3">
                 <div className="flex items-center gap-2">
@@ -960,7 +653,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
                 <button
                   onClick={() => setShowSkillsPopup(false)}
-                  className="w-6 h-6 rounded-full bg-purple-950 border border-purple-800 text-purple-300 hover:text-white font-bold cursor-pointer"
+                  className="w-6 h-6 rounded-full bg-purple-950 border border-purple-800 text-purple-300 hover:text-white font-bold cursor-pointer flex items-center justify-center"
                 >
                   ✕
                 </button>
@@ -1034,3 +727,5 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     </div>
   );
 };
+
+export default InventoryView;

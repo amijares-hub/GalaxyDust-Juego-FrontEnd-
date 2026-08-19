@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 
 export const SpaceCompass: React.FC = () => {
   return (
@@ -15,7 +15,7 @@ export const SpaceCompass: React.FC = () => {
         transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
       >
         <defs>
-          <radialGradient id="compassGlow fontMono" cx="50%" cy="50%" r="50%">
+          <radialGradient id="compassGlow" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="#0E1726" stopOpacity="0.8" />
             <stop offset="100%" stopColor="#030712" stopOpacity="0.95" />
           </radialGradient>
@@ -76,7 +76,7 @@ export const SpaceCompass: React.FC = () => {
         <path d="M 100,195 A 95,95 0 0,1 17.75,147.75" fill="none" stroke="#EF4444" strokeWidth="1.5" strokeOpacity="0.3" strokeDasharray="5, 15" />
       </motion.svg>
 
-      {/* Layer 2: Inner Compass Rose (Rotates in reverse for complex 3D parallax) */}
+      {/* Layer 2: Inner Compass Rose */}
       <motion.svg
         viewBox="0 0 200 200"
         className="absolute w-48 h-48 md:w-56 md:h-56 pointer-events-none"
@@ -103,11 +103,9 @@ export const SpaceCompass: React.FC = () => {
         })}
 
         {/* Compass main needles */}
-        {/* Northern Needle (Blueglow) */}
         <polygon points="100,100 92,100 100,32" fill="url(#neonCyan)" filter="url(#glow)" />
         <polygon points="100,100 108,100 100,32" fill="#0891B2" opacity="0.9" />
 
-        {/* Southern Needle (Redglow) */}
         <polygon points="100,100 92,100 100,168" fill="url(#neonRed)" />
         <polygon points="100,100 108,100 100,168" fill="#991B1B" opacity="0.9" />
 
@@ -127,3 +125,5 @@ export const SpaceCompass: React.FC = () => {
     </div>
   );
 };
+
+export default SpaceCompass;

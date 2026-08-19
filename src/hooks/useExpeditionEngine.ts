@@ -1,82 +1,125 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../context/AuthContext';
 
 export interface Expedition {
   id: string;
-  phase: 'traveling' | 'active' | 'returning' | 'finished';
-  target_cluster: string;
-  timeLeft: number; // Expresado en segundos para las barras de progreso de Tailwind
+  fleet_name: string;
+  sector_name: string;
+  galaxy_cluster: string;
+  star_cluster?: string;
+  status: 'LAUNCHED' | 'SUCCESS' | 'FAILED' | 'CLAIMED';
+  timeLeft: number;
+  progress: number;
+  is_adrift?: boolean;
+  estimated_return_time: string;
 }
 
 export function useExpeditionEngine() {
-  const { user } = useAuth();
+  const [userId, setUserId] = useState<string | null>(null);
   const [activeExpeditions, setActiveExpeditions] = useState<Expedition[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Obtener el UUID real de Supabase Auth (UserProfile del AuthContext no expone `id`)
   useEffect(() => {
-    if (!user?.id) return;
-    let isMounted = true;
-    let channel: any;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
-    const loadExpeditions = async () => {
+  const loadExpeditions = useCallback(async () => {
+    if (!userId) return;
+
+    try {
       const { data, error } = await supabase
-        .from('user_expeditions')
+        .from('active_expeditions')
         .select('*')
-        .in('phase', ['traveling', 'active', 'returning']);
+        .eq('user_id', userId)
+        .eq('status', 'LAUNCHED');
 
-      if (error) {
-        console.error("Fallo al escanear radar estelar:", error.message);
-        return;
-      }
+      if (error) throw error;
 
-      if (data && isMounted) {
-        const mapped: Expedition[] = data.map(exp => {
-          const targetDate = exp.phase === 'traveling' ? new Date(exp.arrival_time) : new Date(exp.return_time);
-          const diffSeconds = Math.max(0, Math.floor((targetDate.getTime() - Date.now()) / 1000));
+      if (data) {
+        const mapped: Expedition[] = data.map((exp: any) => {
+          const returnDate = new Date(exp.estimated_return_time || Date.now());
+          const launchDate = new Date(exp.launch_time || Date.now());
+          const now = Date.now();
+
+          const totalSeconds = Math.max(1, Math.floor((returnDate.getTime() - launchDate.getTime()) / 1000));
+          const diffSeconds = Math.max(0, Math.floor((returnDate.getTime() - now) / 1000));
+          const elapsedSeconds = totalSeconds - diffSeconds;
+          const calculatedProgress = Math.min(100, Math.max(0, (elapsedSeconds / totalSeconds) * 100));
+
           return {
             id: exp.id,
-            phase: exp.phase,
-            target_cluster: exp.target_cluster,
-            timeLeft: diffSeconds
+            fleet_name: exp.fleet_name || "Flota Sin Nombre",
+            sector_name: exp.sector_name || "Espacio Profundo",
+            galaxy_cluster: exp.galaxy_cluster || "Cúmulo Desconocido",
+            star_cluster: exp.star_cluster,
+            status: exp.status,
+            timeLeft: diffSeconds,
+            progress: parseFloat(calculatedProgress.toFixed(1)),
+            is_adrift: exp.is_adrift,
+            estimated_return_time: exp.estimated_return_time
           };
         });
+
         setActiveExpeditions(mapped);
-        setLoading(false);
       }
-    };
+    } catch (err: any) {
+      console.error("🚨 Fallo al escanear radar estelar:", err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
 
-    loadExpeditions();
+  useEffect(() => {
+    if (!userId) return;
+    let isMounted = true;
 
-    // 🛰️ Escucha Realtime: Si el Backoffice o la API alteran la fase o inyectan eventos, refrescamos el HUD
-    channel = supabase
-      .channel(`star_radar_changes_${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_expeditions', filter: `user_id=eq.${user.id}` }, () => {
-        loadExpeditions();
-      })
+    if (isMounted) {
+      loadExpeditions();
+    }
+
+    const channel = supabase
+      .channel(`exp_engine_${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'active_expeditions',
+          filter: `user_id=eq.${userId}`
+        },
+        () => {
+          loadExpeditions();
+        }
+      )
       .subscribe();
 
     return () => {
       isMounted = false;
-      if (channel) supabase.removeChannel(channel);
+      supabase.removeChannel(channel);
     };
-  }, [user?.id]);
+  }, [userId, loadExpeditions]);
 
-  // ⏱️ RELOJ DE TICK CONTINUO: Descuenta segundos en el cliente para animar las barras en tiempo real
   useEffect(() => {
     if (activeExpeditions.length === 0) return;
 
     const timer = setInterval(() => {
-      setActiveExpeditions(prev =>
-        prev.map(exp => ({
+      setActiveExpeditions((prev) =>
+        prev.map((exp) => ({
           ...exp,
           timeLeft: Math.max(0, exp.timeLeft - 1)
-        })).filter(exp => exp.timeLeft > 0) // Si llega a 0, el Realtime de Supabase se encargará de re-hidratar la nueva fase
+        }))
       );
     }, 1000);
 
     return () => clearInterval(timer);
   }, [activeExpeditions.length]);
 
-  return { activeExpeditions, loading };
+  return { activeExpeditions, loading, refreshExpeditions: loadExpeditions };
 }

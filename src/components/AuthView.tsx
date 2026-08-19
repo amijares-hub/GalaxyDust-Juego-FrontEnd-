@@ -4,7 +4,7 @@ import { Mail, Lock, AlertCircle, RefreshCw, ShieldCheck, KeyRound } from 'lucid
 import { useAuth } from '../context/AuthContext';
 
 export const AuthView: React.FC = () => {
-  // 🛰️ Acoplamiento total al motor de estados unificado de Sasori
+  // 🛰️ Acoplamiento al motor de autenticación de Sasori / Supabase Auth
   const {
     screen,
     state,
@@ -24,23 +24,32 @@ export const AuthView: React.FC = () => {
 
   const loading = state === 'authenticating' || state === 'registering' || state === 'verifying_2fa';
 
+  const handleTabChange = (tab: 'login' | 'register') => {
+    setActiveTab(tab);
+    setScreen(tab);
+    setLocalError(null);
+  };
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
 
-    if (!email || !password) {
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail || !cleanPassword) {
       setLocalError("Todos los campos son obligatorios.");
       return;
     }
 
     if (activeTab === 'login') {
-      await submitLogin(email, password, true);
+      await submitLogin(cleanEmail, cleanPassword, true);
     } else {
-      if (password.length < 6) {
-        setLocalError("La firma de acceso requiere un mínimo de 6 caracteres.");
+      if (cleanPassword.length < 6) {
+        setLocalError("La clave de seguridad requiere un mínimo de 6 caracteres.");
         return;
       }
-      await submitRegister(email, password);
+      await submitRegister(cleanEmail, cleanPassword);
     }
   };
 
@@ -57,7 +66,7 @@ export const AuthView: React.FC = () => {
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#0C0D0E] flex flex-col justify-center items-center font-sans select-none text-white">
 
-      {/* ─── FONDO ESPACIAL EXCLUSIVO DE INICIO DE SESIÓN ─── */}
+      {/* ─── FONDO ESPACIAL ─── */}
       <div
         className="absolute inset-0 bg-cover bg-center opacity-40 pointer-events-none z-0 transition-opacity duration-700"
         style={{
@@ -65,7 +74,6 @@ export const AuthView: React.FC = () => {
         }}
       />
 
-      {/* Capa de destello y sombras de ambiente */}
       <div className="absolute top-0 left-0 w-full h-full opacity-30 pointer-events-none z-0">
         <div className="absolute top-[-100px] left-[-100px] w-[500px] h-[500px] bg-[#1C1E22] rounded-full blur-[140px]" />
         <div className="absolute bottom-[-100px] right-[-100px] w-[500px] h-[500px] bg-[#111214] rounded-full blur-[140px]" />
@@ -73,7 +81,7 @@ export const AuthView: React.FC = () => {
 
       <div className="relative z-10 w-full max-w-sm px-6">
 
-        {/* ─── LOGO Y TÍTULO DEL JUEGO ─── */}
+        {/* ─── LOGO Y TÍTULO ─── */}
         <div className="flex flex-col items-center mb-6">
           <img
             src="https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Logo/1.png"
@@ -87,7 +95,7 @@ export const AuthView: React.FC = () => {
 
           <AnimatePresence mode="wait">
 
-            {/* ─── FASE 1: FORMULARIO DE ACCESO (LOGIN / REGISTRO) ─── */}
+            {/* ─── FASE 1: FORMULARIO DE ACCESO ─── */}
             {(screen === 'menu' || screen === 'login' || screen === 'register') && (
               <motion.div
                 key="auth-form"
@@ -101,7 +109,8 @@ export const AuthView: React.FC = () => {
                   <div className="flex-1 text-center">
                     <button
                       type="button"
-                      onClick={() => { setActiveTab('login'); setScreen('login'); }}
+                      disabled={loading}
+                      onClick={() => handleTabChange('login')}
                       className={`w-full pb-2 text-[10px] font-bold uppercase tracking-widest transition-colors cursor-pointer ${activeTab === 'login' ? 'text-cyan-400' : 'text-white/40 hover:text-white/70'}`}
                     >
                       Iniciar Sesión
@@ -110,7 +119,8 @@ export const AuthView: React.FC = () => {
                   <div className="flex-1 text-center">
                     <button
                       type="button"
-                      onClick={() => { setActiveTab('register'); setScreen('register'); }}
+                      disabled={loading}
+                      onClick={() => handleTabChange('register')}
                       className={`w-full pb-2 text-[10px] font-bold uppercase tracking-widest transition-colors cursor-pointer ${activeTab === 'register' ? 'text-cyan-400' : 'text-white/40 hover:text-white/70'}`}
                     >
                       Registro
@@ -130,8 +140,11 @@ export const AuthView: React.FC = () => {
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"><Mail className="w-4 h-4" /></span>
                       <input
-                        type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading}
-                        className="w-full bg-[#1A1C20] border border-white/5 rounded-xl pl-10 pr-3 py-3 text-sm text-white placeholder-white/20 focus:border-cyan-500/50 focus:bg-[#1C1E22] outline-none transition-all"
+                        type="email" 
+                        value={email} 
+                        onChange={(e) => setEmail(e.target.value)} 
+                        disabled={loading}
+                        className="w-full bg-[#1A1C20] border border-white/5 rounded-xl pl-10 pr-3 py-3 text-sm text-white placeholder-white/20 focus:border-cyan-500/50 focus:bg-[#1C1E22] outline-none transition-all disabled:opacity-50"
                         placeholder="comandante@galaxydust.io"
                       />
                     </div>
@@ -142,14 +155,16 @@ export const AuthView: React.FC = () => {
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"><Lock className="w-4 h-4" /></span>
                       <input
-                        type="password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading}
-                        className="w-full bg-[#1A1C20] border border-white/5 rounded-xl pl-10 pr-3 py-3 text-sm text-white placeholder-white/20 focus:border-cyan-500/50 focus:bg-[#1C1E22] outline-none transition-all"
+                        type="password" 
+                        value={password} 
+                        onChange={(e) => setPassword(e.target.value)} 
+                        disabled={loading}
+                        className="w-full bg-[#1A1C20] border border-white/5 rounded-xl pl-10 pr-3 py-3 text-sm text-white placeholder-white/20 focus:border-cyan-500/50 focus:bg-[#1C1E22] outline-none transition-all disabled:opacity-50"
                         placeholder="••••••••"
                       />
                     </div>
                   </div>
 
-                  {/* Renderizado de Alertas de Error / Éxito */}
                   {(localError || errorMessage) && (
                     <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 p-2.5 rounded-lg mt-1">
                       <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
@@ -165,7 +180,8 @@ export const AuthView: React.FC = () => {
                   )}
 
                   <button
-                    type="submit" disabled={loading}
+                    type="submit" 
+                    disabled={loading}
                     className="mt-2 w-full py-3.5 bg-cyan-600 hover:bg-cyan-500 text-white font-black uppercase tracking-[0.2em] text-[10px] rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all active:scale-[0.98] disabled:opacity-70 flex items-center justify-center cursor-pointer"
                   >
                     {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : (activeTab === 'login' ? 'INICIAR SESIÓN' : 'REGISTRAR FIRMA')}
@@ -174,7 +190,7 @@ export const AuthView: React.FC = () => {
               </motion.div>
             )}
 
-            {/* ─── FASE 2: VERIFICACIÓN SEGUNDO FACTOR (MFA/2FA) ─── */}
+            {/* ─── FASE 2: VERIFICACIÓN MULTI-FACTOR (MFA) ─── */}
             {screen === 'two_factor' && (
               <motion.div
                 key="mfa-form"
@@ -192,8 +208,12 @@ export const AuthView: React.FC = () => {
 
                 <form onSubmit={handleOtpSubmit} className="flex flex-col gap-4">
                   <input
-                    type="text" maxLength={6} value={otpCode} onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))} disabled={loading}
-                    className="w-full bg-[#1A1C20] border border-white/10 rounded-xl py-3.5 text-center text-xl font-mono font-black tracking-[0.5em] text-cyan-400 focus:border-cyan-500 outline-none transition-all"
+                    type="text" 
+                    maxLength={6} 
+                    value={otpCode} 
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))} 
+                    disabled={loading}
+                    className="w-full bg-[#1A1C20] border border-white/10 rounded-xl py-3.5 text-center text-xl font-mono font-black tracking-[0.5em] text-cyan-400 focus:border-cyan-500 outline-none transition-all disabled:opacity-50"
                     placeholder="000000"
                   />
 
@@ -206,14 +226,16 @@ export const AuthView: React.FC = () => {
 
                   <div className="flex gap-2.5 mt-2">
                     <button
-                      type="button" onClick={() => setScreen('login')}
+                      type="button" 
+                      onClick={() => setScreen('login')}
                       className="flex-1 py-3 border border-white/10 text-neutral-400 hover:text-white text-[9px] font-mono font-bold tracking-widest uppercase rounded-xl transition-all cursor-pointer"
                     >
                       ABORTAR
                     </button>
                     <button
-                      type="submit" disabled={loading}
-                      className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white text-[9px] font-bold tracking-widest uppercase rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all cursor-pointer"
+                      type="submit" 
+                      disabled={loading}
+                      className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white text-[9px] font-bold tracking-widest uppercase rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all cursor-pointer disabled:opacity-50"
                     >
                       {loading ? <RefreshCw className="w-3 h-3 animate-spin mx-auto" /> : "VERIFICAR"}
                     </button>

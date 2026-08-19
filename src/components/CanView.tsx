@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Cpu, Zap, ChevronRight, BarChart2,
-  Globe, AlertTriangle, RefreshCw, X, Sparkles, Target, Building, Award, FlaskConical, CheckCircle2
+  Cpu, BarChart2, Globe, AlertTriangle, RefreshCw, X, Sparkles, Target, Building, Award, FlaskConical, ChevronRight
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAudioEngine } from '../hooks/useAudioEngine';
 
 interface CanViewProps {
   triggerNotification?: (text: string, e?: any) => void;
 }
 
-// Interfaz para Skills reales
 interface ActiveSkillItem {
   id: string;
   source: 'CAN' | 'STRUCTURE' | 'TECH' | 'BADGE';
@@ -23,26 +22,35 @@ interface ActiveSkillItem {
 
 interface DiscoveredStar {
   id: string;
+  star_id: string;
   star_name: string;
   cluster: string;
+  discovery_order: number;
+  reward_details?: {
+    gd_coin?: number;
+    dark_matter?: number;
+    title?: string;
+  };
   discovered_at: string;
 }
 
 export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
+  const { playSfx } = useAudioEngine();
+
   const [canLevel, setCanLevel] = useState<number>(1);
   const [galacticPower, setGalacticPower] = useState<number>(0);
   const [isUpgrading, setIsUpgrading] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [, setLoading] = useState<boolean>(true);
 
   // Modales
   const [showAmiModal, setShowAmiModal] = useState<boolean>(false);
   const [showStatsModal, setShowStatsModal] = useState<boolean>(false);
   const [showSkillsModal, setShowSkillsModal] = useState<boolean>(false);
 
-  // Vuelos activos y restricciones
+  // Vuelos activos
   const [activeFlightsCount, setActiveFlightsCount] = useState<number>(0);
 
-  // Conteo de Assets Activados Reales
+  // Conteo de activos
   const [assetCounts, setAssetCounts] = useState({
     structures: 0,
     tech: 0,
@@ -51,13 +59,13 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
     maxBadgeSlots: 5
   });
 
-  // Habilidades Activas Jerarquizadas Reales
+  // Habilidades activas reales
   const [activeSkills, setActiveSkills] = useState<ActiveSkillItem[]>([]);
 
-  // Historial Cartográfico A.M.I.
+  // Historial cartográfico A.M.I.
   const [discoveredStars, setDiscoveredStars] = useState<DiscoveredStar[]>([]);
 
-  // Estadísticas de Producción Estimada Diaria Reales
+  // Producción real calculada
   const [dailyProduction, setDailyProduction] = useState({
     metal: 0,
     crystal: 0,
@@ -67,7 +75,6 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
     defenseShieldMod: 0
   });
 
-  // Iconos por categoría de Skill
   const getSkillIcon = (source: string) => {
     switch (source) {
       case 'CAN': return <Cpu className="w-4 h-4 text-cyan-400" />;
@@ -78,53 +85,56 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
     }
   };
 
-  // Cálculo de producción basado en estructuras del usuario en Supabase
+  // 🛡️ CÁLCULO ESTRICTO DE PRODUCCIÓN REAL (SIN VALORES MOCK)
   const calculateRealProduction = async (user_id: string, current_can_level: number) => {
-    const { data: userStructures } = await supabase
-      .from('user_structures')
-      .select(`
-        id, 
-        current_level,
-        seed_structures (
-          structure_name,
-          structure_type,
-          power_score_base
-        )
-      `)
-      .eq('user_id', user_id);
+    try {
+      const { data: userStructures } = await supabase
+        .from('user_structures')
+        .select(`
+          id, 
+          current_level,
+          seed_structures (
+            structure_name,
+            structure_type,
+            power_score_base
+          )
+        `)
+        .eq('user_id', user_id);
 
-    let baseMetal = 0;
-    let baseCrystal = 0;
-    let baseDeuterium = 0;
-    let baseDM = 0;
+      let baseMetal = 0;
+      let baseCrystal = 0;
+      let baseDeuterium = 0;
+      let baseDM = 0;
 
-    const canMod = 1 + (current_can_level * 0.05);
+      const canMod = 1 + (current_can_level * 0.05);
 
-    if (userStructures && userStructures.length > 0) {
-      userStructures.forEach((item: any) => {
-        if (!item.seed_structures) return;
-        const type = item.seed_structures.structure_type || '';
-        const scoreBase = item.seed_structures.power_score_base || 1000;
-        const dailyProd = (item.current_level || 1) * (scoreBase * 2.5);
+      if (userStructures && userStructures.length > 0) {
+        userStructures.forEach((item: any) => {
+          if (!item.seed_structures) return;
+          const type = (item.seed_structures.structure_type || '').toLowerCase();
+          const scoreBase = item.seed_structures.power_score_base || 0;
+          const dailyProd = (item.current_level || 1) * (scoreBase * 2.5);
 
-        if (type.includes('metal')) baseMetal += dailyProd;
-        else if (type.includes('cristal')) baseCrystal += dailyProd;
-        else if (type.includes('deuterio')) baseDeuterium += dailyProd;
-        else if (type.includes('mo')) baseDM += ((item.current_level || 1) * 5);
+          if (type.includes('metal')) baseMetal += dailyProd;
+          else if (type.includes('cristal') || type.includes('crystal')) baseCrystal += dailyProd;
+          else if (type.includes('deuterio') || type.includes('deuterium')) baseDeuterium += dailyProd;
+          else if (type.includes('mo') || type.includes('dark_matter')) baseDM += ((item.current_level || 1) * 5);
+        });
+      }
+
+      setDailyProduction({
+        metal: Math.round(baseMetal * canMod),
+        crystal: Math.round(baseCrystal * canMod),
+        deuterium: Math.round(baseDeuterium * canMod),
+        darkMatter: Math.round(baseDM * canMod),
+        fleetPowerMod: 10 + current_can_level * 2,
+        defenseShieldMod: 8 + current_can_level * 2
       });
+    } catch (err) {
+      console.error("Error al calcular producción diaria real:", err);
     }
-
-    setDailyProduction({
-      metal: Math.round((baseMetal || 24000) * canMod),
-      crystal: Math.round((baseCrystal || 12000) * canMod),
-      deuterium: Math.round((baseDeuterium || 4800) * canMod),
-      darkMatter: Math.round((baseDM || 150) * canMod),
-      fleetPowerMod: 10 + current_can_level * 2,
-      defenseShieldMod: 8 + current_can_level * 2
-    });
   };
 
-  // Carga de datos reales desde Supabase
   const fetchCanData = async () => {
     setLoading(true);
     try {
@@ -153,7 +163,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
 
       setActiveFlightsCount(flights || 0);
 
-      // 3. Conteo de Assets
+      // 3. Conteo de activos real
       const { count: strCount } = await supabase.from('user_structures').select('id', { count: 'exact', head: true }).eq('user_id', user.id);
       const { count: techCount } = await supabase.from('user_technologies').select('id', { count: 'exact', head: true }).eq('user_id', user.id);
       const { count: bdgCount } = await supabase.from('user_badges_unlocked').select('id', { count: 'exact', head: true }).eq('user_id', user.id);
@@ -171,7 +181,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
         maxBadgeSlots: 5
       });
 
-      // 4. Estrellas Cartografiadas A.M.I.
+      // 4. Obtener sistemas cartografiados reales de A.M.I. con orden global
       const { data: starsData } = await supabase
         .from('user_discovered_stars')
         .select('*')
@@ -181,16 +191,21 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
       if (starsData && starsData.length > 0) {
         setDiscoveredStars(starsData.map((s: any) => ({
           id: s.id,
-          star_name: s.star_name || s.name || 'SECTOR ANÓNIMO',
-          cluster: s.galaxy_cluster || s.cluster || 'ALPHA',
+          star_id: s.star_id || s.id,
+          star_name: s.star_name || 'SISTEMA SOLAR',
+          cluster: s.cluster || 'INARA',
+          discovery_order: Number(s.discovery_order || 1),
+          reward_details: s.reward_details || {},
           discovered_at: new Date(s.created_at || Date.now()).toLocaleDateString()
         })));
+      } else {
+        setDiscoveredStars([]);
       }
 
-      // 5. Cargar Skills Reales de Assets Equipados
+      // 5. Cargar habilidades reales
       const skillsToParse: ActiveSkillItem[] = [
-        { id: 'sk-can-1', source: 'CAN', assetName: 'C.A.N. MATRIX LEVEL', effectTitle: 'Velocidad Procesamiento', effectDescription: `+${canLevel * 5}% Velocidad de Procesamiento de Nodos` },
-        { id: 'sk-can-2', source: 'CAN', assetName: 'C.A.N. MATRIX LEVEL', effectTitle: 'Slots Tácticos Adicionales', effectDescription: `+${canLevel * 2} Espacios de Almacenamiento Táctico` }
+        { id: 'sk-can-1', source: 'CAN', assetName: 'C.A.N. MATRIX LEVEL', effectTitle: 'Producción Global', effectDescription: `+${(profile?.level || 1) * 5}% Producción Diaria de Recursos` },
+        { id: 'sk-can-2', source: 'CAN', assetName: 'C.A.N. MATRIX LEVEL', effectTitle: 'Slots Tácticos Adicionales', effectDescription: `+${(profile?.level || 1) * 2} Espacios de Almacenamiento Táctico` }
       ];
 
       const { data: structuresWithSkills } = await supabase
@@ -205,7 +220,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
           
           skillsArray.forEach((sk: any, idx: number) => {
             skillsToParse.push({
-              id: `sk-str-${item.structure_id || 'id'}-${idx}`,
+              id: `sk-str-${item.id || idx}-${idx}`,
               source: 'STRUCTURE',
               assetName: item.seed_structures.structure_name || 'ESTRUCTURA TÁCTICA',
               assetImageUrl: item.seed_structures.image_url,
@@ -230,7 +245,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
           
           skillsArray.forEach((sk: any, idx: number) => {
             skillsToParse.push({
-              id: `sk-tech-${item.technology_id || 'id'}-${idx}`,
+              id: `sk-tech-${item.id || idx}-${idx}`,
               source: 'TECH',
               assetName: item.seed_technologies.technology_name || 'TECNOLOGÍA AVANZADA',
               assetImageUrl: item.seed_technologies.image_url,
@@ -256,31 +271,35 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
   }, []);
 
   const handleUpgradeCan = async () => {
+    if (isUpgrading) return;
     setIsUpgrading(true);
-    const newLevel = canLevel + 1;
+    playSfx(880);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from('user_profiles')
-          .update({ level: newLevel, updated_at: new Date().toISOString() })
-          .eq('id', user.id);
-      }
+      const { data, error } = await supabase.rpc('upgrade_can_node_secure');
 
-      setCanLevel(newLevel);
+      if (error) throw error;
+
+      playSfx(1200);
+      setCanLevel(data.new_level);
+      setGalacticPower(data.new_power);
 
       if (triggerNotification) {
-        triggerNotification(`⚡ NODO C.A.N. ELEVADO A NIVEL ${newLevel} CON ÉXITO`);
+        triggerNotification(`⚡ NODO C.A.N. ELEVADO A NIVEL ${data.new_level} CON ÉXITO`);
       }
-    } catch (err) {
+
+      fetchCanData();
+    } catch (err: any) {
       console.error("Error al subir nivel C.A.N.:", err);
+      playSfx(300);
+      if (triggerNotification) {
+        triggerNotification(`⛔ ERROR AL ELEVAR NODO: ${err.message}`);
+      }
     } finally {
       setIsUpgrading(false);
     }
   };
 
-  // Iconos interactivos con Tooltips para la grilla
   const skillGridItems = useMemo(() => {
     return activeSkills.map((sk) => (
       <div key={sk.id} className="relative group cursor-pointer aspect-square rounded-lg border border-cyan-900/60 bg-[#050910] hover:border-cyan-400 transition-all p-1 flex items-center justify-center overflow-hidden">
@@ -297,7 +316,6 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
           getSkillIcon(sk.source)
         )}
 
-        {/* TOOLTIP EMERGENTE */}
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-[#0a0f13] border border-cyan-500/70 rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none font-mono text-[8px] text-left">
           <div className="flex justify-between items-center border-b border-cyan-950 pb-0.5 mb-1">
             <span className="font-black text-cyan-400 uppercase truncate">{sk.assetName}</span>
@@ -326,13 +344,13 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
         </div>
       </div>
 
-      {/* BANNER DE RESTRICCION DE VUELO */}
+      {/* BANNER DE RESTRICCIÓN DE VUELO */}
       {activeFlightsCount > 0 && (
         <div className="p-2.5 bg-red-950/40 border border-red-500/60 rounded-xl flex items-center justify-between gap-2 text-red-300 text-[8px] sm:text-[9px]">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-red-400 animate-pulse shrink-0" />
             <span className="font-bold uppercase tracking-wider">
-              RESTRICCION ACTIVA: {activeFlightsCount} FLOTA(S) EN VUELO. SE PROHÍBE ALTERAR O REEMPLAZAR TECNOLOGÍAS Y ESTRUCTURAS.
+              RESTRICCIÓN ACTIVA: {activeFlightsCount} FLOTA(S) EN VUELO. SE PROHÍBE ALTERAR O REEMPLAZAR TECNOLOGÍAS Y ESTRUCTURAS.
             </span>
           </div>
           <span className="text-[7.5px] bg-red-900/80 px-2 py-0.5 rounded font-black border border-red-600 uppercase shrink-0">
@@ -341,10 +359,10 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
         </div>
       )}
 
-      {/* ─── ESTRUCTURA PRINCIPAL EN 3 COLUMNAS ─── */}
+      {/* ESTRUCTURA PRINCIPAL */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch min-h-[340px]">
         
-        {/* ─── COLUMNA 1 (IZQUIERDA - 3 cols): NIVEL CAN & GALACTIC POWER ─── */}
+        {/* COLUMNA 1: NIVEL CAN & GALACTIC POWER */}
         <div className="lg:col-span-3 bg-black/60 border border-cyan-950 rounded-xl p-4 flex flex-col items-center justify-between text-center relative">
           <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">
             NIVEL DE C.A.N.
@@ -371,10 +389,9 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
           </button>
         </div>
 
-        {/* ─── COLUMNA 2 (CENTRO - 5 cols): MITAD ARRIBA ASSETS ACTIVADOS, MITAD ABAJO ACTIVE SKILLS ─── */}
+        {/* COLUMNA 2: ASSETS ACTIVADOS & ACTIVE SKILLS */}
         <div className="lg:col-span-5 flex flex-col gap-3.5">
           
-          {/* Mitad Superior: ASSETS ACTIVADOS COMPACTO (SIN ÍCONOS) */}
           <div className="bg-black/60 border border-cyan-950 rounded-xl p-3 flex flex-col justify-between">
             <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider block text-center mb-2 border-b border-cyan-950 pb-1">
               ASSETS ACTIVADOS
@@ -395,7 +412,6 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
             </div>
           </div>
 
-          {/* Mitad Inferior: DASHBOARD DE ACTIVE SKILLS */}
           <div className="flex-1 bg-black/60 border border-cyan-950 rounded-xl p-3 flex flex-col justify-between min-h-[160px]">
             <div className="flex justify-between items-center mb-2 pb-1 border-b border-cyan-950">
               <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">
@@ -406,14 +422,12 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
               </span>
             </div>
 
-            {/* Grilla de Iconos con Tooltips */}
             <div className="grid grid-cols-5 sm:grid-cols-6 gap-2 flex-1 overflow-y-auto max-h-[140px] pr-1 custom-scrollbar">
               {skillGridItems}
             </div>
 
-            {/* Botón Pop-up Detalles Completos */}
             <button
-              onClick={() => setShowSkillsModal(true)}
+              onClick={() => { playSfx(660); setShowSkillsModal(true); }}
               className="mt-2.5 w-full py-1.5 bg-gradient-to-r from-cyan-950 to-cyan-900 hover:from-cyan-900 border border-cyan-500/60 text-cyan-200 text-[8px] font-black uppercase tracking-widest rounded-lg cursor-pointer transition-colors shadow-inner flex items-center justify-center gap-1.5"
             >
               VER DETALLES COMPLETOS DE SKILLS
@@ -422,79 +436,124 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
 
         </div>
 
-        {/* ─── COLUMNA 3 (DERECHA - 4 cols): BOTONES LLAMATIVOS A.M.I. & STATS Y PRODUCCIÓN ─── */}
+        {/* COLUMNA 3: A.M.I. & STATS */}
         <div className="lg:col-span-4 flex flex-col justify-between gap-3.5">
           
-          {/* Card / Botón Táctico A.M.I. */}
+          {/* CAJA A.M.I. */}
           <div
-            onClick={() => setShowAmiModal(true)}
+            onClick={() => { playSfx(660); setShowAmiModal(true); }}
             className="flex-1 bg-black/80 border-2 border-cyan-500 hover:border-cyan-300 p-4 rounded-xl flex flex-col items-center justify-center text-center gap-1.5 cursor-pointer transition-all shadow-[0_0_15px_rgba(6,182,212,0.25)] hover:scale-[1.02] active:scale-95 group"
           >
             <Globe className="w-7 h-7 text-cyan-400 animate-pulse group-hover:scale-110 transition-transform" />
-            <div className="text-[11px] font-black text-white uppercase tracking-wider">A.M.I. CARTOGRAFÍA SIDERAL</div>
+            <div className="text-[13px] font-black text-white uppercase tracking-widest">A.M.I.</div>
             <div className="text-sm font-bold text-cyan-300 mt-1">
               {assetCounts.totalDiscoveredStars.toLocaleString()} <span className="text-[8px] text-cyan-500 uppercase">ESTRELLAS MAPEADAS</span>
             </div>
           </div>
 
-          {/* Card / Botón Táctico Stats & Producción */}
+          {/* CAJA STATS & PRODUCCIÓN DIARIA */}
           <div
-            onClick={() => setShowStatsModal(true)}
+            onClick={() => { playSfx(660); setShowStatsModal(true); }}
             className="flex-1 bg-black/80 border-2 border-purple-500 hover:border-purple-300 p-4 rounded-xl flex flex-col items-center justify-center text-center gap-1.5 cursor-pointer transition-all shadow-[0_0_15px_rgba(168,85,247,0.25)] hover:scale-[1.02] active:scale-95 group"
           >
             <BarChart2 className="w-7 h-7 text-purple-400 animate-pulse group-hover:scale-110 transition-transform" />
             <div className="text-[11px] font-black text-white uppercase tracking-wider">STATS & PRODUCCIÓN DIARIA</div>
-            <div className="text-xs font-bold text-purple-300 mt-1 flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-[8.5px] uppercase">MATRIZ DE CÁLCULO ESTIMADA</span>
-            </div>
           </div>
 
         </div>
 
       </div>
 
-      {/* ─── MODAL 1: A.M.I. CARTOGRAFÍA SIDERAL ─── */}
+      {/* MODAL 1: A.M.I. (TARJETAS DINÁMICAS DESDE BD) */}
       {showAmiModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 font-mono text-white">
-          <div className="w-full max-w-2xl bg-[#080b0e] border border-cyan-500/50 rounded-2xl p-5 text-left space-y-4 shadow-2xl">
+          <div className="w-full max-w-3xl bg-[#080b0e] border border-cyan-500/50 rounded-2xl p-5 text-left space-y-4 shadow-2xl">
             <div className="flex justify-between items-center border-b border-cyan-950 pb-3">
               <div className="flex items-center gap-2">
                 <Globe className="w-5 h-5 text-cyan-400 animate-pulse" />
                 <h3 className="text-xs font-black text-white uppercase tracking-widest">
-                  A.M.I. (ASTRAL MAPPING INSTITUTE) - REGISTRO CARTOGRÁFICO
+                  A.M.I. - CATÁLOGO CARTOGRÁFICO DE SISTEMAS SOLARES
                 </h3>
               </div>
-              <button onClick={() => setShowAmiModal(false)} className="p-1 text-zinc-400 hover:text-white cursor-pointer">
+              <button onClick={() => { playSfx(440); setShowAmiModal(false); }} className="p-1 text-zinc-400 hover:text-white cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <p className="text-[8.5px] text-zinc-400 uppercase">
-              Historial de exploración estelar real y catálogo de estrellas mapeadas por la flota del comando.
+              Catálogo oficial de Sistemas Solares (SS) mapeados. Muestra la posición histórica global de descubrimiento y las recompensas otorgadas.
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[360px] overflow-y-auto custom-scrollbar pr-1">
               {discoveredStars.length === 0 ? (
-                <div className="col-span-2 text-center text-zinc-600 text-[10px] py-10 uppercase font-bold bg-black/40 rounded-xl border border-cyan-950">SIN ESTRELLAS MAPEADAS EN ESTE SECTOR</div>
+                <div className="col-span-full text-center text-zinc-600 text-[10px] py-12 uppercase font-bold bg-black/40 rounded-xl border border-cyan-950">
+                  SIN SISTEMAS SOLARES MAPEADOS EN EL REGISTRO
+                </div>
               ) : (
-                discoveredStars.map((star) => (
-                  <div key={star.id} className="p-3 bg-black/60 border border-cyan-950 rounded-xl flex items-center justify-between text-[8.5px]">
-                    <div className="flex flex-col text-left">
-                      <span className="font-bold text-white uppercase">{star.star_name}</span>
-                      <span className="text-[7.5px] text-cyan-400 uppercase">CLÚSTER: {star.cluster}</span>
+                discoveredStars.map((star) => {
+                  const rank = star.discovery_order;
+                  const reward = star.reward_details || {};
+                  
+                  const coinReward = Number(reward.gd_coin || 0);
+                  const dynamicTitle = reward.title || `REGISTRO NATIVO (${rank}º+)`;
+
+                  let badgeColor = "bg-cyan-950/80 text-zinc-400 border-cyan-900";
+                  let badgeIcon = "📡";
+
+                  if (rank === 1) {
+                    badgeColor = "bg-amber-500/20 text-amber-300 border-amber-500/80 shadow-[0_0_10px_rgba(245,158,11,0.2)]";
+                    badgeIcon = "🥇";
+                  } else if (rank === 2) {
+                    badgeColor = "bg-slate-300/20 text-slate-200 border-slate-300/80";
+                    badgeIcon = "🥈";
+                  } else if (rank === 3) {
+                    badgeColor = "bg-amber-800/20 text-amber-500 border-amber-700/80";
+                    badgeIcon = "🥉";
+                  }
+
+                  return (
+                    <div 
+                      key={star.id} 
+                      className="bg-[#050910] border border-cyan-500/30 rounded-xl p-3 flex flex-col justify-between gap-2.5 shadow-lg relative overflow-hidden"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex flex-col text-left">
+                          <span className="text-[10px] font-black text-white uppercase truncate max-w-[140px]">
+                            {star.star_name}
+                          </span>
+                          <span className="text-[7.5px] text-cyan-400 font-bold uppercase">
+                            CLÚSTER: {star.cluster}
+                          </span>
+                        </div>
+                        <span className="text-[7px] text-zinc-500 font-mono">
+                          {star.discovered_at}
+                        </span>
+                      </div>
+
+                      <div className={`p-2 rounded-lg border flex items-center justify-between text-[8px] font-bold ${badgeColor}`}>
+                        <span className="flex items-center gap-1 uppercase truncate max-w-[180px]">
+                          <span>{badgeIcon}</span> {dynamicTitle}
+                        </span>
+                      </div>
+
+                      <div className="bg-black/60 p-2 rounded-lg border border-cyan-950 text-[7.5px] font-mono flex justify-between items-center">
+                        <span className="text-zinc-400 uppercase">BOTÍN REGISTRADO:</span>
+                        {coinReward > 0 ? (
+                          <span className="text-amber-400 font-bold">
+                            +{coinReward.toLocaleString()} GD
+                          </span>
+                        ) : (
+                          <span className="text-zinc-600 uppercase font-bold">SIN PREMIO EXTRA</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-emerald-400 font-bold text-[7.5px] block">MAPEADO</span>
-                      <span className="text-[7px] text-zinc-500">{star.discovered_at}</span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
             <div className="pt-2 border-t border-cyan-950 flex justify-end">
-              <button onClick={() => setShowAmiModal(false)} className="px-4 py-2 bg-black border border-zinc-800 text-zinc-300 hover:text-white text-[9px] font-bold uppercase rounded-lg cursor-pointer">
+              <button onClick={() => { playSfx(440); setShowAmiModal(false); }} className="px-4 py-2 bg-black border border-zinc-800 text-zinc-300 hover:text-white text-[9px] font-bold uppercase rounded-lg cursor-pointer">
                 CERRAR
               </button>
             </div>
@@ -502,7 +561,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
         </div>
       )}
 
-      {/* ─── MODAL 2: ESTADÍSTICAS Y PRODUCCIÓN ESTIMADA DIARIA ─── */}
+      {/* MODAL 2: ESTADÍSTICAS Y PRODUCCIÓN DIARIA REAL */}
       {showStatsModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 font-mono text-white">
           <div className="w-full max-w-lg bg-[#080b0e] border border-purple-500/50 rounded-2xl p-5 text-left space-y-4 shadow-2xl">
@@ -510,17 +569,17 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
               <div className="flex items-center gap-2">
                 <BarChart2 className="w-5 h-5 text-purple-400 animate-pulse" />
                 <h3 className="text-xs font-black text-white uppercase tracking-widest">
-                  ESTADÍSTICAS Y PRODUCCIÓN ESTIMADA DIARIA
+                  ESTADÍSTICAS Y PRODUCCIÓN DIARIA
                 </h3>
               </div>
-              <button onClick={() => setShowStatsModal(false)} className="p-1 text-zinc-400 hover:text-white cursor-pointer">
+              <button onClick={() => { playSfx(440); setShowStatsModal(false); }} className="p-1 text-zinc-400 hover:text-white cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="space-y-3 text-[9px]">
               <span className="text-cyan-400 font-bold uppercase block border-b border-purple-950 pb-1">
-                PRODUCCIÓN ESTIMADA DIARIA (24 HORAS)
+                PRODUCCIÓN REAL CALCULADA (24 HORAS)
               </span>
 
               <div className="grid grid-cols-2 gap-2 font-mono">
@@ -559,7 +618,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
             </div>
 
             <div className="pt-2 border-t border-purple-950 flex justify-end">
-              <button onClick={() => setShowStatsModal(false)} className="px-4 py-2 bg-black border border-zinc-800 text-zinc-300 hover:text-white text-[9px] font-bold uppercase rounded-lg cursor-pointer">
+              <button onClick={() => { playSfx(440); setShowStatsModal(false); }} className="px-4 py-2 bg-black border border-zinc-800 text-zinc-300 hover:text-white text-[9px] font-bold uppercase rounded-lg cursor-pointer">
                 ACEPTAR
               </button>
             </div>
@@ -567,7 +626,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
         </div>
       )}
 
-      {/* ─── MODAL 3: POP-UP DETALLES COMPLETOS DE SKILLS ─── */}
+      {/* MODAL 3: ACTIVE SKILLS DETALLADAS */}
       {showSkillsModal && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[100] flex items-center justify-center p-4 font-mono text-white">
           <div className="w-full max-w-2xl bg-[#080b0e] border border-cyan-500/50 rounded-2xl p-5 text-left space-y-4 shadow-2xl">
@@ -578,7 +637,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
                   LISTA DETALLADA DE ACTIVE SKILLS TÁCTICAS
                 </h3>
               </div>
-              <button onClick={() => setShowSkillsModal(false)} className="p-1 text-zinc-400 hover:text-white cursor-pointer">
+              <button onClick={() => { playSfx(440); setShowSkillsModal(false); }} className="p-1 text-zinc-400 hover:text-white cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -622,7 +681,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
             </div>
 
             <div className="pt-2 border-t border-cyan-950 flex justify-end">
-              <button onClick={() => setShowSkillsModal(false)} className="px-4 py-2 bg-black border border-zinc-800 text-zinc-300 hover:text-white text-[9px] font-bold uppercase rounded-lg cursor-pointer">
+              <button onClick={() => { playSfx(440); setShowSkillsModal(false); }} className="px-4 py-2 bg-black border border-zinc-800 text-zinc-300 hover:text-white text-[9px] font-bold uppercase rounded-lg cursor-pointer">
                 ACEPTAR
               </button>
             </div>

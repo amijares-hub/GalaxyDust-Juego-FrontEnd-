@@ -1,7 +1,7 @@
 import React, { createContext, useContext } from 'react';
 import { useSasoriAuth, UseSasoriAuthReturn } from '../hooks/useSasoriAuth';
 
-// 🛰️ Creación del canal cuántico del contexto global de autenticación
+// 🛰️ Contexto global de autenticación
 const AuthContext = createContext<UseSasoriAuthReturn | undefined>(undefined);
 
 interface AuthProviderProps {
@@ -9,9 +9,9 @@ interface AuthProviderProps {
 }
 
 /**
- * 🌌 PROVEEDOR GLOBAL DE AUTENTICACIÓN (AuthPrvoder)
- * Distribuye de forma homogénea el estado del piloto hacia todas las vistas de la aplicación,
- * centralizando las llamadas en el motor maestro de `useSasoriAuth`.
+ * 🌌 PROVEEDOR GLOBAL DE AUTENTICACIÓN (AuthProvider)
+ * Distribuye homogéneamente el estado de sesión hacia todas las vistas
+ * centralizando las llamadas en el motor de `useSasoriAuth`.
  */
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const auth = useSasoriAuth();
@@ -25,8 +25,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
 /**
  * 🛠️ HOOK CONSUMIDOR GLOBAL: `useAuth`
- * Permite a cualquier componente hijo (vistas de inventario, naves, HUD) acceder 
- * instantáneamente a las credenciales del usuario y funciones de desconexión.
+ * Permite a cualquier componente hijo acceder a las credenciales
+ * del usuario y funciones de autenticación.
  */
 export const useAuth = (): UseSasoriAuthReturn => {
   const context = useContext(AuthContext);

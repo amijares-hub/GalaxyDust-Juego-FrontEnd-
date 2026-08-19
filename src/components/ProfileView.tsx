@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
-  User, ShieldCheck, Zap, Swords, Coins, Database, Compass,
-  MapPin, BarChart2, CheckCircle2, Lock, ArrowLeft, Layers, Box, Sparkles, X, Edit3, Award, Check
+  User, Swords, CheckCircle2, Lock, ArrowLeft, X, Edit3, Award, Check
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { usePlayerProfile } from '../hooks/usePlayerProfile';
+import { useAudioEngine } from '../hooks/useAudioEngine';
 
 interface ProfileViewProps {
   onBack?: () => void;
@@ -11,7 +12,6 @@ interface ProfileViewProps {
   onProfileUpdate?: (updatedFields: { avatar_url?: string; badge_name?: string; badge_image?: string }) => void;
 }
 
-// 🌐 AVATARES OFICIALES SOLICITADOS
 const GAME_AVATARS = [
   "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Avatares%20de%20Comandantes/1.png",
   "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Avatares%20de%20Comandantes/2.png",
@@ -34,7 +34,6 @@ const GAME_AVATARS = [
   "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Avatares%20de%20Comandantes/20.png"
 ];
 
-// 🎖️ INSIGNIAS OFICIALES
 const GAME_BADGES = [
   {
     id: "badge_1",
@@ -49,18 +48,18 @@ const GAME_BADGES = [
 ];
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotification, onProfileUpdate }) => {
-  const [activeTab, setActiveTab] = useState<'STATS' | 'PVP-PVE' | 'ECONOMY' | 'ACHIEVEMENTS'>('STATS');
-  const [loading, setLoading] = useState(true);
+  const { playSfx } = useAudioEngine();
+  const { profile: hookProfile } = usePlayerProfile();
 
-  // Modales
+  const [activeTab, setActiveTab] = useState<'STATS' | 'PVP-PVE' | 'ECONOMY' | 'ACHIEVEMENTS'>('STATS');
+  const [, setLoading] = useState(true);
+
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const [isBadgeModalOpen, setIsBadgeModalOpen] = useState(false);
 
-  // Selección temporal
   const [tempSelectedAvatar, setTempSelectedAvatar] = useState<string | null>(null);
   const [tempSelectedBadge, setTempSelectedBadge] = useState<{ name: string; image: string } | null>(null);
 
-  // Perfil Principal
   const [profileData, setProfileData] = useState<any>({
     username: 'COMANDANTE',
     avatar_url: GAME_AVATARS[0],
@@ -83,77 +82,70 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
   const [assetCounts, setAssetStats] = useState({ ships: 0, tools: 0, fleets: 0, discoveredStars: 0 });
   const [battleLogs, setBattleLogs] = useState<any[]>([]);
 
-  // ─── CARGAR DATOS EN TIEMPO REAL DESDE SUPABASE + AUTH + LOCALSTORAGE ───
+  // Sincronizar datos del perfil reactivamente
+  useEffect(() => {
+    if (!hookProfile) return;
+
+    const savedAvatar = typeof window !== 'undefined'
+      ? localStorage.getItem(`user_avatar_${hookProfile.id}`) || localStorage.getItem('user_avatar')
+      : null;
+    const savedBadgeName = typeof window !== 'undefined'
+      ? localStorage.getItem(`user_badge_name_${hookProfile.id}`)
+      : null;
+    const savedBadgeImage = typeof window !== 'undefined'
+      ? localStorage.getItem(`user_badge_image_${hookProfile.id}`)
+      : null;
+
+    const realAvatar = hookProfile.avatar_url || hookProfile.avatar || savedAvatar || GAME_AVATARS[0];
+    const realBadgeName = hookProfile.badge_name || savedBadgeName || GAME_BADGES[0].name;
+    const realBadgeImage = hookProfile.badge_image || savedBadgeImage || GAME_BADGES[0].image;
+
+    setProfileData({
+      username: hookProfile.username || hookProfile.display_name || 'PILOTO IMPERIAL',
+      avatar_url: realAvatar,
+      level: hookProfile.level || 1,
+      ep: hookProfile.exp_points || hookProfile.ep || 0,
+      max_ep: (hookProfile.level || 1) * 1000,
+      power_score: parseFloat(hookProfile.power_score || 0),
+      metal: parseFloat(hookProfile.metal || 0),
+      crystal: parseFloat(hookProfile.crystal || 0),
+      deuterium: parseFloat(hookProfile.deuterium || 0),
+      dark_matter: parseFloat(hookProfile.dark_matter || 0),
+      gd_coin: parseFloat(hookProfile.gd_coin || 0),
+      quantum_credit: parseFloat(hookProfile.quantum_credit || 0),
+      phantom_coin: parseFloat(hookProfile.phantom_coin || 0),
+      badge_name: realBadgeName,
+      badge_image: realBadgeImage
+    });
+  }, [hookProfile]);
+
+  // Carga de estadísticas complementarias
   const fetchRealUserData = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id;
+      if (!user) { setLoading(false); return; }
+      const userId = user.id;
 
-      // Memoria Local
-      const savedAvatar = userId ? (localStorage.getItem(`user_avatar_${userId}`) || localStorage.getItem('user_avatar')) : null;
-      const savedBadgeName = userId ? localStorage.getItem(`user_badge_name_${userId}`) : null;
-      const savedBadgeImage = userId ? localStorage.getItem(`user_badge_image_${userId}`) : null;
-
-      // Consultar user_profiles
-      let profile = null;
-      if (userId) {
-        const { data: p1 } = await supabase.from('user_profiles').select('*').eq('id', userId).maybeSingle();
-        if (p1) profile = p1;
-        else {
-          const { data: p2 } = await supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle();
-          if (p2) profile = p2;
-        }
-      }
-
-      // Metadata de Auth Supabase
-      const authAvatar = user?.user_metadata?.avatar_url || user?.user_metadata?.avatar;
-      
-      const realAvatar = profile?.avatar_url || profile?.avatar || authAvatar || savedAvatar || GAME_AVATARS[0];
-      const realBadgeName = profile?.badge_name || savedBadgeName || GAME_BADGES[0].name;
-      const realBadgeImage = profile?.badge_image || savedBadgeImage || GAME_BADGES[0].image;
-
-      setProfileData({
-        username: profile?.username || profile?.display_name || profile?.name || user?.email?.split('@')[0] || 'PILOTO IMPERIAL',
-        avatar_url: realAvatar,
-        level: profile?.level || 1,
-        ep: profile?.exp_points || profile?.ep || 0,
-        max_ep: (profile?.level || 1) * 1000,
-        power_score: parseFloat(profile?.power_score || 0),
-        metal: parseFloat(profile?.metal || 0),
-        crystal: parseFloat(profile?.crystal || 0),
-        deuterium: parseFloat(profile?.deuterium || 0),
-        dark_matter: parseFloat(profile?.dark_matter || 0),
-        gd_coin: parseFloat(profile?.gd_coin || 0),
-        quantum_credit: parseFloat(profile?.quantum_credit || 0),
-        phantom_coin: parseFloat(profile?.phantom_coin || 0),
-        badge_name: realBadgeName,
-        badge_image: realBadgeImage
+      const { data: historyRows, count: completedCount } = await supabase.from('expedition_history').select('galaxy_cluster', { count: 'exact' }).eq('user_id', userId);
+      const { count: activeCount } = await supabase.from('active_expeditions').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'LAUNCHED');
+      const clusterMap: Record<string, number> = {};
+      (historyRows || []).forEach((row: any) => {
+        const gc = row.galaxy_cluster || 'PELA';
+        clusterMap[gc] = (clusterMap[gc] || 0) + 1;
       });
+      setExpeditionStats({ completed: completedCount || 0, active: activeCount || 0, historyByCluster: clusterMap });
 
-      if (userId) {
-        const { data: historyRows, count: completedCount } = await supabase.from('expedition_history').select('galaxy_cluster', { count: 'exact' }).eq('user_id', userId);
-        const { count: activeCount } = await supabase.from('active_expeditions').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'LAUNCHED');
-        
-        const clusterMap: Record<string, number> = {};
-        (historyRows || []).forEach((row: any) => {
-          const gc = row.galaxy_cluster || 'PELA';
-          clusterMap[gc] = (clusterMap[gc] || 0) + 1;
-        });
-        setExpeditionStats({ completed: completedCount || 0, active: activeCount || 0, historyByCluster: clusterMap });
+      const { count: shipsCount } = await supabase.from('user_ships').select('id', { count: 'exact', head: true }).eq('user_id', userId);
+      const { count: toolsCount } = await supabase.from('user_tools').select('id', { count: 'exact', head: true }).eq('user_id', userId);
+      const { count: fleetsCount } = await supabase.from('fleets').select('id', { count: 'exact', head: true }).eq('user_id', userId);
+      const { count: starsCount } = await supabase.from('user_discovered_stars').select('id', { count: 'exact', head: true }).eq('discoverer_id', userId);
+      setAssetStats({ ships: shipsCount || 0, tools: toolsCount || 0, fleets: fleetsCount || 0, discoveredStars: starsCount || 0 });
 
-        const { count: shipsCount } = await supabase.from('user_ships').select('id', { count: 'exact', head: true }).eq('user_id', userId);
-        const { count: toolsCount } = await supabase.from('user_tools').select('id', { count: 'exact', head: true }).eq('user_id', userId);
-        const { count: fleetsCount } = await supabase.from('fleets').select('id', { count: 'exact', head: true }).eq('user_id', userId);
-        const { count: starsCount } = await supabase.from('user_discovered_stars').select('id', { count: 'exact', head: true }).eq('discoverer_id', userId);
-        setAssetStats({ ships: shipsCount || 0, tools: toolsCount || 0, fleets: fleetsCount || 0, discoveredStars: starsCount || 0 });
-
-        const { data: logs } = await supabase.from('expedition_logs').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(10);
-        if (logs) setBattleLogs(logs);
-      }
-
+      const { data: logs } = await supabase.from('expedition_logs').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(10);
+      if (logs) setBattleLogs(logs);
     } catch (err) {
-      console.error("Error al cargar perfil:", err);
+      console.error("Error al cargar estadísticas:", err);
     } finally {
       setLoading(false);
     }
@@ -164,11 +156,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
   }, []);
 
   const handleOpenAvatarModal = () => {
+    playSfx(660);
     setTempSelectedAvatar(profileData.avatar_url || GAME_AVATARS[0]);
     setIsAvatarModalOpen(true);
   };
 
   const handleOpenBadgeModal = () => {
+    playSfx(660);
     setTempSelectedBadge({
       name: profileData.badge_name || GAME_BADGES[0].name,
       image: profileData.badge_image || GAME_BADGES[0].image
@@ -176,62 +170,45 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
     setIsBadgeModalOpen(true);
   };
 
-  // ─── GUARDADO MULTI-NIVEL DE AVATAR (SUPABASE AUTH + DB + LOCALSTORAGE + EVENTO) ───
   const handleConfirmAvatar = async () => {
     if (!tempSelectedAvatar) return;
+    playSfx(1200);
 
-    // 1. Estado Local de la Vista
     setProfileData((prev: any) => ({ ...prev, avatar_url: tempSelectedAvatar }));
     setIsAvatarModalOpen(false);
 
-    // 2. Notificar por Callback
     if (onProfileUpdate) {
       onProfileUpdate({ avatar_url: tempSelectedAvatar });
     }
 
-    // 3. Notificar vía Evento Global de Navegador (para Header, Chat, etc.)
     window.dispatchEvent(new CustomEvent('profile_updated', {
       detail: { avatar_url: tempSelectedAvatar }
     }));
 
-    // 4. Guardado en Supabase Auth + LocalStorage + DB
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user?.id) {
-      localStorage.setItem(`user_avatar_${user.id}`, tempSelectedAvatar);
-      localStorage.setItem('user_avatar', tempSelectedAvatar);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        localStorage.setItem(`user_avatar_${user.id}`, tempSelectedAvatar);
+        localStorage.setItem('user_avatar', tempSelectedAvatar);
 
-      // Actualizar User Metadata en Auth Supabase
-      try {
-        await supabase.auth.updateUser({
-          data: { avatar_url: tempSelectedAvatar, avatar: tempSelectedAvatar }
+        const { error } = await supabase.rpc('update_user_profile_customization_secure', {
+          p_avatar_url: tempSelectedAvatar
         });
-      } catch (err) {
-        console.warn("Error actualizando Auth Metadata:", err);
+
+        if (error) throw error;
       }
 
-      // Probar actualización en user_profiles cubriendo todas las combinaciones de columnas e IDs
-      const updatePayloads = [
-        { avatar_url: tempSelectedAvatar, avatar: tempSelectedAvatar },
-        { avatar_url: tempSelectedAvatar },
-        { avatar: tempSelectedAvatar }
-      ];
-
-      for (const payload of updatePayloads) {
-        const { error: err1 } = await supabase.from('user_profiles').update(payload).eq('id', user.id);
-        if (!err1) break;
-        const { error: err2 } = await supabase.from('user_profiles').update(payload).eq('user_id', user.id);
-        if (!err2) break;
+      if (triggerNotification) {
+        triggerNotification("✅ AVATAR GUARDADO CORRECTAMENTE EN LA RED");
       }
-    }
-
-    if (triggerNotification) {
-      triggerNotification("✅ AVATAR GUARDADO CORRECTAMENTE EN LA RED");
+    } catch (err: any) {
+      console.error("Error al actualizar avatar:", err);
     }
   };
 
-  // ─── GUARDADO MULTI-NIVEL DE INSIGNIA ───
   const handleConfirmBadge = async () => {
     if (!tempSelectedBadge) return;
+    playSfx(1200);
 
     setProfileData((prev: any) => ({
       ...prev,
@@ -248,30 +225,25 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
       detail: { badge_name: tempSelectedBadge.name, badge_image: tempSelectedBadge.image }
     }));
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user?.id) {
-      localStorage.setItem(`user_badge_name_${user.id}`, tempSelectedBadge.name);
-      localStorage.setItem(`user_badge_image_${user.id}`, tempSelectedBadge.image);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        localStorage.setItem(`user_badge_name_${user.id}`, tempSelectedBadge.name);
+        localStorage.setItem(`user_badge_image_${user.id}`, tempSelectedBadge.image);
 
-      try {
-        await supabase.auth.updateUser({
-          data: { badge_name: tempSelectedBadge.name, badge_image: tempSelectedBadge.image }
+        const { error } = await supabase.rpc('update_user_profile_customization_secure', {
+          p_badge_name: tempSelectedBadge.name,
+          p_badge_image: tempSelectedBadge.image
         });
-      } catch (e) {}
 
-      const badgePayload = {
-        badge_name: tempSelectedBadge.name,
-        badge_image: tempSelectedBadge.image
-      };
-
-      const { error: err1 } = await supabase.from('user_profiles').update(badgePayload).eq('id', user.id);
-      if (err1) {
-        await supabase.from('user_profiles').update(badgePayload).eq('user_id', user.id);
+        if (error) throw error;
       }
-    }
 
-    if (triggerNotification) {
-      triggerNotification(`✅ INSIGNIA GUARDADA: ${tempSelectedBadge.name}`);
+      if (triggerNotification) {
+        triggerNotification(`✅ INSIGNIA GUARDADA: ${tempSelectedBadge.name}`);
+      }
+    } catch (err: any) {
+      console.error("Error al actualizar insignia:", err);
     }
   };
 
@@ -292,7 +264,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
       <div className="w-full bg-[#05070a] border border-cyan-500/30 p-3 rounded-xl flex justify-between items-center shrink-0">
         <div className="flex items-center gap-3">
           {onBack && (
-            <button onClick={onBack} className="p-1.5 bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 rounded-lg cursor-pointer">
+            <button onClick={() => { playSfx(440); onBack(); }} className="p-1.5 bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 rounded-lg cursor-pointer">
               <ArrowLeft className="w-4 h-4" />
             </button>
           )}
@@ -338,7 +310,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
           </div>
         </div>
 
-        {/* TARJETA DE INSIGNIA + BOTÓN CAMBIAR */}
+        {/* TARJETA DE INSIGNIA */}
         <div 
           className="relative w-full md:w-64 h-16 rounded-xl border border-cyan-500/50 bg-cover bg-center overflow-hidden flex items-center justify-between p-3 shadow-lg shrink-0"
           style={{ backgroundImage: `url('${profileData.badge_image}')` }}
@@ -359,7 +331,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
         {(['STATS', 'PVP-PVE', 'ECONOMY', 'ACHIEVEMENTS'] as const).map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => { playSfx(880); setActiveTab(tab); }}
             className={`py-2 rounded transition-all cursor-pointer border ${
               activeTab === tab
                 ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black shadow-md'
@@ -466,7 +438,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
         </div>
       )}
 
-      {/* ─── MODAL 1: SELECCIÓN DE AVATAR (CON CONFIRMACIÓN) ─── */}
+      {/* MODAL 1: SELECCIÓN DE AVATAR */}
       {isAvatarModalOpen && (
         <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 font-mono">
           <div className="w-full max-w-md bg-[#080b0e] border border-cyan-500/50 rounded-2xl p-5 text-left space-y-4 shadow-2xl">
@@ -487,7 +459,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
                 return (
                   <div
                     key={idx}
-                    onClick={() => setTempSelectedAvatar(url)}
+                    onClick={() => { playSfx(660); setTempSelectedAvatar(url); }}
                     className={`relative w-full aspect-square rounded-xl bg-black border-2 cursor-pointer overflow-hidden transition-all hover:scale-102 ${
                       isSelected 
                         ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.7)]' 
@@ -526,7 +498,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
         </div>
       )}
 
-      {/* ─── MODAL 2: CATÁLOGO DE INSIGNIAS ─── */}
+      {/* MODAL 2: CATÁLOGO DE INSIGNIAS */}
       {isBadgeModalOpen && (
         <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 font-mono">
           <div className="w-full max-w-md bg-[#080b0e] border border-cyan-500/50 rounded-2xl p-5 text-left space-y-4 shadow-2xl">
@@ -547,7 +519,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
                 return (
                   <div
                     key={badge.id}
-                    onClick={() => setTempSelectedBadge({ name: badge.name, image: badge.image })}
+                    onClick={() => { playSfx(660); setTempSelectedBadge({ name: badge.name, image: badge.image }); }}
                     className={`relative h-20 rounded-xl border-2 cursor-pointer overflow-hidden flex items-center justify-between p-4 transition-all hover:scale-101 ${
                       isSelected
                         ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.7)]'

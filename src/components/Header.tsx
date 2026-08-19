@@ -42,31 +42,31 @@ export const Header: React.FC<HeaderProps> = ({
     setOpenDropdown(prev => (prev === type ? null : type));
   };
 
-  // 🌐 TODAS LAS MONEDAS EXISTENTES EN EL JUEGO
+  // 🌐 RESOLUCIÓN FLEXIBLE DE MONEDAS DEL USUARIO (Soporta singular/plural de DB)
   const currencies = [
-    { label: 'GD COIN', value: userProfile?.gd_coin || 0, color: 'text-amber-300' },
-    { label: 'QUANTUM CREDIT', value: userProfile?.quantum_credit || 0, color: 'text-cyan-300' },
-    { label: 'PHANTOM COIN', value: userProfile?.phantom_coin || 0, color: 'text-purple-300' },
-    { label: 'HALLOWEEN COIN', value: userProfile?.halloween_coin || 0, color: 'text-orange-400' },
-    { label: 'XMAS COIN', value: userProfile?.xmas_coin || 0, color: 'text-red-400' },
-    { label: 'VALENTINE COIN', value: userProfile?.valentine_coin || 0, color: 'text-pink-400' }
+    { label: 'GD COIN', value: userProfile?.gd_coins ?? userProfile?.gd_coin ?? 0, color: 'text-amber-300' },
+    { label: 'QUANTUM CREDIT', value: userProfile?.quantum_credits ?? userProfile?.quantum_credit ?? 0, color: 'text-cyan-300' },
+    { label: 'PHANTOM COIN', value: userProfile?.phantom_coins ?? userProfile?.phantom_coin ?? 0, color: 'text-purple-300' },
+    { label: 'HALLOWEEN COIN', value: userProfile?.halloween_coins ?? userProfile?.halloween_coin ?? 0, color: 'text-orange-400' },
+    { label: 'XMAS COIN', value: userProfile?.xmas_coins ?? userProfile?.xmas_coin ?? 0, color: 'text-red-400' },
+    { label: 'VALENTINE COIN', value: userProfile?.valentine_coins ?? userProfile?.valentine_coin ?? 0, color: 'text-pink-400' }
   ];
 
-  // 🌐 TODOS LOS RECURSOS EXISTENTES EN EL JUEGO
+  // 🌐 RESOLUCIÓN FLEXIBLE DE RECURSOS DEL USUARIO
   const resources = [
-    { label: 'METAL', value: userProfile?.metal || 0, color: 'text-cyan-200' },
-    { label: 'CRISTAL', value: userProfile?.crystal || 0, color: 'text-purple-200' },
-    { label: 'DEUTERIO', value: userProfile?.deuterium || 0, color: 'text-blue-300' },
-    { label: 'MATERIA OSCURA', value: userProfile?.dark_matter || 0, color: 'text-indigo-400' },
-    { label: 'OMNIPLATE', value: userProfile?.omniplate || 0, color: 'text-emerald-300' },
-    { label: 'ORICHALTRON', value: userProfile?.orichaltron || 0, color: 'text-yellow-300' },
-    { label: 'LUNAR FIBER', value: userProfile?.lunar_fiber || 0, color: 'text-slate-200' },
-    { label: 'INFINITE CORE', value: userProfile?.infinite_core || 0, color: 'text-teal-300' },
-    { label: 'PRIMAL TOKEN', value: userProfile?.primal_token || 0, color: 'text-amber-400' },
-    { label: 'XENOPLASM', value: userProfile?.xenoplasm || 0, color: 'text-green-400' },
-    { label: 'ORGANIUM', value: userProfile?.organium || 0, color: 'text-lime-300' },
-    { label: 'MANA', value: userProfile?.mana || 0, color: 'text-blue-400' },
-    { label: 'WOOD', value: userProfile?.wood || 0, color: 'text-amber-600' }
+    { label: 'METAL', value: userProfile?.metal ?? 0, color: 'text-cyan-200' },
+    { label: 'CRISTAL', value: userProfile?.crystal ?? 0, color: 'text-purple-200' },
+    { label: 'DEUTERIO', value: userProfile?.deuterium ?? 0, color: 'text-blue-300' },
+    { label: 'MATERIA OSCURA', value: userProfile?.dark_matter ?? 0, color: 'text-indigo-400' },
+    { label: 'OMNIPLATE', value: userProfile?.omniplate ?? 0, color: 'text-emerald-300' },
+    { label: 'ORICHALTRON', value: userProfile?.orichaltron ?? 0, color: 'text-yellow-300' },
+    { label: 'LUNAR FIBER', value: userProfile?.lunar_fiber ?? 0, color: 'text-slate-200' },
+    { label: 'INFINITE CORE', value: userProfile?.infinite_core ?? 0, color: 'text-teal-300' },
+    { label: 'PRIMAL TOKEN', value: userProfile?.primal_token ?? 0, color: 'text-amber-400' },
+    { label: 'XENOPLASM', value: userProfile?.xenoplasm ?? 0, color: 'text-green-400' },
+    { label: 'ORGANIUM', value: userProfile?.organium ?? 0, color: 'text-lime-300' },
+    { label: 'MANA', value: userProfile?.mana ?? 0, color: 'text-blue-400' },
+    { label: 'WOOD', value: userProfile?.wood ?? 0, color: 'text-amber-600' }
   ];
 
   const tabs = [

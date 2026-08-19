@@ -10,16 +10,19 @@ interface HeaderNotificationBellProps {
 export const HeaderNotificationBell: React.FC<HeaderNotificationBellProps> = ({ onClick, isActive }) => {
   const [unreadCount, setUnreadCount] = useState<number>(0);
 
-  // ─── CONSULTAR NOTIFICACIONES NO LEÍDAS ───
+  // ─── CONSULTAR NOTIFICACIONES NO LEÍDAS (ZERO-TRUST) ───
   const fetchUnreadCount = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || '9abc737e-9c3d-4349-a976-59af24f51f4d';
+      if (!user) {
+        setUnreadCount(0);
+        return;
+      }
 
       const { count, error } = await supabase
         .from('user_notifications')
         .select('notification_id', { count: 'exact', head: true })
-        .eq('user_id', userId)
+        .eq('user_id', user.id)
         .eq('is_read', false);
 
       if (!error && count !== null) {
@@ -33,16 +36,31 @@ export const HeaderNotificationBell: React.FC<HeaderNotificationBellProps> = ({ 
   useEffect(() => {
     fetchUnreadCount();
 
-    // Reconsultar periódicamente cada 10 segundos
-    const interval = setInterval(fetchUnreadCount, 10000);
-    return () => clearInterval(interval);
+    // 🛡️ SUSCRIPCIÓN REALTIME Y POLLING DE RESPALDO
+    const interval = setInterval(fetchUnreadCount, 15000);
+
+    const subscription = supabase
+      .channel('user_notifications_bell')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_notifications' },
+        () => {
+          fetchUnreadCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
   return (
     <button
       onClick={() => {
         onClick();
-        fetchUnreadCount(); // Refrescar al hacer clic
+        fetchUnreadCount();
       }}
       className={`relative p-2.5 rounded-xl border backdrop-blur-md transition-all cursor-pointer shadow-lg group ${
         isActive
@@ -66,3 +84,5 @@ export const HeaderNotificationBell: React.FC<HeaderNotificationBellProps> = ({ 
     </button>
   );
 };
+
+export default HeaderNotificationBell;

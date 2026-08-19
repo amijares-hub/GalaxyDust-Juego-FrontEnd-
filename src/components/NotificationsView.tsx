@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
@@ -16,19 +16,8 @@ import {
   Skull
 } from "lucide-react";
 import { Button } from "./ui/joly-button";
-import { supabase } from "../lib/supabase";
-
-export interface NotificationRecord {
-  notification_id: string;
-  user_id: string;
-  box_type: string;
-  category: string;
-  title: string;
-  message: string;
-  action_url?: string | null;
-  is_read: boolean;
-  created_at: string;
-}
+import { useNotifications } from "../hooks/useNotifications";
+export type { NotificationRecord } from "../hooks/useNotifications";
 
 interface NotificationsViewProps {
   triggerNotification?: (text: string, e?: any) => void;
@@ -39,141 +28,34 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   triggerNotification,
   onBack
 }) => {
-  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const {
+    notifications,
+    unreadCount,
+    loading: isLoading,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification
+  } = useNotifications();
+
   const [activeTab, setActiveTab] = useState<string>("ALL");
   const [filterRead, setFilterRead] = useState<"ALL" | "UNREAD">("ALL");
 
-  // ─── CARGA REAL DESDE SUPABASE + SUSCRIPCIÓN EN TIEMPO REAL ───
-  const fetchNotifications = async () => {
-    setIsLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || '9abc737e-9c3d-4349-a976-59af24f51f4d';
-
-      const { data, error } = await supabase
-        .from('user_notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setNotifications(data || []);
-    } catch (err: any) {
-      console.error("Error al cargar notificaciones:", err);
-      if (triggerNotification) {
-        triggerNotification("⚠️ FALLO AL SINCRONIZAR RED DE NOTIFICACIONES");
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchNotifications();
-
-    // 🎯 Suscripción en tiempo real a nuevos hitos de expedición o alertas de vuelo
-    let channel: any = null;
-    supabase.auth.getUser().then(({ data }) => {
-      const userId = data?.user?.id || '9abc737e-9c3d-4349-a976-59af24f51f4d';
-
-      channel = supabase
-        .channel(`user_notifications_${userId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'user_notifications',
-            filter: `user_id=eq.${userId}`
-          },
-          (payload) => {
-            const newNotif = payload.new as NotificationRecord;
-            setNotifications((prev) => [newNotif, ...prev]);
-            if (triggerNotification) {
-              triggerNotification(`🔔 ${newNotif.title.toUpperCase()}`);
-            }
-          }
-        )
-        .subscribe();
-    });
-
-    return () => {
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, []);
-
-  // ─── MARCAR COMO LEÍDA ───
+  // 🛡️ Acciones delegadas al hook maestro
   const handleMarkAsRead = async (notificationId: string) => {
-    try {
-      const { error } = await supabase
-        .from('user_notifications')
-        .update({ is_read: true })
-        .eq('notification_id', notificationId);
-
-      if (error) throw error;
-
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.notification_id === notificationId ? { ...n, is_read: true } : n
-        )
-      );
-
-      if (triggerNotification) {
-        triggerNotification("✓ NOTIFICACIÓN MARCADA COMO LEÍDA");
-      }
-    } catch (err: any) {
-      console.error("Error marcando como leída:", err);
-    }
+    await markAsRead(notificationId);
+    if (triggerNotification) triggerNotification("✓ NOTIFICACIÓN MARCADA COMO LEÍDA");
   };
 
-  // ─── MARCAR TODAS COMO LEÍDAS ───
   const handleMarkAllAsRead = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || '9abc737e-9c3d-4349-a976-59af24f51f4d';
-
-      const { error } = await supabase
-        .from('user_notifications')
-        .update({ is_read: true })
-        .eq('user_id', userId)
-        .eq('is_read', false);
-
-      if (error) throw error;
-
-      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-
-      if (triggerNotification) {
-        triggerNotification("✓ TODAS LAS NOTIFICACIONES MARCADAS COMO LEÍDAS");
-      }
-    } catch (err: any) {
-      console.error("Error marcando todas como leídas:", err);
-    }
+    await markAllAsRead();
+    if (triggerNotification) triggerNotification("✓ TODAS LAS NOTIFICACIONES MARCADAS COMO LEÍDAS");
   };
 
-  // ─── ELIMINAR NOTIFICACIÓN ───
   const handleDeleteNotification = async (notificationId: string) => {
-    try {
-      const { error } = await supabase
-        .from('user_notifications')
-        .delete()
-        .eq('notification_id', notificationId);
-
-      if (error) throw error;
-
-      setNotifications((prev) =>
-        prev.filter((n) => n.notification_id !== notificationId)
-      );
-
-      if (triggerNotification) {
-        triggerNotification("🗑️ NOTIFICACIÓN ELIMINADA DE LA RED");
-      }
-    } catch (err: any) {
-      console.error("Error eliminando notificación:", err);
-    }
+    await deleteNotification(notificationId);
+    if (triggerNotification) triggerNotification("🗑️ NOTIFICACIÓN ELIMINADA DE LA RED");
   };
 
-  // ─── FILTRADO DE NOTIFICACIONES ───
   const filteredNotifications = useMemo(() => {
     let list = [...notifications];
 
@@ -190,10 +72,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
     return list;
   }, [notifications, activeTab, filterRead]);
 
-  const unreadCount = useMemo(
-    () => notifications.filter((n) => !n.is_read).length,
-    [notifications]
-  );
+  // unreadCount ya viene del hook
 
   const getCategoryIcon = (category: string, boxType: string, title?: string) => {
     const type = (boxType || category || "").toUpperCase();
@@ -312,7 +191,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
         </div>
       </div>
 
-      {/* LISTA DE NOTIFICACIONES (SCROLL INTERNO) */}
+      {/* LISTA DE NOTIFICACIONES */}
       <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1 space-y-2">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-cyan-500 py-16">
@@ -339,7 +218,6 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                   : "bg-[#05080c]/60 border-cyan-950/60 opacity-80 hover:opacity-100"
               }`}
             >
-              {/* Ícono + Contenido */}
               <div className="flex items-start gap-3 flex-1 min-w-0">
                 <div className={`p-2.5 rounded-xl border shrink-0 mt-0.5 ${
                   !n.is_read
@@ -382,7 +260,6 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                 </div>
               </div>
 
-              {/* Acciones */}
               <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
                 {!n.is_read && (
                   <button
@@ -418,3 +295,5 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
     </div>
   );
 };
+
+export default NotificationsView;
