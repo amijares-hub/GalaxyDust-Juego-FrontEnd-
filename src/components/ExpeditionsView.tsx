@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   CornerUpLeft, X, Search, Lock, MapPin, 
-  Wrench, Bot, FileText, Package, Clock, Pickaxe, Radio, Compass, Box, Check, Trash2
+  Wrench, Bot, FileText, Package, Clock, Pickaxe, Radio, Compass, Box, Check, Trash2, Rocket, Sparkles
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAudioEngine } from '../hooks/useAudioEngine';
@@ -134,12 +134,10 @@ const resolveImageUrl = (rawUrl?: string, fallbackId?: string) => {
   if (rawUrl && typeof rawUrl === 'string' && rawUrl.trim() !== '') {
     const clean = rawUrl.trim();
     if (clean.startsWith('http://') || clean.startsWith('https://')) return clean;
-    // Si la cadena tiene extensión de imagen o ruta de carpeta válida
     if (clean.includes('.') || clean.includes('/')) {
       return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/galaxy-assets/${clean.replace(/^\//, '')}`;
     }
   }
-  // Si no hay ruta de archivo real, usar imagen por defecto para evitar HTTP 400
   return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
 };
 
@@ -155,7 +153,6 @@ const formatDuration = (ms: number): string => {
 const isShipAsset = (type: string) => ['naves', 'ship', 'ships', 'nave'].includes(type.toLowerCase());
 const isToolAsset = (type: string) => ['tools', 'tool', 'herramientas', 'herramienta'].includes(type.toLowerCase());
 const isLicenseAsset = (type: string) => ['licencia', 'license', 'licenses'].includes(type.toLowerCase());
-
 
 export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   initialView = 'selection',
