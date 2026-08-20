@@ -64,6 +64,12 @@ interface SectorCard {
   targetWindow?: "expeditions" | "alliance" | "profile" | "settings";
 }
 
+interface ToastNotification {
+  id: string;
+  text: string;
+  timestamp: string;
+}
+
 const cards: SectorCard[] = [
   { id: "expedition", title: "EXPEDITION", description: "Venture into the unknown, explore, farm, and dominate the galaxy.", imageSrc: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop", targetWindow: "expeditions" },
   { id: "alliance", title: "ALLIANCE", description: "Coordinate your power. Expand your dominion.", imageSrc: "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=800&auto=format&fit=crop", targetWindow: "alliance" },
@@ -81,6 +87,9 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
   const [activeFlightsCount, setActiveFlightsCount] = useState<number>(0);
   const [utcTime, setUtcTime] = useState<string>(miningService.getFormattedUtcTime());
 
+  // 🎯 ESTADO PARA NOTIFICACIONES FLOTANTES (TOASTS)
+  const [toasts, setToasts] = useState<ToastNotification[]>([]);
+
   const [power, setPower] = useState(0);
   const [currencies, setCurrencies] = useState({ gd_coin: 0, quantum_credit: 0, phantom_coin: 0, halloween_coin: 0, xmas_coin: 0, valentine_coin: 0 });
   const [resources, setResources] = useState({
@@ -88,8 +97,26 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     lunar_fiber: 0, infinite_core: 0, primal_token: 0, xenoplasm: 0, organium: 0, mana: 0, wood: 0
   });
 
+  // 🎯 MANEJADOR VISUAL DE NOTIFICACIONES
   const handleTriggerNotification = (text: string, e?: any) => {
     console.log("📢 [SYSTEM_NOTIFICATION]:", text);
+    const id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
+    const newToast: ToastNotification = {
+      id,
+      text,
+      timestamp: new Date().toLocaleTimeString()
+    };
+
+    setToasts(prev => [newToast, ...prev].slice(0, 4));
+    setUnreadNotifCount(prev => prev + 1);
+
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 5500);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
   };
 
   const [missions, setMissions] = useState<Mission[]>([
@@ -109,9 +136,10 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     return () => clearInterval(timer);
   }, []);
 
-  // 🔄 CARGA Y SINCRONIZACIÓN CONTINUA DE RECURSOS / MONEDAS REALES
+  // 🔄 CARGA Y SINCRONIZACIÓN CONTINUA DE RECURSOS / MONEDAS REALES + LISTENERS DE LOGS
   useEffect(() => {
-    let channel: any;
+    let profileChannel: any;
+    let logsChannel: any;
     let isMounted = true;
 
     const loadUserProfile = async (authUser: any) => {
@@ -193,8 +221,8 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         setUnreadNotifCount(notifCount);
       }
 
-      // Suscripción Realtime
-      channel = supabase
+      // Suscripción Realtime Perfil
+      profileChannel = supabase
         .channel(`economy_hud_stream_${authUser.id}`)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_profiles' }, (payload: any) => {
           const updated = payload.new;
@@ -205,7 +233,23 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         })
         .subscribe();
 
-      // ⏱️ Failsafe: Refresco automático cada 3 segundos para garantizar la lectura de expediciones reclamadas
+      // 🎯 SUSCRIPCIÓN REALTIME PARA EVENTOS/LOGS DE EXPEDICIÓN DEL USUARIO
+      logsChannel = supabase
+        .channel(`expedition_logs_stream_${authUser.id}`)
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'expedition_logs',
+          filter: `user_id=eq.${authUser.id}`
+        }, (payload: any) => {
+          const newLog = payload.new;
+          if (newLog && isMounted) {
+            handleTriggerNotification(`🛰️ [${newLog.event_type || 'ALERTA'}]: ${newLog.title || newLog.message}`);
+          }
+        })
+        .subscribe();
+
+      // Refresco automático cada 3 segundos
       const pollInterval = setInterval(() => {
         if (isMounted) loadUserProfile(authUser);
       }, 3000);
@@ -217,7 +261,8 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
 
     return () => {
       isMounted = false;
-      if (channel) supabase.removeChannel(channel);
+      if (profileChannel) supabase.removeChannel(profileChannel);
+      if (logsChannel) supabase.removeChannel(logsChannel);
     };
   }, []);
 
@@ -228,7 +273,43 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     >
       <div className="fixed inset-0 bg-black/55 backdrop-blur-[1px] z-0 pointer-events-none" />
 
-      {/* ─── BARRA SUPERIOR HEADER (ENVÍA TODOS LOS DATOS REALES) ─── */}
+      {/* ─── CONTENEDOR FLOTANTE DE NOTIFICACIONES TOAST (Z-INDEX 100) ─── */}
+      <div className="fixed top-14 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none font-mono">
+        <AnimatePresence>
+          {toasts.map(toast => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, x: 50, scale: 0.9 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 50, scale: 0.9 }}
+              className="pointer-events-auto bg-[#080d14]/95 border-2 border-cyan-400/80 rounded-xl p-3 shadow-[0_0_20px_rgba(6,182,212,0.4)] backdrop-blur-md flex items-start gap-3 relative text-left"
+            >
+              <div className="p-1.5 bg-cyan-950/80 border border-cyan-500/50 rounded-lg text-cyan-300 shrink-0">
+                <Bell className="w-4 h-4 animate-bounce" />
+              </div>
+
+              <div className="flex-1 pr-4">
+                <div className="flex justify-between items-center mb-0.5">
+                  <span className="text-[9px] font-black text-cyan-400 uppercase tracking-widest">ALERTA C.A.N.</span>
+                  <span className="text-[7.5px] text-zinc-500 font-mono">{toast.timestamp}</span>
+                </div>
+                <p className="text-[9.5px] font-bold text-zinc-200 leading-tight uppercase">
+                  {toast.text}
+                </p>
+              </div>
+
+              <button
+                onClick={() => removeToast(toast.id)}
+                className="absolute top-2 right-2 text-zinc-500 hover:text-white cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
+      {/* ─── BARRA SUPERIOR HEADER ─── */}
       <Header
         userProfile={{
           ...user,
@@ -255,21 +336,23 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           mana: resources.mana,
           wood: resources.wood
         }}
-        activeTab={activeTab === 'home' && activeWindow === 'home' ? 'MAIN' :
-                   activeTab === 'can' ? 'CAN' :
-                   activeWindow === 'expeditions' || activeWindow === 'expeditions_flights' ? 'EXPEDITIONS' :
-                   activeTab === 'marketplace' ? 'MARKET' :
-                   activeTab === 'phantom' ? 'PHANTOM' :
-                   activeTab === 'inventory' ? 'INVENTORY' :
-                   activeTab === 'mission' ? 'MISSION' : 'MAIN'}
+        activeTab={
+          activeTab === 'marketplace' ? 'MARKET' :
+          activeTab === 'phantom' ? 'PHANTOM' :
+          activeTab === 'inventory' ? 'INVENTORY' :
+          activeTab === 'mission' ? 'MISSION' :
+          activeTab === 'can' ? 'CAN' :
+          (activeWindow === 'expeditions' || activeWindow === 'expeditions_flights') ? 'EXPEDITIONS' :
+          'MAIN'
+        }
         onSelectTab={(tab) => {
           if (tab === 'MAIN') { setActiveTab('home'); setActiveWindow('home'); }
-          else if (tab === 'CAN') { setActiveTab('can'); }
+          else if (tab === 'CAN') { setActiveTab('can'); setActiveWindow('home'); }
           else if (tab === 'EXPEDITIONS') { setActiveTab('home'); setActiveWindow('expeditions'); }
-          else if (tab === 'MARKET') { setActiveTab('marketplace'); }
-          else if (tab === 'PHANTOM') { setActiveTab('phantom'); }
-          else if (tab === 'INVENTORY') { setActiveTab('inventory'); }
-          else if (tab === 'MISSION') { setActiveTab('mission'); }
+          else if (tab === 'MARKET') { setActiveTab('marketplace'); setActiveWindow('home'); }
+          else if (tab === 'PHANTOM') { setActiveTab('phantom'); setActiveWindow('home'); }
+          else if (tab === 'INVENTORY') { setActiveTab('inventory'); setActiveWindow('home'); }
+          else if (tab === 'MISSION') { setActiveTab('mission'); setActiveWindow('home'); }
         }}
         unreadNotificationsCount={unreadNotifCount}
         onOpenNotifications={() => { setActiveTab('home'); setActiveWindow('notifications'); }}
@@ -310,8 +393,13 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                     <div
                       key={card.id}
                       onClick={() => {
-                        if (card.targetWindow) setActiveWindow(card.targetWindow);
-                        else if (card.targetTab) setActiveTab(card.targetTab);
+                        if (card.targetWindow) {
+                          setActiveTab("home");
+                          setActiveWindow(card.targetWindow);
+                        } else if (card.targetTab) {
+                          setActiveTab(card.targetTab);
+                          setActiveWindow("home");
+                        }
                       }}
                       className="relative h-[440px] w-full rounded-xl overflow-hidden cursor-pointer border border-neutral-800 hover:border-red-500/60 transition-all duration-300 group flex flex-col justify-between p-6 bg-black/85 backdrop-blur-sm shadow-2xl"
                     >
@@ -342,14 +430,14 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
             ) : activeWindow === "expeditions" ? (
               <ExpeditionsView initialView="selection" triggerNotification={handleTriggerNotification} />
             ) : activeWindow === "expeditions_flights" ? (
-              <ExpeditionsView initialView="flights" onBack={() => setActiveWindow("home")} triggerNotification={handleTriggerNotification} />
+              <ExpeditionsView initialView="flights" onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />
             ) : activeWindow === "alliance" ? (
-              <AllianceView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} onBack={() => setActiveWindow("home")} triggerNotification={handleTriggerNotification} />
+              <AllianceView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />
             ) : activeWindow === "notifications" ? (
-              <NotificationsView onBack={() => setActiveWindow("home")} triggerNotification={handleTriggerNotification} />
+              <NotificationsView onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />
             ) : (
               <ProfileView 
-                onBack={() => setActiveWindow("home")} 
+                onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} 
                 triggerNotification={handleTriggerNotification}
                 onProfileUpdate={(updated) => {
                   if (updated.avatar_url) {
@@ -451,9 +539,9 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           )}
 
           {activeTab === "can" && <CanView />}
-          {activeTab === "marketplace" && <MarketplaceView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} playerWood={resources.wood} setPlayerWood={() => { }} playerFood={resources.deuterium} setPlayerFood={() => { }} playerStone={resources.dark_matter} setPlayerStone={() => { }} playerOre={resources.metal} setPlayerOre={() => { }} onBack={() => setActiveTab("home")} triggerNotification={handleTriggerNotification} />}
-          {activeTab === "phantom" && <PhantomStationView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} onBack={() => setActiveTab("home")} triggerNotification={handleTriggerNotification} />}
-          {activeTab === "inventory" && <InventoryView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} onBack={() => setActiveTab("home")} triggerNotification={handleTriggerNotification} />}
+          {activeTab === "marketplace" && <MarketplaceView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} playerWood={resources.wood} setPlayerWood={() => { }} playerFood={resources.deuterium} setPlayerFood={() => { }} playerStone={resources.dark_matter} setPlayerStone={() => { }} playerOre={resources.metal} setPlayerOre={() => { }} onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />}
+          {activeTab === "phantom" && <PhantomStationView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />}
+          {activeTab === "inventory" && <InventoryView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />}
         </AnimatePresence>
       </div>
 

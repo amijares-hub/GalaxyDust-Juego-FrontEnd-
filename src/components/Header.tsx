@@ -11,6 +11,38 @@ interface HeaderProps {
   onOpenProfile?: () => void;
 }
 
+// 🎯 COMPROBACIÓN FLEXIBLE DE PESTAÑAS (SOPORTA MAYÚSCULAS/MINÚSCULAS Y ALIAS)
+const isTabActive = (currentActive: string = '', tabId: string): boolean => {
+  const cleanActive = currentActive.trim().toUpperCase();
+  const cleanTab = tabId.trim().toUpperCase();
+
+  if (cleanActive === cleanTab) return true;
+
+  if (cleanTab === 'MARKET') {
+    return ['MARKET', 'MARKETPLACE', 'MARKETPLACE_P2P', 'P2P'].includes(cleanActive);
+  }
+  if (cleanTab === 'EXPEDITIONS' || cleanTab === 'EXPEDITION') {
+    return ['EXPEDITION', 'EXPEDITIONS', 'FLIGHTS', 'EXPEDICION', 'EXPEDICIONES'].includes(cleanActive);
+  }
+  if (cleanTab === 'CAN') {
+    return ['CAN', 'C.A.N.', 'C.A.N'].includes(cleanActive);
+  }
+  if (cleanTab === 'INVENTORY') {
+    return ['INVENTORY', 'INVENTARIO'].includes(cleanActive);
+  }
+  if (cleanTab === 'MISSION') {
+    return ['MISSION', 'MISSIONS', 'MISION', 'MISIONES'].includes(cleanActive);
+  }
+  if (cleanTab === 'MAIN') {
+    return ['MAIN', 'HOME', 'INICIO'].includes(cleanActive);
+  }
+  if (cleanTab === 'PHANTOM') {
+    return ['PHANTOM', 'PHANTOM_STATION'].includes(cleanActive);
+  }
+
+  return false;
+};
+
 export const Header: React.FC<HeaderProps> = ({
   userProfile,
   activeTab = 'MAIN',
@@ -44,9 +76,9 @@ export const Header: React.FC<HeaderProps> = ({
 
   // 🌐 RESOLUCIÓN FLEXIBLE DE MONEDAS DEL USUARIO (Soporta singular/plural de DB)
   const currencies = [
-    { label: 'GD COIN', value: userProfile?.gd_coins ?? userProfile?.gd_coin ?? 0, color: 'text-amber-300' },
+    { label: 'GD COIN', value: userProfile?.gd_coin ?? userProfile?.gd_coins ?? 0, color: 'text-amber-300' },
     { label: 'QUANTUM CREDIT', value: userProfile?.quantum_credits ?? userProfile?.quantum_credit ?? 0, color: 'text-cyan-300' },
-    { label: 'PHANTOM COIN', value: userProfile?.phantom_coins ?? userProfile?.phantom_coin ?? 0, color: 'text-purple-300' },
+    { label: 'PHANTOM COIN', value: userProfile?.phantom_coin ?? userProfile?.phantom_coins ?? 0, color: 'text-purple-300' },
     { label: 'HALLOWEEN COIN', value: userProfile?.halloween_coins ?? userProfile?.halloween_coin ?? 0, color: 'text-orange-400' },
     { label: 'XMAS COIN', value: userProfile?.xmas_coins ?? userProfile?.xmas_coin ?? 0, color: 'text-red-400' },
     { label: 'VALENTINE COIN', value: userProfile?.valentine_coins ?? userProfile?.valentine_coin ?? 0, color: 'text-pink-400' }
@@ -61,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
     { label: 'OMNIPLATE', value: userProfile?.omniplate ?? 0, color: 'text-emerald-300' },
     { label: 'ORICHALTRON', value: userProfile?.orichaltron ?? 0, color: 'text-yellow-300' },
     { label: 'LUNAR FIBER', value: userProfile?.lunar_fiber ?? 0, color: 'text-slate-200' },
-    { label: 'INFINITE CORE', value: userProfile?.infinite_core ?? 0, color: 'text-teal-300' },
+    { label: 'INFINITE CORE', value: userProfile?.infinite_core ?? userProfile?.infinity_core ?? 0, color: 'text-teal-300' },
     { label: 'PRIMAL TOKEN', value: userProfile?.primal_token ?? 0, color: 'text-amber-400' },
     { label: 'XENOPLASM', value: userProfile?.xenoplasm ?? 0, color: 'text-green-400' },
     { label: 'ORGANIUM', value: userProfile?.organium ?? 0, color: 'text-lime-300' },
@@ -108,7 +140,9 @@ export const Header: React.FC<HeaderProps> = ({
       {/* 2. PESTAÑAS NAVEGACIÓN */}
       <div className="flex-1 flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none px-1 py-0.5 min-w-0">
         {tabs.map(tab => {
-          const isActive = activeTab === tab.id;
+          // 🎯 VERIFICACIÓN ROBUSTA DE PESTAÑA ACTIVA
+          const isActive = isTabActive(activeTab, tab.id);
+
           return (
             <button
               key={tab.id}

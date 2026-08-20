@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   CornerUpLeft, X, Search, Lock, MapPin, 
-  Wrench, Bot, FileText, Package, Clock, Pickaxe, Radio, Compass, Box, Check, Trash2, Rocket, Sparkles
+  Wrench, Bot, FileText, Package, Clock, Pickaxe, Radio, Compass, Box, Check, Trash2, Rocket, Sparkles, History
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAudioEngine } from '../hooks/useAudioEngine';
@@ -112,6 +112,7 @@ export interface GCClusterData {
   max_metal?: number;
   min_crystal?: number;
   max_crystal?: number;
+  ss_discovery_rate?: number;
 }
 
 export type LeftMenuCategory = 'Fleets' | 'Naves' | 'Astrobots' | 'Tools' | 'Consumibles' | 'Licencia';
@@ -124,6 +125,26 @@ export interface ExpeditionViewProps {
 }
 
 export type ExpeditionsViewProps = ExpeditionViewProps;
+
+// 🎥 BIBLIOTECA DE ASSETS DE VIDEO
+const GC_VIDEO = "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/GCs,Galaxias%20y%20demas/GC1.webm";
+
+const GALAXY_VIDEOS = [
+  "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/GCs,Galaxias%20y%20demas/GalaxyVioleta_VP9.webm",
+  "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/GCs,Galaxias%20y%20demas/GalaxyMarron_VP9.webm",
+  "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/GCs,Galaxias%20y%20demas/GalaxyGris_VP9.webm"
+];
+
+const SC_VIDEOS = [
+  "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/GCs,Galaxias%20y%20demas/SC2.webm",
+  "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/GCs,Galaxias%20y%20demas/SC3.mp4",
+  "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/GCs,Galaxias%20y%20demas/SC4.mp4",
+  "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/GCs,Galaxias%20y%20demas/SC5.mp4",
+  "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/GCs,Galaxias%20y%20demas/SC6.mp4",
+  "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/GCs,Galaxias%20y%20demas/SC7.mp4",
+  "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/GCs,Galaxias%20y%20demas/SC8.mp4",
+  "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/GCs,Galaxias%20y%20demas/SC9.mp4"
+];
 
 const isValidUUID = (str?: string | null): boolean => {
   if (!str) return false;
@@ -148,6 +169,66 @@ const formatDuration = (ms: number): string => {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
   return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
+};
+
+const formatUtcDateTime = (item: any) => {
+  if (!item) return 'N/A UTC';
+  const rawDate = typeof item === 'object'
+    ? (item.created_at || item.claimed_at || item.completed_at || item.timestamp || item.date || item.return_time || item.estimated_return_time || item.launch_time || item.updated_at)
+    : item;
+
+  if (!rawDate) return 'N/A UTC';
+  const d = new Date(rawDate);
+  if (isNaN(d.getTime())) return 'N/A UTC';
+  
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const year = d.getUTCFullYear();
+  const hours = String(d.getUTCHours()).padStart(2, '0');
+  const mins = String(d.getUTCMinutes()).padStart(2, '0');
+  const secs = String(d.getUTCSeconds()).padStart(2, '0');
+  
+  return `${day}/${month}/${year} ${hours}:${mins}:${secs} UTC`;
+};
+
+const getMinedResources = (item: any) => {
+  const metal = 
+    Number(item?.metal_mined) || Number(item?.metal) || Number(item?.metal_amount) || Number(item?.looted_metal) || 
+    Number(item?.rewards?.metal) || Number(item?.rewards?.metal_mined) || Number(item?.rewards_looted?.metal) || Number(item?.rewards_looted?.metal_mined) || Number(item?.resources?.metal) || 0;
+
+  const crystal = 
+    Number(item?.crystal_mined) || Number(item?.crystal) || Number(item?.crystal_amount) || Number(item?.looted_crystal) || 
+    Number(item?.rewards?.crystal) || Number(item?.rewards?.crystal_mined) || Number(item?.rewards_looted?.crystal) || Number(item?.rewards_looted?.crystal_mined) || Number(item?.resources?.crystal) || 0;
+
+  const deuterium = Number(item?.deuterium_mined) || Number(item?.deuterium) || Number(item?.rewards?.deuterium) || Number(item?.rewards_looted?.deuterium) || 0;
+
+  return { metal, crystal, deuterium };
+};
+
+// 🎬 REPRODUCTOR DE VIDEO SEGURO PARA EL FONDO DEL PANEL
+const PresentationVideoPlayer: React.FC<{ src: string }> = ({ src }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.defaultMuted = true;
+      videoRef.current.muted = true;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [src]);
+
+  return (
+    <video
+      ref={videoRef}
+      key={src}
+      src={src}
+      autoPlay
+      loop
+      muted
+      playsInline
+      className="absolute inset-0 w-full h-full object-cover pointer-events-none border-0 outline-none rounded-xl"
+    />
+  );
 };
 
 const isShipAsset = (type: string) => ['naves', 'ship', 'ships', 'nave'].includes(type.toLowerCase());
@@ -193,8 +274,11 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   const [fleets, setFleets] = useState<Fleet[]>([]);
   const [selectedFleet, setSelectedFleet] = useState<Fleet | null>(null);
   const [activeExpeditions, setActiveExpeditions] = useState<Expedition[]>([]);
+  const [completedHistory, setCompletedHistory] = useState<any[]>([]);
   const [expeditionLogs, setExpeditionLogs] = useState<Record<string, ExpeditionLog[]>>({});
   const [loading, setLoading] = useState(false);
+
+  const [notifiedExpIds, setNotifiedExpIds] = useState<Set<string>>(new Set());
 
   const [isStartJourneyOpen, setIsStartJourneyOpen] = useState(false);
   const [activeFlightCategory, setActiveFlightCategory] = useState<string>('ALL');
@@ -209,7 +293,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
   const leftMenuOptions: LeftMenuCategory[] = ['Fleets', 'Naves', 'Astrobots', 'Tools', 'Licencia', 'Consumibles'];
 
-  // 🛡️ DETECTAR ACTIVOS EN VUELO PARA BLOQUEAR SU SELECCIÓN
   const inFlightAssetIds = useMemo(() => {
     const ids = new Set<string>();
     activeExpeditions.forEach((exp: any) => {
@@ -231,9 +314,43 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     return ids;
   }, [activeExpeditions, fleets]);
 
-  // 🎯 CÁLCULO DEL MODIFICADOR NETO
+  const activeGcObject = useMemo(() => {
+    return gcList.find(g => g.id === selectedGC) || null;
+  }, [gcList, selectedGC]);
+
+  // 🎯 LÓGICA DE PRESENTACIÓN DINÁMICA DE TEXTO Y VIDEO SEGÚN EL PASO DE SELECCIÓN
+  const currentStepPresentation = useMemo(() => {
+    if (currentStep === 'GC' || !selectedGC) {
+      return {
+        text: "SELECCIONA UN GALAXY CLUSTER (GC) PARA PREPARAR LA MISIÓN",
+        videoUrl: GC_VIDEO
+      };
+    }
+
+    if (currentStep === 'GAL' || !selectedGAL) {
+      const galIndex = dbGalaxies.findIndex(g => g.id === selectedGAL);
+      const idx = galIndex >= 0 ? galIndex : 0;
+      return {
+        text: "SELECCIONA UNA GALAXIA PARA PREPARAR LA MISIÓN",
+        videoUrl: GALAXY_VIDEOS[idx % GALAXY_VIDEOS.length]
+      };
+    }
+
+    // PASO SC / SS / PLANETA
+    const scIndex = dbStarClusters.findIndex(s => s.id === selectedSC);
+    const idx = scIndex >= 0 ? scIndex : 0;
+    return {
+      text: "SELECCIONA UN STAR CLUSTER (SC) PARA PREPARAR LA MISIÓN",
+      videoUrl: SC_VIDEOS[idx % SC_VIDEOS.length]
+    };
+  }, [currentStep, selectedGC, selectedGAL, selectedSC, dbGalaxies, dbStarClusters]);
+
   const totalExpeditionProbability = useMemo(() => {
-    let modifierSum = (userCanLevel * 5) + globalPassiveBonus;
+    const baseClusterRate = activeGcObject?.ss_discovery_rate !== undefined 
+      ? Number(activeGcObject.ss_discovery_rate) 
+      : 5;
+
+    let modifierSum = baseClusterRate + globalPassiveBonus;
 
     selectedAssets.forEach((asset: Asset) => {
       const effectVal = asset.effect !== undefined ? Number(asset.effect) : Number(asset.skill_bonus || 0);
@@ -250,11 +367,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     }
 
     return Number(modifierSum.toFixed(2));
-  }, [selectedAssets, selectedFleet, globalPassiveBonus, userCanLevel]);
-
-  const activeGcObject = useMemo(() => {
-    return gcList.find(g => g.id === selectedGC) || null;
-  }, [gcList, selectedGC]);
+  }, [activeGcObject, selectedAssets, selectedFleet, globalPassiveBonus]);
 
   const dynamicMiningRanges = useMemo(() => {
     if (!activeGcObject) return { minMetal: 0, maxMetal: 0, minCrystal: 0, maxCrystal: 0, canMineMetal: false, canMineCrystal: false };
@@ -315,11 +428,10 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     return parts.join(' > ') || 'SELECCIONA COORDENADAS GALÁCTICAS';
   };
 
-  // Función para apilar activos duplicados con contador (x2, x3)
   const stackAssets = (rawAssets: Asset[]) => {
     const map = new Map<string, { asset: Asset; count: number }>();
-    rawAssets.forEach(a => {
-      const key = a.name || a.id;
+    rawAssets.forEach((a, index) => {
+      const key = a.id || a.name || `asset-${index}`;
       if (map.has(key)) {
         map.get(key)!.count += 1;
       } else {
@@ -335,6 +447,20 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!activeExpeditions.length) return;
+    activeExpeditions.forEach((exp) => {
+      const returnMs = new Date(exp.estimated_return_time).getTime();
+      if (now >= returnMs && !notifiedExpIds.has(exp.id)) {
+        setNotifiedExpIds(prev => new Set(prev).add(exp.id));
+        playSfx(1200);
+        if (triggerNotification) {
+          triggerNotification(`🎉 ¡EXPEDICIÓN FINALIZADA! La flota ${exp.fleet_name} ha llegado a su destino (${exp.sector_name}). Reclama tus recompensas.`);
+        }
+      }
+    });
+  }, [now, activeExpeditions, notifiedExpIds]);
 
   useEffect(() => {
     if (!selectedGC) { setDbGalaxies([]); return; }
@@ -447,7 +573,8 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
           min_metal: g.min_metal ?? 300,
           max_metal: g.max_metal ?? 1200,
           min_crystal: g.min_crystal ?? 150,
-          max_crystal: g.max_crystal ?? 600
+          max_crystal: g.max_crystal ?? 600,
+          ss_discovery_rate: g.ss_discovery_rate ?? 5
         }));
         setGcList(gcObjects);
         setSelectedGC(prev => prev ?? gcObjects[0].id);
@@ -465,6 +592,28 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         counts[gc] = (counts[gc] || 0) + 1;
       });
       setCompletedCountsByGC(counts);
+
+      try {
+        const { data: rawHistory, error: historyErr } = await supabase
+          .from('expedition_history')
+          .select('*')
+          .eq('user_id', userId);
+
+        if (!historyErr && rawHistory) {
+          const sorted = [...rawHistory].sort((a: any, b: any) => {
+            const getTimestamp = (item: any) => {
+              const raw = item?.created_at || item?.claimed_at || item?.completed_at || item?.timestamp || item?.date || item?.return_time || item?.estimated_return_time || item?.launch_time || item?.updated_at;
+              return raw ? new Date(raw).getTime() : 0;
+            };
+            return getTimestamp(b) - getTimestamp(a);
+          });
+          setCompletedHistory(sorted.slice(0, 10));
+        } else {
+          setCompletedHistory([]);
+        }
+      } catch (eHistory) {
+        setCompletedHistory([]);
+      }
 
       let globalNetBonus = 0;
       let hasCrystalUnlock = false;
@@ -683,7 +832,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     return { valid: true };
   };
 
-  // 🛡️ BLOQUEO DE SELECCIÓN SI EL ACTIVO ESTÁ EN VUELO
   const toggleAssetSelection = (asset: Asset) => {
     if (inFlightAssetIds.has(asset.id)) {
       playSfx(300);
@@ -870,7 +1018,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   const getFilteredFlights = () => {
     return activeExpeditions.filter(exp => {
       const expType = exp.type || 'EXPLORATION';
-      if (activeFlightCategory !== 'ALL' && expType !== activeFlightCategory) return false;
+      if (activeFlightCategory !== 'ALL' && activeFlightCategory !== 'HISTORIAL' && expType !== activeFlightCategory) return false;
 
       if (flightSearchQuery.trim() !== '') {
         const query = flightSearchQuery.toLowerCase();
@@ -904,7 +1052,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     }
   };
 
-  // ─── RENDERIZADO VISTA VUELOS EN CURSO ───
+  // ─── RENDERIZADO VISTA VUELOS EN CURSO / HISTORIAL ───
   if (initialView === 'flights') {
     return (
       <div className="w-full max-w-7xl mx-auto bg-[#080b0e] border border-cyan-500/30 p-5 rounded-2xl shadow-2xl relative overflow-hidden font-mono text-left select-none flex flex-col gap-4 text-white">
@@ -917,7 +1065,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleClaimAllExpeditions}
-              disabled={!hasFinishedFlights}
+              disabled={!hasFinishedFlights || activeFlightCategory === 'HISTORIAL'}
               className="px-3 py-1.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[8.5px] font-black uppercase rounded-lg shadow-lg cursor-pointer transition-all"
             >
               CLAIM ALL
@@ -939,22 +1087,75 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               />
             </div>
             <div className="flex flex-col gap-1">
-              {['ALL', 'EXPLORATION', 'MINING', 'DOMINATION'].map((cat) => (
+              {['ALL', 'EXPLORATION', 'MINING', 'DOMINATION', 'HISTORIAL'].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => { playSfx(660); setActiveFlightCategory(cat); }}
-                  className={`w-full px-2.5 py-1.5 rounded-lg text-[8px] font-mono font-bold uppercase transition-all cursor-pointer border ${
-                    activeFlightCategory === cat ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black' : 'bg-[#0a0f14] text-zinc-400 border-transparent hover:text-white'
+                  className={`w-full px-2.5 py-1.5 rounded-lg text-[8px] font-mono font-bold uppercase transition-all cursor-pointer flex items-center justify-between border ${
+                    activeFlightCategory === cat 
+                      ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black' 
+                      : 'bg-[#0a0f14] text-zinc-400 border-transparent hover:text-white'
                   }`}
                 >
-                  {cat}
+                  <span>{cat === 'HISTORIAL' ? `📜 HISTORIAL (${completedHistory.length})` : cat}</span>
+                  {cat === 'HISTORIAL' && <History className="w-3 h-3 text-amber-400" />}
                 </button>
               ))}
             </div>
           </div>
 
           <div className="flex-1 w-full grid grid-cols-1 lg:grid-cols-2 gap-3 max-h-[440px] overflow-y-auto pr-1">
-            {getFilteredFlights().length === 0 ? (
+            {activeFlightCategory === 'HISTORIAL' ? (
+              completedHistory.length === 0 ? (
+                <div className="col-span-full p-12 text-center text-zinc-500 text-[10px] uppercase tracking-widest bg-[#05070a] border border-cyan-500/10 rounded-xl">
+                  NO HAY EXPEDICIONES FINALIZADAS REGISTRADAS EN TU HISTORIAL REAL
+                </div>
+              ) : (
+                completedHistory.map((item, idx) => {
+                  const res = getMinedResources(item);
+
+                  return (
+                    <div key={item.id || idx} className="p-3.5 rounded-xl border border-amber-500/30 bg-[#050910] shadow-lg flex flex-col justify-between gap-2 relative">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="text-[10px] font-black text-white uppercase">{item.fleet_name || 'FLOTA INDEPENDIENTE'}</span>
+                          <span className="text-[8px] text-amber-400 font-bold block">{item.galaxy_cluster || 'INARA'} / {item.sector_name || 'SECTOR'}</span>
+                        </div>
+                        <span className="text-[7.5px] bg-emerald-950 text-emerald-400 border border-emerald-800 font-black px-2 py-0.5 rounded uppercase">
+                          {item.status || 'COMPLETADA'}
+                        </span>
+                      </div>
+
+                      <div className="bg-black/60 p-2 rounded-lg border border-cyan-950 text-[8px] space-y-1">
+                        <div className="flex justify-between text-zinc-400">
+                          <span>MINADO METAL:</span>
+                          <strong className={res.metal > 0 ? "text-cyan-300 font-bold" : "text-zinc-600"}>
+                            {res.metal > 0 ? `+${res.metal.toLocaleString()}` : '+0'}
+                          </strong>
+                        </div>
+                        <div className="flex justify-between text-zinc-400">
+                          <span>MINADO CRISTAL:</span>
+                          <strong className={res.crystal > 0 ? "text-purple-300 font-bold" : "text-zinc-600"}>
+                            {res.crystal > 0 ? `+${res.crystal.toLocaleString()}` : '+0'}
+                          </strong>
+                        </div>
+                        {res.deuterium > 0 && (
+                          <div className="flex justify-between text-zinc-400">
+                            <span>MINADO DEUTERIO:</span>
+                            <strong className="text-emerald-300 font-bold">+{res.deuterium.toLocaleString()}</strong>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex justify-between items-center text-[7.5px] text-zinc-500 font-mono">
+                        <span>MISION: {item.type || 'EXPLORACIÓN'}</span>
+                        <span className="text-amber-300/90 font-bold">{formatUtcDateTime(item)}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )
+            ) : getFilteredFlights().length === 0 ? (
               <div className="col-span-full p-12 text-center text-zinc-500 text-[10px] uppercase tracking-widest bg-[#05070a] border border-cyan-500/10 rounded-xl">
                 NO HAY OPERACIONES EN CURSO REGISTRADAS EN ESTE SECTOR
               </div>
@@ -1029,13 +1230,12 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                       </div>
                     </div>
 
-                    {/* MUESTRA DE ACTIVOS EQUIPADOS STACKEADOS (x2, x3) */}
                     {deployedAssets.length > 0 && (
                       <div className="bg-[#020508] p-2 rounded-lg border border-cyan-950 flex flex-col gap-1">
                         <span className="text-[7px] font-bold text-zinc-400 uppercase">ACTIVIDAD Y COMPOSICIÓN DE FLOTA:</span>
                         <div className="flex flex-wrap gap-1.5">
-                          {stackAssets(deployedAssets).map(({ asset, count }) => (
-                            <div key={asset.id || asset.name} className="relative bg-black/80 border border-cyan-900 rounded p-1 flex items-center gap-1">
+                          {stackAssets(deployedAssets).map(({ asset, count }, idx) => (
+                            <div key={`${asset.id || asset.name}-${idx}`} className="relative bg-black/80 border border-cyan-900 rounded p-1 flex items-center gap-1">
                               <img src={asset.image_url} alt={asset.name} className="w-5 h-5 object-cover rounded" />
                               <span className="text-[7px] font-bold text-white truncate max-w-[80px]">{asset.name}</span>
                               {count > 1 && (
@@ -1284,7 +1484,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                         🎯 PROBABILIDAD DE DESCUBRIMIENTO DE SS: {totalExpeditionProbability}%
                       </p>
                       <p className="text-[7.5px] text-zinc-500 mt-0.5">
-                        (CAN: +{userCanLevel * 5}% | Pasivo: {globalPassiveBonus >= 0 ? `+${globalPassiveBonus}` : globalPassiveBonus}%)
+                        (Base GC: +{activeGcObject?.ss_discovery_rate ?? 5}% | Pasivo: {globalPassiveBonus >= 0 ? `+${globalPassiveBonus}` : globalPassiveBonus}%)
                       </p>
                     </div>
 
@@ -1372,34 +1572,50 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
             </div>
           </div>
 
-          {/* MAPA ESTELAR */}
-          <div className="flex-1 border border-cyan-500/30 bg-[#05070a] rounded-xl relative overflow-hidden flex flex-col justify-center items-center shadow-2xl h-full p-6 text-center">
-            {selectedSC ? (
-              <div className="flex flex-col items-center gap-4 max-w-md bg-[#0a0f18] p-6 border border-cyan-500/40 rounded-2xl shadow-xl">
-                <div>
-                  <h3 className="text-sm font-black text-white uppercase">
-                    DESTINO: {selectedPlanet ? selectedPlanet.name : `STAR CLUSTER [${dbStarClusters.find(s => s.id === selectedSC)?.name || selectedSC}]`}
-                  </h3>
-                  <p className="text-[11px] text-amber-400 font-extrabold mt-2">
-                    🎯 {selectedPlanet ? "EFICIENCIA DE EXTRACCIÓN DE MINADO:" : "PROBABILIDAD DE DESCUBRIMIENTO DE SS:"} {totalExpeditionProbability}%
-                  </p>
-                  <p className="text-[8.5px] text-zinc-500 mt-0.5">
-                    (CAN Nivel {userCanLevel}: +{userCanLevel * 5}% | Pasivo: {globalPassiveBonus >= 0 ? `+${globalPassiveBonus}` : globalPassiveBonus}%)
-                  </p>
-                </div>
+          {/* MAPA ESTELAR Y LIENZO DE PRESENTACIÓN VISUAL DINÁMICO DE VIDEO */}
+          <div className="flex-1 border border-cyan-500/30 bg-[#05070a] rounded-xl relative overflow-hidden flex flex-col justify-between items-center shadow-2xl h-full p-4 text-center">
+            
+            {/* 1. BARRA SUPERIOR INDICADORA DINÁMICA */}
+            <div className="w-full flex justify-between items-center shrink-0 bg-[#020508]/80 border border-cyan-500/30 px-4 py-2 rounded-xl backdrop-blur-sm z-10">
+              <div className="text-cyan-300 text-[10px] font-black uppercase tracking-widest">
+                {currentStepPresentation.text}
+              </div>
+              <span className="text-[8px] font-mono font-bold text-cyan-400 bg-cyan-950/80 px-2.5 py-1 rounded border border-cyan-800 uppercase">
+                GALAXY CLUSTER: {activeGcObject?.name || selectedGC || 'PELA'}
+              </span>
+            </div>
 
-                <button
-                  onClick={() => { playSfx(880); setIsDispatchPanelActive(true); }}
-                  className="px-6 py-3 bg-gradient-to-r from-cyan-600 to-teal-600 border border-cyan-400 text-white text-[11px] font-black uppercase rounded-lg shadow-lg cursor-pointer hover:brightness-110 active:scale-95 transition-all"
-                >
-                  EQUIPAR Y DESPLEGAR MISIÓN
-                </button>
-              </div>
-            ) : (
-              <div className="text-zinc-600 text-xs font-bold uppercase tracking-widest">
-                SELECCIONA UN STAR CLUSTER (SC) PARA PREPARAR LA MISIÓN
-              </div>
-            )}
+            {/* 2. ÁREA INFERIOR CON EL REPRODUCTOR DE VIDEO DE FONDO Y ACCIÓN */}
+            <div className="w-full flex-1 relative mt-2 rounded-xl overflow-hidden flex flex-col items-center justify-center border-0 bg-transparent">
+              
+              {/* 🎥 REPRODUCCIÓN DINÁMICA DEL VIDEO DE PRESENTACIÓN DEL PASO ACTUAL */}
+              <PresentationVideoPlayer src={currentStepPresentation.videoUrl} />
+
+              {/* PANEL DE ACCIÓN CENTRAL SI HAY UN SC SELECCIONADO */}
+              {selectedSC && (
+                <div className="relative z-20 flex flex-col items-center gap-3 max-w-md bg-[#0a0f18]/90 p-5 border border-cyan-500/50 rounded-2xl shadow-2xl backdrop-blur-md">
+                  <div>
+                    <h3 className="text-xs font-black text-white uppercase">
+                      DESTINO: {selectedPlanet ? selectedPlanet.name : `STAR CLUSTER [${dbStarClusters.find(s => s.id === selectedSC)?.name || selectedSC}]`}
+                    </h3>
+                    <p className="text-[10px] text-amber-400 font-extrabold mt-1">
+                      🎯 {selectedPlanet ? "EFICIENCIA DE EXTRACCIÓN DE MINADO:" : "PROBABILIDAD DE DESCUBRIMIENTO DE SS:"} {totalExpeditionProbability}%
+                    </p>
+                    <p className="text-[8px] text-zinc-400 mt-0.5">
+                      (Base GC: +{activeGcObject?.ss_discovery_rate ?? 5}% | Pasivo: {globalPassiveBonus >= 0 ? `+${globalPassiveBonus}` : globalPassiveBonus}%)
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => { playSfx(880); setIsDispatchPanelActive(true); }}
+                    className="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-teal-600 border border-cyan-400 text-white text-[10px] font-black uppercase rounded-lg shadow-lg cursor-pointer hover:brightness-110 active:scale-95 transition-all"
+                  >
+                    EQUIPAR Y DESPLEGAR MISIÓN
+                  </button>
+                </div>
+              )}
+            </div>
+
           </div>
 
         </div>
@@ -1427,7 +1643,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
             </div>
 
             <div className="mt-auto space-y-2">
-               {/* PREVISUALIZACIÓN DE RANGOS DE EXTRACCIÓN */}
                <div className="bg-[#020508] p-2 rounded-lg border border-cyan-900/50 flex flex-col gap-1 text-[7px] font-mono">
                  <span className="text-cyan-400 font-bold uppercase mb-0.5">Rango Estimado de Extracción:</span>
                  {dynamicMiningRanges.canMineMetal ? (
@@ -1463,10 +1678,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
             </div>
           </div>
 
-          {/* CONTENEDOR PRINCIPAL: BÚSQUEDA + GRID DISPONIBLE (2x4) + GRID SELECCIONADO */}
           <div className="flex-1 border border-cyan-500/20 bg-[#05070a] p-3 rounded-xl flex flex-col justify-between gap-2.5 h-full overflow-hidden">
-            
-            {/* 1. SECCIÓN SUPERIOR: HEADER (TEXTO LIMPIO SIN ICONO) + BARRA DE BÚSQUEDA */}
             <div className="flex items-center justify-between gap-2 bg-[#020508] p-2 rounded-lg border border-cyan-950 shrink-0">
               <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider">
                 DISPONIBLES: {currentLeftCategory.toUpperCase()} ({filteredInventory.length})
@@ -1491,7 +1703,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               )}
             </div>
 
-            {/* 2. COMPONENTE DISPONIBLES: GRID 2 FILAS x 4 COLUMNAS CON SCROLL INTERNO Y BLOQUEO EN VUELO */}
             <div className="flex-1 border border-cyan-950/60 bg-black/40 rounded-xl p-1.5 overflow-hidden flex flex-col">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[145px] pr-1 custom-scrollbar">
                 {currentLeftCategory === 'Fleets' ? (
@@ -1568,7 +1779,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               </div>
             </div>
 
-            {/* 3. COMPONENTE DE ACTIVOS SELECCIONADOS (TEXTO LIMPIO SIN ICONO) */}
             <div className="border border-cyan-500/40 bg-black/60 rounded-xl p-2 flex flex-col gap-1.5 shrink-0">
               <div className="flex justify-between items-center px-1">
                 <span className="text-[8.5px] font-black text-amber-400 uppercase tracking-wider">
@@ -1588,7 +1798,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 )}
               </div>
 
-              {/* GRID 2 FILAS x 4 COLUMNAS CON SCROLL INTERNO SI SUPERA 8 TARJETAS */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-[145px] overflow-y-auto pr-1 custom-scrollbar p-1 bg-[#020508] rounded-lg border border-cyan-950">
                 {selectedFleet && (
                   <div
@@ -1641,7 +1850,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               </div>
             </div>
 
-            {/* 4. BARRA DE ESTADO INFERIOR CON MÉTRICA DISTINGUIDA */}
             <div className="p-2.5 bg-[#020508] border border-cyan-950 rounded-lg flex justify-between items-center text-[9.5px] shrink-0">
               <span className="text-zinc-400 font-bold uppercase">
                 {selectedPlanet ? "EFICIENCIA DE EXTRACCIÓN APLICADA:" : "PROBABILIDAD DE DESCUBRIMIENTO DE SS:"}
@@ -1655,7 +1863,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         </div>
       )}
 
-      {/* 🛠️ POP-UP DEDICADO DE REQUISITO DE TOOL */}
       {showToolRequiredModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-4 font-mono">
           <div className="w-full max-w-md bg-[#080b0e] border-2 border-cyan-500/80 rounded-2xl p-6 text-center space-y-4 shadow-[0_0_35px_rgba(6,182,212,0.3)]">
@@ -1692,7 +1899,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         </div>
       )}
 
-      {/* MODAL FINAL DE CONFIRMACIÓN */}
       {isStartJourneyOpen && (
         <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 font-mono">
           <div className="w-full max-w-md bg-[#080b0e] border border-cyan-500/40 rounded-2xl p-6 text-center space-y-4">
@@ -1715,7 +1921,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         </div>
       )}
 
-      {/* SUB-MODAL RECOMPENSAS */}
       {isRewardSummaryOpen && (
         <div className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4 font-mono">
           <div className="w-[480px] bg-[#080b0e] border border-cyan-500/40 rounded-xl flex flex-col overflow-hidden shadow-2xl h-[320px]">

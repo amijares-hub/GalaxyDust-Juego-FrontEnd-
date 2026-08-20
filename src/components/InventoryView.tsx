@@ -23,7 +23,6 @@ import { useInventory, type InventoryItem } from "../hooks/useInventory";
 import { useAudioEngine } from "../hooks/useAudioEngine";
 export type { InventoryItem } from "../hooks/useInventory";
 
-
 interface InventoryViewProps {
   playerGems: number;
   setPlayerGems: React.Dispatch<React.SetStateAction<number>>;
@@ -35,55 +34,121 @@ interface InventoryViewProps {
   onBack: () => void;
 }
 
-const matchInventoryCategory = (itemCategory: string, selectedSidebarKey: string): boolean => {
+// 🌐 RESOLUCIÓN Y NORMALIZACIÓN DE RUTA DE IMÁGENES
+const resolveImageUrl = (rawUrl?: string): string => {
+  if (!rawUrl || typeof rawUrl !== 'string' || rawUrl.trim() === '') {
+    return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
+  }
+  const clean = rawUrl.trim();
+  if (clean.startsWith('http://') || clean.startsWith('https://')) return clean;
+
+  if (clean.startsWith('Assets') || clean.startsWith('Monedas') || clean.includes('Assets%20para')) {
+    return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/${clean.replace(/^\//, '')}`;
+  }
+
+  return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/galaxy-assets/${clean.replace(/^\//, '')}`;
+};
+
+// 🎯 CLASIFICADOR ESTRICHO Y DETERMINISTA DE CATEGORÍAS DE ASSETS
+const getItemCategory = (item: InventoryItem): string => {
+  const cat = String(item.category || "").toLowerCase().trim();
+  const type = String((item as any).type || "").toLowerCase().trim();
+  const name = String(item.name || (item as any).fullname || "").toLowerCase().trim();
+
+  if (cat === "fleets" || (item as any).is_fleet) return "Fleets";
+
+  // 1. Estructuras (Minitas, Depósitos, Fábricas, Extractores, Agencias, etc.)
+  if (
+    ["structures", "structure", "estructura", "estructuras"].includes(cat) ||
+    ["structures", "structure", "estructura"].includes(type) ||
+    /mine|deposit|factory|hq|extractor|plant|refinery|storage|building|estructura|structure|layer|agency/.test(name)
+  ) {
+    return "Structures";
+  }
+
+  // 2. Defensas (Cañones, Lanzadores, Torretas, Baterías, Defensas)
+  if (
+    ["defense", "defenses", "defensa", "defensas"].includes(cat) ||
+    ["defense", "defensa"].includes(type) ||
+    /cannon|launcher|turret|torpedo|barrier|battery|defensa|defense/.test(name)
+  ) {
+    return "Defense";
+  }
+
+  // 3. Astrobots (Robots, Drones, Astrobots)
+  if (
+    ["astrobots", "astrobot", "robot", "robots"].includes(cat) ||
+    ["astrobot", "robot"].includes(type) ||
+    /astrobot|robot|drone|android/.test(name)
+  ) {
+    return "Astrobots";
+  }
+
+  // 4. Tecnologías e Investigaciones
+  if (
+    ["tecnology", "technology", "technologies", "tech", "tecnologia", "tecnología"].includes(cat) ||
+    ["technology", "tech", "tecnologia"].includes(type) ||
+    /technology|tecnologia|tech|research/.test(name)
+  ) {
+    return "Tecnology";
+  }
+
+  // 5. Blueprints / Planos
+  if (
+    ["blueprints", "blueprint", "plano", "planos"].includes(cat) ||
+    ["blueprint", "plano"].includes(type) ||
+    /blueprint|plano|schematic/.test(name)
+  ) {
+    return "Blueprints";
+  }
+
+  // 6. Insignias / Badges
+  if (
+    ["badges", "badge", "insignia", "insignias"].includes(cat) ||
+    ["badge", "insignia"].includes(type) ||
+    /badge|insignia|medal/.test(name)
+  ) {
+    return "Badges";
+  }
+
+  // 7. Licencias
+  if (
+    ["licencia", "license", "licenses", "licencias"].includes(cat) ||
+    ["license", "licencia"].includes(type) ||
+    /license|licencia|permit/.test(name)
+  ) {
+    return "Licencia";
+  }
+
+  // 8. Herramientas / Tools
+  if (
+    ["tools", "tool", "herramientas", "herramienta"].includes(cat) ||
+    ["tool", "herramienta"].includes(type) ||
+    /tool|herramienta|drill|probe|scanner|sensor/.test(name)
+  ) {
+    return "Tools";
+  }
+
+  // 9. Consumibles
+  if (
+    ["consumibles", "consumables", "consumable"].includes(cat) ||
+    ["consumable", "consumible"].includes(type) ||
+    /consumable|consumible|capsule|ration|resupply/.test(name)
+  ) {
+    return "Consumibles";
+  }
+
+  // 🚀 CUALQUIER ASSET RESTANTE ES UNA NAVE (SPACESHIPS)
+  return "Spaceships";
+};
+
+// 🔍 EVALUADOR EXCLUSIVO POR PESTAÑA DEL MENÚ LATERAL
+const matchInventoryCategory = (item: InventoryItem, selectedSidebarKey: string): boolean => {
   if (!selectedSidebarKey || selectedSidebarKey === "All") return true;
-  if (selectedSidebarKey === "Favorites") return true;
-  if (selectedSidebarKey === "Fleets") return itemCategory === "Fleets";
+  if (selectedSidebarKey === "Favorites") return Boolean(item.favorite);
 
-  const normItem = (itemCategory || "").toLowerCase().trim();
-  const normKey = selectedSidebarKey.toLowerCase().trim();
-
-  if (normKey === "spaceships" || normKey === "ships" || normKey === "naves") {
-    return ["spaceships", "ships", "ship", "spaceship", "nave", "naves"].includes(normItem);
-  }
-
-  if (["tecnology", "technology", "tech", "tecnologia"].includes(normKey)) {
-    return ["tecnology", "technology", "tech", "tecnología", "tecnologia"].includes(normItem);
-  }
-
-  if (["defense", "defenses", "defensa"].includes(normKey)) {
-    return ["defense", "defenses", "defensa", "defensas"].includes(normItem);
-  }
-
-  if (["structures", "structure", "estructuras"].includes(normKey)) {
-    return ["structures", "structure", "estructura", "estructuras"].includes(normItem);
-  }
-
-  if (["astrobots", "astrobot", "robots"].includes(normKey)) {
-    return ["astrobots", "astrobot", "robot", "robots"].includes(normItem);
-  }
-
-  if (["blueprints", "blueprint", "planos"].includes(normKey)) {
-    return ["blueprints", "blueprint", "plano", "planos"].includes(normItem);
-  }
-
-  if (["badges", "badge", "insignias"].includes(normKey)) {
-    return ["badges", "badge", "insignia", "insignias"].includes(normItem);
-  }
-
-  if (["licencia", "licenses", "license", "licencias"].includes(normKey)) {
-    return ["licencia", "license", "licenses", "licencias"].includes(normItem);
-  }
-
-  if (["tools", "tool", "herramientas"].includes(normKey)) {
-    return ["tools", "tool", "herramienta", "herramientas"].includes(normItem);
-  }
-
-  if (["consumibles", "consumables", "consumable"].includes(normKey)) {
-    return ["consumibles", "consumables", "consumable"].includes(normItem);
-  }
-
-  return normItem === normKey;
+  const determinedCategory = getItemCategory(item);
+  return determinedCategory.toLowerCase() === selectedSidebarKey.toLowerCase();
 };
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
@@ -113,7 +178,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   const [showSubModal, setShowSubModal] = useState<"fleet" | null>(null);
   const [showSkillsPopup, setShowSkillsPopup] = useState(false);
-  const [fleets, setFleets] = useState<any[]>([])
+  const [fleets, setFleets] = useState<any[]>([]);
 
   useEffect(() => {
     if (!selectedChar) {
@@ -133,9 +198,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     }
   }, [showSubModal]);
 
-
-
-
   const getFilteredCharacters = useMemo(() => {
     let list = [...characters];
 
@@ -146,7 +208,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     if (activeSidebarCategory === "Favorites") {
       list = list.filter((c) => c.favorite);
     } else if (activeSidebarCategory !== "All") {
-      list = list.filter((c) => matchInventoryCategory(c.category, activeSidebarCategory));
+      list = list.filter((c) => matchInventoryCategory(c, activeSidebarCategory));
     }
 
     if (filterDropdown1 !== "ALL CLASES") {
@@ -357,10 +419,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     {modsEnabled ? "NO HAY NAVES EN VUELO REGISTRADAS" : "NO HAY ASSETS DISPONIBLES EN ESTE SECTOR"}
                   </div>
                 ) : (
-                  getFilteredCharacters.map((char) => {
+                  getFilteredCharacters.map((char, idx) => {
+                    const uniqueKey = `${char.category || 'asset'}-${char.id}-${idx}`;
                     return (
                       <div
-                        key={char.id}
+                        key={uniqueKey}
                         onClick={() => { playSfx(char.sound); setSelectedChar(char); }}
                         className="flex flex-col items-center justify-between relative group cursor-pointer transition-all duration-200 select-none p-2 rounded-xl border border-cyan-900/50 bg-[#070c12] hover:bg-[#0c1620] hover:border-cyan-400/80 shadow-lg text-center h-fit w-full"
                       >
@@ -369,11 +432,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                             <div className="absolute inset-0 border-2 border-dashed border-red-500 animate-[spin_5s_linear_infinite] pointer-events-none z-20 rounded-lg" />
                           )}
 
+                          {/* 🎯 CÁRGADOR DE IMAGEN CON FALLBACK AUTOMÁTICO */}
                           <img
-                            src={char.avatar_url}
+                            src={resolveImageUrl(char.avatar_url || (char as any).image_url)}
                             alt={char.name}
                             className={`w-full h-full object-cover ${!char.unlocked ? "grayscale opacity-50 brightness-50" : ""}`}
                             referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.onerror = null;
+                              target.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
+                            }}
                           />
 
                           {char.is_in_flight && (
@@ -441,7 +510,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-[7.5px] font-mono text-cyan-400 font-extrabold uppercase bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/40">
-                      {selectedChar.category.toUpperCase()} ASSET
+                      {getItemCategory(selectedChar).toUpperCase()} ASSET
                     </span>
                     <button onClick={(e) => handleToggleFavorite(selectedChar, e)} className="text-amber-400 hover:scale-110 transition-transform font-mono text-[9px] font-bold cursor-pointer">
                       {selectedChar.favorite ? "★ FAVORITO" : "☆ FAVORITO"}
@@ -484,7 +553,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4 relative z-10">
                   <div className="md:col-span-4 flex flex-col items-center gap-3 bg-black/40 border border-cyan-950 p-3.5 rounded-2xl text-center h-fit">
                     <div className="relative w-24 h-28 aspect-square rounded-xl border-2 border-cyan-400 overflow-hidden shadow-[0_0_20px_rgba(34,211,238,0.25)]">
-                      <img src={selectedChar.avatar_url} alt={selectedChar.name} className="w-full h-full object-cover" />
+                      <img 
+                        src={resolveImageUrl(selectedChar.avatar_url || (selectedChar as any).image_url)} 
+                        alt={selectedChar.name} 
+                        className="w-full h-full object-cover" 
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null;
+                          target.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
+                        }}
+                      />
                       <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-cyan-950 border border-cyan-400 text-white font-mono font-black text-[8.5px] shadow">
                         x{selectedChar.quantity}
                       </div>
@@ -509,7 +587,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       <p className="text-[9px] font-sans text-zinc-300 leading-relaxed uppercase">{selectedChar.description || "Sin descripción disponible."}</p>
                     </div>
 
-                    {matchInventoryCategory(selectedChar.category, 'Spaceships') ? (
+                    {getItemCategory(selectedChar) === 'Spaceships' ? (
                       <>
                         <div className="bg-black/40 border border-red-900/40 p-2.5 rounded-xl">
                           <span className="text-[7.5px] text-red-400 font-bold tracking-widest uppercase block mb-1.5 border-b border-red-900/30 pb-1">Matriz Ofensiva</span>
@@ -606,7 +684,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     [SKILLS]
                   </button>
 
-                  {matchInventoryCategory(selectedChar.category, 'Spaceships') && showSubModal === null && !selectedChar.is_in_flight && (
+                  {getItemCategory(selectedChar) === 'Spaceships' && showSubModal === null && !selectedChar.is_in_flight && (
                     <button
                       onClick={() => setShowSubModal("fleet")}
                       className="px-3.5 py-1.5 bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-500/50 text-cyan-300 rounded-xl text-[8.5px] font-mono font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5"
