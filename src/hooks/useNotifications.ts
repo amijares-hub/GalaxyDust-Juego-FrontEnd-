@@ -17,7 +17,35 @@ export const useNotifications = () => {
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // 🎯 CONSULTA A LA TABLA OFICIAL DE NOTIFICACIONES `user_notifications`
+  const getReadIds = (userId: string): Set<string> => {
+    try {
+      const stored = localStorage.getItem(`read_notifs_${userId}`);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  };
+
+  const saveReadId = (userId: string, id: string) => {
+    try {
+      const readIds = getReadIds(userId);
+      readIds.add(id);
+      localStorage.setItem(`read_notifs_${userId}`, JSON.stringify(Array.from(readIds)));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const saveAllReadIds = (userId: string, ids: string[]) => {
+    try {
+      const readIds = getReadIds(userId);
+      ids.forEach(id => readIds.add(id));
+      localStorage.setItem(`read_notifs_${userId}`, JSON.stringify(Array.from(readIds)));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const fetchNotifications = useCallback(async () => {
     try {
       setLoading(true);
@@ -30,45 +58,50 @@ export const useNotifications = () => {
       }
 
       const { data, error } = await supabase
-        .from('user_notifications')
-        .select('*')
+        .from('expedition_logs')
+        .select('id, user_id, expedition_id, event_type, title, message, rewards_looted, damage_sustained, created_at')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (!error && data) {
-        const formatted: NotificationRecord[] = data.map((item: any) => ({
-          notification_id: (item.notification_id || item.id)?.toString(),
-          category: item.category || 'SYSTEM',
-          box_type: item.box_type || item.category || 'SYSTEM',
-          title: item.title || 'COMUNICADO C.A.N.',
-          message: item.message || 'Sin mensaje especificado.',
-          action_url: item.action_url || null,
-          is_read: Boolean(item.is_read),
-          created_at: item.created_at || new Date().toISOString()
-        }));
+        const readIds = getReadIds(user.id);
+        const formatted: NotificationRecord[] = data.map((item: any) => {
+          const idStr = String(item.id || '');
+          return {
+            notification_id: idStr,
+            category: (item.event_type || 'EXPEDITION').toUpperCase(),
+            box_type: 'EXPEDITION',
+            title: item.title || 'INFORME DE EXPEDICIÓN',
+            message: item.message || 'Sin mensaje especificado.',
+            is_read: readIds.has(idStr),
+            created_at: item.created_at || new Date().toISOString()
+          };
+        });
 
         setNotifications(formatted);
         setUnreadCount(formatted.filter(n => !n.is_read).length);
       }
     } catch (err) {
-      console.error("Error al cargar comunicaciones desde user_notifications:", err);
+      console.error("Error al cargar comunicaciones:", err);
     } finally {
       setLoading(false);
     }
   }, []);
 
   const markAsRead = async (id: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) saveReadId(user.id, id);
     setNotifications(prev => prev.map(n => n.notification_id === id ? { ...n, is_read: true } : n));
     setUnreadCount(prev => Math.max(0, prev - 1));
-    await supabase.from('user_notifications').update({ is_read: true }).or(`notification_id.eq.${id},id.eq.${id}`);
   };
 
   const markAllAsRead = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    saveAllReadIds(user.id, notifications.map(n => n.notification_id));
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     setUnreadCount(0);
-    await supabase.from('user_notifications').update({ is_read: true }).eq('user_id', user.id);
   };
 
   const deleteNotification = async (id: string) => {
@@ -77,7 +110,7 @@ export const useNotifications = () => {
       const target = notifications.find(n => n.notification_id === id);
       return (target && !target.is_read) ? Math.max(0, prev - 1) : prev;
     });
-    await supabase.from('user_notifications').delete().or(`notification_id.eq.${id},id.eq.${id}`);
+    await supabase.from('expedition_logs').delete().eq('id', id);
   };
 
   useEffect(() => {
@@ -89,10 +122,10 @@ export const useNotifications = () => {
       if (!user) return;
 
       channel = supabase
-        .channel(`realtime_user_notifications_${user.id}`)
+        .channel(`realtime_notifications_stream_${user.id}`)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'user_notifications', filter: `user_id=eq.${user.id}` },
+          { event: '*', schema: 'public', table: 'expedition_logs', filter: `user_id=eq.${user.id}` },
           () => {
             fetchNotifications();
           }

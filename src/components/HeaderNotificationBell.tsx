@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Bell } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import { useNotifications } from "../hooks/useNotifications";
 
 interface HeaderNotificationBellProps {
   onClick: () => void;
@@ -8,59 +8,14 @@ interface HeaderNotificationBellProps {
 }
 
 export const HeaderNotificationBell: React.FC<HeaderNotificationBellProps> = ({ onClick, isActive }) => {
-  const [unreadCount, setUnreadCount] = useState<number>(0);
-
-  // ─── CONSULTAR NOTIFICACIONES NO LEÍDAS (ZERO-TRUST) ───
-  const fetchUnreadCount = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setUnreadCount(0);
-        return;
-      }
-
-      const { count, error } = await supabase
-        .from('user_notifications')
-        .select('notification_id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_read', false);
-
-      if (!error && count !== null) {
-        setUnreadCount(count);
-      }
-    } catch (err) {
-      console.error("Error obteniendo conteo de notificaciones:", err);
-    }
-  };
-
-  useEffect(() => {
-    fetchUnreadCount();
-
-    // 🛡️ SUSCRIPCIÓN REALTIME Y POLLING DE RESPALDO
-    const interval = setInterval(fetchUnreadCount, 15000);
-
-    const subscription = supabase
-      .channel('user_notifications_bell')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'user_notifications' },
-        () => {
-          fetchUnreadCount();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      clearInterval(interval);
-      supabase.removeChannel(subscription);
-    };
-  }, []);
+  // 🎯 UNIFICACIÓN: Lee el conteo exacto directamente del hook maestro de notificaciones
+  const { unreadCount, refresh } = useNotifications();
 
   return (
     <button
       onClick={() => {
         onClick();
-        fetchUnreadCount();
+        refresh();
       }}
       className={`relative p-2.5 rounded-xl border backdrop-blur-md transition-all cursor-pointer shadow-lg group ${
         isActive
@@ -71,7 +26,7 @@ export const HeaderNotificationBell: React.FC<HeaderNotificationBellProps> = ({ 
     >
       <Bell className="w-5 h-5 text-cyan-400 animate-pulse" />
       
-      {/* CÍRCULO ROJO DINÁMICO */}
+      {/* CÍRCULO ROJO DINÁMICO SINCRONIZADO */}
       {unreadCount > 0 && (
         <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white font-mono text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-[0_0_8px_rgba(239,68,68,0.8)] border border-black animate-bounce">
           {unreadCount > 99 ? "99+" : unreadCount}

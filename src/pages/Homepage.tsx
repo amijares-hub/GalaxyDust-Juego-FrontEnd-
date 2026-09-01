@@ -51,6 +51,11 @@ interface ToastNotification {
   timestamp: string;
 }
 
+const isValidUUID = (str?: string | null): boolean => {
+  if (!str) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+};
+
 const cards: SectorCard[] = [
   { id: "expedition", title: "EXPEDITION", description: "Venture into the unknown, explore, farm, and dominate the galaxy.", imageSrc: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop", targetWindow: "expeditions" },
   { id: "alliance", title: "ALLIANCE", description: "Coordinate your power. Expand your dominion.", imageSrc: "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=800&auto=format&fit=crop", targetWindow: "alliance" },
@@ -82,7 +87,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     return activeFlights.filter(exp => new Date(exp.estimated_return_time).getTime() <= nowMs).length;
   }, [activeFlights, utcTime]);
 
-  // 🎯 DISPARADOR DE COMUNICADOS CORREGIDO PARA USER_NOTIFICATIONS Y EXPEDITION_LOGS
   const handleTriggerNotification = async (text: string, payloadOrExpId?: any) => {
     const id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
     const newToast: ToastNotification = {
@@ -96,49 +100,30 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (authUser) {
-        let expIdStr: string | null = null;
+        let validExpId: string | null = null;
         let rewardsPayload: any = {};
 
-        if (typeof payloadOrExpId === 'string') {
-          expIdStr = payloadOrExpId;
+        if (typeof payloadOrExpId === 'string' && isValidUUID(payloadOrExpId)) {
+          validExpId = payloadOrExpId;
         } else if (payloadOrExpId && typeof payloadOrExpId === 'object') {
-          if (payloadOrExpId.expId) expIdStr = String(payloadOrExpId.expId);
+          if (isValidUUID(payloadOrExpId.expId)) validExpId = payloadOrExpId.expId;
           if (payloadOrExpId.rewards) rewardsPayload = payloadOrExpId.rewards;
         }
 
-        // 1. Insertar en user_notifications para la vista de Comunicaciones
-        await supabase.from('user_notifications').insert([{
+        await supabase.from('expedition_logs').insert([{
           user_id: authUser.id,
-          category: 'EXPEDITION',
-          box_type: 'EXPEDITION',
+          expedition_id: validExpId,
+          event_type: 'discovery',
           title: 'EXPEDICIÓN FINALIZADA',
           message: text,
-          is_read: false
+          rewards_looted: rewardsPayload,
+          damage_sustained: 0
         }]);
 
-        // 2. Si proviene de expedición, registrar en expedition_logs para la tarjeta de vuelo
-        if (expIdStr) {
-          await supabase.from('expedition_logs').insert([{
-            user_id: authUser.id,
-            expedition_id: expIdStr,
-            event_type: 'discovery',
-            title: 'MISION FINALIZADA',
-            message: text,
-            rewards_looted: rewardsPayload,
-            damage_sustained: 0
-          }]);
-        }
-
-        const { count } = await supabase
-          .from('user_notifications')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', authUser.id)
-          .eq('is_read', false);
-
-        if (count !== null) setUnreadNotifCount(count);
+        setUnreadNotifCount(prev => prev + 1);
       }
     } catch (err) {
-      console.error("Error al registrar notificación:", err);
+      console.error("Error al persistir notificación:", err);
       setUnreadNotifCount(prev => prev + 1);
     }
 
@@ -163,8 +148,8 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     const nowMs = Date.now();
     activeFlights.forEach((exp) => {
       const returnMs = new Date(exp.estimated_return_time).getTime();
-      if (nowMs >= returnMs && !notifiedFlightIds.has(String(exp.id))) {
-        setNotifiedFlightIds(prev => new Set(prev).add(String(exp.id)));
+      if (nowMs >= returnMs && !notifiedFlightIds.has(exp.id)) {
+        setNotifiedFlightIds(prev => new Set(prev).add(exp.id));
         handleTriggerNotification(
           `🎉 ¡EXPEDICIÓN FINALIZADA! La flota ${exp.fleet_name || 'de expedición'} ha llegado a su destino (${exp.sector_name || 'SC'}). Reclama tus recompensas en Expeditions In Flight.`,
           { expId: exp.id }
@@ -175,7 +160,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
 
   useEffect(() => {
     let profileChannel: any;
-    let notifChannel: any;
+    let logsChannel: any;
     let expeditionsChannel: any;
     let isMounted = true;
 
@@ -248,16 +233,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       await loadUserProfile(authUser);
       await loadActiveExpeditions(authUser.id);
 
-      const { count: notifCount } = await supabase
-        .from('user_notifications')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', authUser.id)
-        .eq('is_read', false);
-
-      if (notifCount !== null && notifCount !== undefined && isMounted) {
-        setUnreadNotifCount(notifCount);
-      }
-
       profileChannel = supabase
         .channel(`economy_hud_stream_${authUser.id}`)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_profiles' }, () => {
@@ -272,16 +247,16 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         })
         .subscribe();
 
-      notifChannel = supabase
-        .channel(`user_notifications_stream_${authUser.id}`)
+      logsChannel = supabase
+        .channel(`expedition_logs_stream_${authUser.id}`)
         .on('postgres_changes', { 
           event: 'INSERT', 
           schema: 'public', 
-          table: 'user_notifications',
+          table: 'expedition_logs',
           filter: `user_id=eq.${authUser.id}`
         }, (payload: any) => {
-          const newNotif = payload.new;
-          if (newNotif && isMounted && !newNotif.is_read) {
+          const newLog = payload.new;
+          if (newLog && isMounted) {
             setUnreadNotifCount(prev => prev + 1);
           }
         })
@@ -302,7 +277,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     return () => {
       isMounted = false;
       if (profileChannel) supabase.removeChannel(profileChannel);
-      if (notifChannel) supabase.removeChannel(notifChannel);
+      if (logsChannel) supabase.removeChannel(logsChannel);
       if (expeditionsChannel) supabase.removeChannel(expeditionsChannel);
     };
   }, []);

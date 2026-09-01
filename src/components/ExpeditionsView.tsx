@@ -490,22 +490,91 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
       let legacyUserId: number | null = null;
       if (profile?.legacy_id) legacyUserId = Number(profile.legacy_id);
 
-      // 🎯 CARGA DE HISTORIAL DE LAS ÚLTIMAS 10 EXPEDICIONES COMPLETADAS
-      const { data: historyRows } = await supabase
-        .from('expedition_history')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+      // 🎯 CONSISTENCIA TOTAL: BÚSQUEDA TRIPLE PARA RECUPERAR EL HISTORIAL COMPLETO
+      const [
+        { data: historyRows },
+        { data: claimedExpeditions },
+        { data: rewardLogs }
+      ] = await Promise.all([
+        supabase.from('expedition_history').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('active_expeditions').select('*').eq('user_id', userId).in('status', ['CLAIMED', 'SUCCESS']).order('launch_time', { ascending: false }),
+        supabase.from('expedition_logs').select('*').eq('user_id', userId).not('rewards_looted', 'is', null).order('created_at', { ascending: false })
+      ]);
 
-      if (historyRows) {
-        const counts: Record<string, number> = {};
-        historyRows.forEach((row: any) => {
-          const gc = row.galaxy_cluster || 'PELA';
-          counts[gc] = (counts[gc] || 0) + 1;
+      const unifiedHistoryMap = new Map<string, ExpeditionHistoryRecord>();
+
+      (historyRows || []).forEach((row: any) => {
+        const key = String(row.id || row.expedition_id || Math.random());
+        unifiedHistoryMap.set(key, {
+          id: key,
+          fleet_name: row.fleet_name || 'FLOTA IMPERIAL',
+          galaxy_cluster: row.galaxy_cluster || 'INARA',
+          sector_name: row.sector_name || 'SECTOR MINERO',
+          status: row.status || 'CLAIMED',
+          metal_mined: Number(row.metal_mined || row.metal || 0),
+          crystal_mined: Number(row.crystal_mined || row.crystal || 0),
+          dark_matter_mined: Number(row.dark_matter_mined || row.dark_matter || 0),
+          created_at: row.created_at || new Date().toISOString()
         });
-        setCompletedCountsByGC(counts);
-        setCompletedHistory(historyRows.slice(0, 10));
-      }
+      });
+
+      (claimedExpeditions || []).forEach((exp: any) => {
+        const key = String(exp.id);
+        if (!unifiedHistoryMap.has(key)) {
+          unifiedHistoryMap.set(key, {
+            id: key,
+            fleet_name: exp.fleet_name || 'FLOTA IMPERIAL',
+            galaxy_cluster: exp.galaxy_cluster || 'INARA',
+            sector_name: exp.sector_name || 'SECTOR MINERO',
+            status: exp.status || 'CLAIMED',
+            metal_mined: Number(exp.calculated_min_metal || 300),
+            crystal_mined: Number(exp.calculated_min_crystal || 150),
+            dark_matter_mined: 0,
+            created_at: exp.launch_time || exp.created_at || new Date().toISOString()
+          });
+        }
+      });
+
+      (rewardLogs || []).forEach((log: any) => {
+        const key = String(log.expedition_id || log.id);
+        const rewards = log.rewards_looted || {};
+        const metal = Number(rewards.metal || 0);
+        const crystal = Number(rewards.crystal || 0);
+        const darkMatter = Number(rewards.dark_matter || 0);
+
+        if (metal > 0 || crystal > 0 || darkMatter > 0) {
+          if (!unifiedHistoryMap.has(key)) {
+            unifiedHistoryMap.set(key, {
+              id: key,
+              fleet_name: log.title || 'MISION COMPLETADA',
+              galaxy_cluster: 'INARA',
+              sector_name: log.message?.includes('EN ') ? log.message.split('EN ')[1]?.split(':')[0] : 'SECTOR EXPLORADO',
+              status: 'CLAIMED',
+              metal_mined: metal,
+              crystal_mined: crystal,
+              dark_matter_mined: darkMatter,
+              created_at: log.created_at || new Date().toISOString()
+            });
+          } else {
+            const existing = unifiedHistoryMap.get(key)!;
+            if (metal > 0) existing.metal_mined = metal;
+            if (crystal > 0) existing.crystal_mined = crystal;
+            if (darkMatter > 0) existing.dark_matter_mined = darkMatter;
+          }
+        }
+      });
+
+      const combinedList = Array.from(unifiedHistoryMap.values())
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      const counts: Record<string, number> = {};
+      combinedList.forEach((row) => {
+        const gc = row.galaxy_cluster || 'PELA';
+        counts[gc] = (counts[gc] || 0) + 1;
+      });
+
+      setCompletedCountsByGC(counts);
+      setCompletedHistory(combinedList.slice(0, 10));
 
       let globalNetBonus = 0;
       let hasCrystalUnlock = false;
@@ -1016,7 +1085,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         </div>
 
         <div className="w-full flex flex-col md:flex-row gap-3.5 items-start">
-          {/* SIDEBAR IZQUIERDO DE NAVEGACIÓN Y RESUMEN HISTÓRICO */}
           <div className="w-full md:w-56 shrink-0 bg-[#05070a] border border-cyan-500/20 p-3 rounded-xl flex flex-col gap-2.5 min-h-[380px] justify-between">
             <div className="flex flex-col gap-2.5">
               <div className="relative w-full">
@@ -1044,7 +1112,6 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               </div>
             </div>
 
-            {/* BLOQUE DINÁMICO DE LAS ÚLTIMAS 10 EXPEDICIONES EN EL ESPACIO INFERIOR DEL SIDEBAR */}
             <div className="mt-2 border-t border-cyan-950 pt-2 flex flex-col flex-1 overflow-hidden">
               <span className="text-[8px] font-black text-cyan-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
                 <span className="flex items-center gap-1">
@@ -1064,7 +1131,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                     return (
                       <div key={item.id || idx} className="p-1.5 bg-[#0a0f14] border border-cyan-950 hover:border-cyan-800 rounded text-[7.5px] flex flex-col gap-0.5 transition-colors">
                         <div className="flex justify-between items-center font-bold">
-                          <span className="text-white truncate max-w-[110px]">{item.fleet_name || 'FLOTA INDEPENDIENTE'}</span>
+                          <span className="text-white truncate max-w-[110px]">{item.fleet_name || 'FLOTA IMPERIAL'}</span>
                           <span className="text-emerald-400 text-[6.5px] bg-emerald-950 px-1 py-0.5 rounded border border-emerald-800">
                             {item.status || 'CLAIMED'}
                           </span>
@@ -1095,7 +1162,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                   <div key={exp.id} className="p-3.5 rounded-xl border border-cyan-500/30 bg-[#050910] shadow-lg flex flex-col justify-between gap-2.5 relative overflow-hidden">
                     <div className="flex justify-between items-start">
                       <div className="flex flex-col">
-                        <span className="text-[10.5px] font-black text-white uppercase truncate">{exp.fleet_name || 'FLOTA INDEPENDIENTE'}</span>
+                        <span className="text-[10.5px] font-black text-white uppercase truncate">{exp.fleet_name || 'FLOTA IMPERIAL'}</span>
                         <span className="text-[8px] text-cyan-400 font-bold uppercase">{exp.galaxy_cluster} / {exp.sector_name || 'SECTOR'}</span>
                       </div>
                       <span className="text-[7.5px] font-mono px-2 py-0.5 rounded font-black border bg-emerald-950 text-emerald-400 border-emerald-800">

@@ -73,11 +73,16 @@ interface MyInventoryItem {
   amount?: number;
 }
 
-// 🌐 NORMALIZACIÓN ESTRICTA Y UNIFICADA DE CATEGORÍAS
+// 🌐 NORMALIZACIÓN ESTRICTA DE CATEGORÍAS
 const normalizeCategory = (cat?: string, type?: string): AssetCategory => {
+  const upperCat = String(cat || '').toUpperCase().trim();
+  if (['SHIPS', 'TOOLS', 'STRUCTURES', 'TECH', 'BLUEPRINTS', 'LICENSES', 'ASTROBOTS', 'CONSUMABLES'].includes(upperCat)) {
+    return upperCat as AssetCategory;
+  }
+
   const raw = `${cat || ''} ${type || ''}`.toLowerCase().trim();
   
-  if (['spaceships', 'ships', 'naves', 'nave', 'spaceship'].some(k => raw.includes(k))) return 'SHIPS';
+  if (['spaceships', 'ships', 'naves', 'nave', 'spaceship', 'ship'].some(k => raw.includes(k))) return 'SHIPS';
   if (['tools', 'tool', 'herramientas', 'herramienta'].some(k => raw.includes(k))) return 'TOOLS';
   if (['structures', 'structure', 'estructuras', 'estructura', 'defense', 'defensa', 'defenses'].some(k => raw.includes(k))) return 'STRUCTURES';
   if (['technologies', 'technology', 'tech', 'tecnología', 'tecnologia'].some(k => raw.includes(k))) return 'TECH';
@@ -132,6 +137,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   const [priceSort, setPriceSort] = useState<PriceSortOption>('NONE');
 
   const [myInventory, setMyInventory] = useState<MyInventoryItem[]>([]);
+  const [isLocalLoading, setIsLocalLoading] = useState<boolean>(false);
 
   // Modal de Publicación
   const [selectedItemToList, setSelectedItemToList] = useState<MyInventoryItem | null>(null);
@@ -140,9 +146,10 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   const [auctionDuration, setAuctionDuration] = useState<'12h' | '24h' | '48h'>('24h');
   const [sellDescription, setSellDescription] = useState<string>('');
 
-  // 🎯 MAPEADO DE ACTIVOS PROPIOS A TODAS LAS CATEGORÍAS
-  useEffect(() => {
-    const syncInventory = async () => {
+  // 🎯 HIDRATACIÓN COMPLETA DE ACTIVOS DESDE SUPABASE Y HOOKS
+  const syncInventory = async () => {
+    setIsLocalLoading(true);
+    try {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || currentUserId;
       if (!userId) return;
@@ -155,7 +162,60 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
       const activeListingIds = new Set((dbListings || []).map((l: any) => String(l.inventory_item_id)));
 
-      const formatted: MyInventoryItem[] = (inventoryItems || []).map((item) => {
+      // 1. Cargar desde la base de datos directamente para evitar listas vacías
+      const loadCat = async (userTable: string, seedTable: string, category: AssetCategory, fkCols: string[]) => {
+        const { data: userRows } = await supabase.from(userTable).select('*').eq('user_id', userId);
+        if (!userRows || userRows.length === 0) return [];
+
+        const { data: seedRows } = await supabase.from(seedTable).select('*');
+        const seedMap = new Map<string, any>();
+        (seedRows || []).forEach((s: any) => {
+          [s.id, s.ship_id, s.id_ship, s.tool_id, s.astrobot_id, s.license_id, s.consumable_id].forEach(k => {
+            if (k !== undefined && k !== null) seedMap.set(String(k), s);
+          });
+        });
+
+        return userRows.map((row: any) => {
+          let targetId: string | null = null;
+          for (const col of fkCols) {
+            if (row[col] !== undefined && row[col] !== null) {
+              targetId = String(row[col]);
+              break;
+            }
+          }
+          const seed = targetId ? seedMap.get(targetId) : null;
+          const realName = row.custom_name || seed?.ship_name || seed?.name || row.name || `${category} #${row.id}`;
+          const rawImg = seed?.image_url || seed?.avatar_url || seed?.avatar || row.image_url;
+          const finalImg = resolveImageUrl(rawImg);
+          const rarity = normalizeRarity(seed?.rarity || row.rarity);
+          const isListed = activeListingIds.has(String(row.id));
+
+          return {
+            id: String(row.id),
+            title: realName,
+            category: category,
+            rarity: rarity,
+            description: seed?.description || row.description || `Activo estelar de la flota.`,
+            image_url: finalImg,
+            is_locked: Boolean(row.is_in_flight) || isListed,
+            is_in_flight: Boolean(row.is_in_flight),
+            amount: row.quantity || row.amount || 1
+          };
+        });
+      };
+
+      const [ships, tools, astrobots, consumables, licenses] = await Promise.all([
+        loadCat('user_ships', 'seed_ships', 'SHIPS', ['id_ship', 'ship_id', 'id']),
+        loadCat('user_tools', 'seed_tools', 'TOOLS', ['tool_id', 'id']),
+        loadCat('user_astrobots', 'seed_astrobots', 'ASTROBOTS', ['astrobot_id', 'id']),
+        loadCat('user_consumibles', 'seed_consumables', 'CONSUMABLES', ['consumable_id', 'id']),
+        loadCat('user_licenses', 'seed_licenses', 'LICENSES', ['license_id', 'id'])
+      ]);
+
+      const directAssets = [...ships, ...tools, ...astrobots, ...consumables, ...licenses];
+
+      // 2. Integrar con useInventory como respaldo
+      const hookAssets: MyInventoryItem[] = (inventoryItems || []).map((item) => {
         const itemCat = normalizeCategory(item.category, item.type);
         const itemRarity = normalizeRarity(item.rarity);
         const isListed = activeListingIds.has(String(item.id));
@@ -173,9 +233,18 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
         };
       });
 
-      setMyInventory(formatted);
-    };
+      const mergedMap = new Map<string, MyInventoryItem>();
+      [...directAssets, ...hookAssets].forEach(a => mergedMap.set(a.id, a));
 
+      setMyInventory(Array.from(mergedMap.values()));
+    } catch (err) {
+      console.error("Error al sincronizar inventario del Marketplace:", err);
+    } finally {
+      setIsLocalLoading(false);
+    }
+  };
+
+  useEffect(() => {
     syncInventory();
   }, [inventoryItems, currentUserId, marketListings]);
 
@@ -240,6 +309,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
       if (fetchMarketplaceData) await fetchMarketplaceData();
       if (refreshInventory) await refreshInventory();
+      await syncInventory();
 
       if (triggerNotification) {
         triggerNotification(`🔒 ACTIVO PUBLICADO COMO ${sellIsAuction ? 'SUBASTA EN VIVO' : 'VENTA DIRECTA'}`);
@@ -255,6 +325,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
       await cancelListing(listing.id);
       if (fetchMarketplaceData) await fetchMarketplaceData();
       if (refreshInventory) await refreshInventory();
+      await syncInventory();
       if (triggerNotification) triggerNotification("🔓 ACTIVO RETIRADO DEL MERCADO Y DESBLOQUEADO");
     } catch (err: any) {
       console.error("Error al cancelar oferta:", err);
@@ -267,6 +338,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
       if (setPlayerGold) setPlayerGold((prev: number) => Math.max(0, prev - item.price));
       if (fetchMarketplaceData) await fetchMarketplaceData();
       if (refreshInventory) await refreshInventory();
+      await syncInventory();
       if (triggerNotification) triggerNotification(`🎉 TRANSACCIÓN EXITOSA: Adquiriste "${item.title}"`);
     } catch (err: any) {
       if (triggerNotification) triggerNotification(`⛔ TRANSACCIÓN RECHAZADA: ${err.message}`);
@@ -551,7 +623,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
           </div>
         ) : (
           <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5 max-h-[440px] overflow-y-auto pr-1.5 custom-scrollbar">
-            {inventoryLoading ? (
+            {(inventoryLoading || isLocalLoading) ? (
               <div className="col-span-full p-12 text-center text-cyan-500 text-[10px] uppercase tracking-widest bg-[#05070a] border border-cyan-500/10 rounded-xl">
                 ESCANEAR ACTIVOS DEL JUGADOR...
               </div>
