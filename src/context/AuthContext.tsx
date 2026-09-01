@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useMemo } from 'react';
 import { useSasoriAuth, UseSasoriAuthReturn } from '../hooks/useSasoriAuth';
 
 // 🛰️ Contexto global de autenticación
@@ -16,8 +16,23 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const auth = useSasoriAuth();
 
+  // 🎯 ESTABILIZACIÓN DE REFERENCIA (MEMOIZACIÓN)
+  // Evita propagar re-renders a toda la aplicación si el objeto retornado no cambia sus valores clave.
+  const value = useMemo(() => auth, [
+    auth.screen,
+    auth.state,
+    auth.user,
+    auth.errorMessage,
+    auth.successMessage,
+    auth.setScreen,
+    auth.submitLogin,
+    auth.submitRegister,
+    auth.verifyTwoFA,
+    auth.logout
+  ]);
+
   return (
-    <AuthContext.Provider value={auth}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

@@ -3,219 +3,345 @@ import { supabase } from '../lib/supabase';
 
 export interface InventoryItem {
   id: string;
+  seed_id?: string;
   name: string;
-  fullname: string;
+  fullname?: string;
   category: string;
+  type?: string;
   rarity: string;
   faction?: string;
-  avatar_url: string;
-  unlocked: boolean;
-  quantity: number;
   level: number;
-  stars: number;
-  blueprints_owned: number;
-  blueprints_required: number;
-  crafting_costs?: any;
-  tactical_stats?: any;
-  skills?: any;
-  set_skills?: string;
-  effect?: string;
+  stars?: number;
+  quantity: number;
+  unlocked: boolean;
+  favorite: boolean;
+  is_in_flight: boolean;
+  avatar_url: string;
+  image_url?: string;
+  description?: string;
+  power_score?: number;
+  effect?: string | number;
   stack_info?: string;
   duration_info?: string;
-  power_score?: number;
-  description?: string;
-  favorite?: boolean;
+  set_skills?: string;
+  skills?: any;
   sound?: string;
-  raw_seed?: any;
-  is_in_flight?: boolean;
+  tactical_stats?: {
+    hp?: number;
+    shield?: number;
+    defense?: number;
+    speed_boost?: number;
+    kinetic_attack?: number;
+    laser_attack?: number;
+    plasma_attack?: number;
+    ionic_attack?: number;
+    graviton_attack?: number;
+  };
 }
 
-export function useInventory() {
-  const [userId, setUserId] = useState<string | null>(null);
+const resolveImageUrl = (rawUrl?: string): string => {
+  if (!rawUrl || typeof rawUrl !== 'string' || rawUrl.trim() === '') {
+    return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
+  }
+  const clean = rawUrl.trim();
+  if (clean.startsWith('http://') || clean.startsWith('https://')) return clean;
+
+  if (clean.startsWith('Assets') || clean.startsWith('Monedas') || clean.includes('Assets%20para')) {
+    return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/${clean.replace(/^\//, '')}`;
+  }
+
+  return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/galaxy-assets/${clean.replace(/^\//, '')}`;
+};
+
+export const useInventory = () => {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Obtener el UUID real de Supabase Auth (no del AuthContext que usa UserProfile sin id)
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUserId(session?.user?.id ?? null);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id ?? null);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
   const fetchInventory = useCallback(async () => {
-    if (!userId) {
-      setItems([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
     try {
-      const currentUserId = userId;
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setItems([]);
+        return;
+      }
 
-      const { data: activeExps } = await supabase
+      // 1. OBTENER EXPEDICIONES ACTIVAS EN VUELO
+      const { data: activeExpeditions } = await supabase
         .from('active_expeditions')
         .select('*')
-        .eq('user_id', currentUserId)
+        .eq('user_id', user.id)
         .eq('status', 'LAUNCHED');
 
-      const hasActiveExpeditions = (activeExps || []).length > 0;
-      const allItems: InventoryItem[] = [];
+      // 2. OBTENER FLOTAS DEL USUARIO
+      const { data: userFleets } = await supabase
+        .from('fleets')
+        .select('*')
+        .eq('user_id', user.id);
 
-      const loadCategory = async (
-        userTable: string,
-        seedTable: string,
-        categoryName: string,
-        possibleFkCols: string[],
-        pkSeedCol: string = 'id',
-        nameCols: string[] = ['name', 'title']
-      ) => {
-        try {
-          const { data: userRows } = await supabase
-            .from(userTable)
-            .select('*')
-            .eq('user_id', currentUserId);
+      const inFlightIds = new Set<string>();
+      const inFlightNames = new Set<string>();
 
-          if (!userRows || userRows.length === 0) return;
-
-          const { data: seedRows } = await supabase.from(seedTable).select('*');
-          if (!seedRows || seedRows.length === 0) return;
-
-          const seedMap = new Map();
-          seedRows.forEach((s: any) => {
-            if (s[pkSeedCol]) seedMap.set(s[pkSeedCol].toString(), s);
-            if (s.id) seedMap.set(s.id.toString(), s);
-            if (s.ship_id) seedMap.set(s.ship_id.toString(), s);
-            if (s.structure_id) seedMap.set(s.structure_id.toString(), s);
-            if (s.technology_id) seedMap.set(s.technology_id.toString(), s);
-            if (s.tool_id) seedMap.set(s.tool_id.toString(), s);
-            if (s.astrobot_id) seedMap.set(s.astrobot_id.toString(), s);
-            if (s.defense_id) seedMap.set(s.defense_id.toString(), s);
-            if (s.blueprint_id) seedMap.set(s.blueprint_id.toString(), s);
+      (activeExpeditions || []).forEach((exp: any) => {
+        const deployed = exp.equipped_assets || exp.assets || exp.ships || [];
+        if (Array.isArray(deployed)) {
+          deployed.forEach((a: any) => {
+            if (a.id) inFlightIds.add(String(a.id).trim().toLowerCase());
+            if (a.seed_id) inFlightIds.add(String(a.seed_id).trim().toLowerCase());
+            if (a.id_ship) inFlightIds.add(String(a.id_ship).trim().toLowerCase());
+            if (a.name) inFlightNames.add(String(a.name).trim().toLowerCase());
           });
-
-          userRows.forEach((row: any, idx: number) => {
-            let targetId: string | null = null;
-            const searchCols = [...possibleFkCols, 'ship_id', 'structure_id', 'technology_id', 'tool_id', 'astrobot_id', 'defense_id', 'blueprint_id', 'consumable_id', 'license_id', 'badge_id', 'seed_id', 'id'];
-
-            for (const col of searchCols) {
-              if (row[col]) {
-                targetId = row[col].toString();
-                break;
-              }
-            }
-
-            if (!targetId) return;
-
-            const seed = seedMap.get(targetId);
-            if (!seed) return;
-
-            let realName = 'ACTIVO';
-            for (const col of nameCols) {
-              if (seed[col]) {
-                realName = seed[col];
-                break;
-              }
-            }
-
-            let parsedSkills = seed.skills;
-            if (typeof parsedSkills === 'string') {
-              try { parsedSkills = JSON.parse(parsedSkills); } catch (e) { }
-            }
-
-            const imageUrl = seed.image_url || seed.avatar_url || seed.avatar || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
-
-            const isInFlight = categoryName === 'Spaceships' && (
-              (row.flight_state && row.flight_state !== 'IDLE' && row.flight_state !== 'LANDED') ||
-              (hasActiveExpeditions && idx === 0)
-            );
-
-            allItems.push({
-              id: row.id?.toString() || targetId,
-              name: realName,
-              fullname: realName,
-              category: categoryName,
-              rarity: seed.rarity || 'Common',
-              faction: seed.company || seed.collection || seed.series || 'GD',
-              avatar_url: imageUrl,
-              unlocked: true,
-              quantity: row.quantity || row.amount || 1,
-              level: row.current_level || row.level || 1,
-              stars: 3,
-              blueprints_owned: 1,
-              blueprints_required: 1,
-              description: seed.description || 'Sin descripción disponible.',
-              power_score: seed.power_score || 0,
-              effect: seed.effect || null,
-              set_skills: seed.set_skills || null,
-              stack_info: seed.stack || seed.max_stack?.toString() || null,
-              duration_info: seed.duration || null,
-              skills: parsedSkills || null,
-              is_in_flight: !!isInFlight,
-              crafting_costs: {
-                metal: seed.base_metal_cost || seed.req_metal || 0,
-                crystal: seed.base_crystal_cost || seed.req_crystal || 0,
-                deuterium: seed.req_deuterium || 0,
-                dark_matter: seed.req_dark_matter || 0,
-                gd_coins: seed.req_gd || 0
-              },
-              tactical_stats: {
-                hp: seed.resistance || seed.base_hp || 1000,
-                shield: seed.shield || 500,
-                defense: seed.defense || 100,
-                kinetic_attack: seed.attack_standard || 0,
-                laser_attack: seed.attack_laser || 0,
-                plasma_attack: seed.attack_plasma || 0,
-                ionic_attack: seed.attack_ionic || 0,
-                graviton_attack: seed.attack_graviton || 0,
-                travel_speed: seed.speed_boost || 50,
-                combat_speed: seed.speed_boost || 50,
-                speed_boost: seed.speed_boost || 0,
-                cargo_capacity: seed.cargo_capacity || 1000,
-                fleet_space: seed.fleet_slots || 1,
-                production: seed.production_min || 0
-              },
-              raw_seed: seed
-            });
-          });
-        } catch (catErr) {
-          console.warn(`Error al cargar categoría ${categoryName}:`, catErr);
         }
-      };
 
-      await Promise.all([
-        loadCategory('user_ships', 'seed_ships', 'Spaceships', ['ship_id'], 'ship_id', ['ship_name', 'name']),
-        loadCategory('user_structures', 'seed_structures', 'Structures', ['structure_id', 'building_id'], 'id', ['name', 'title']),
-        loadCategory('user_technologies', 'seed_technologies', 'Tecnology', ['technology_id'], 'id', ['name', 'title']),
-        loadCategory('user_tools', 'seed_tools', 'Tools', ['tool_id'], 'id', ['name', 'title']),
-        loadCategory('user_astrobots', 'seed_astrobots', 'Astrobots', ['astrobot_id'], 'id', ['name', 'title']),
-        loadCategory('user_defenses', 'seed_defenses', 'Defense', ['defense_id'], 'defense_id', ['defense_name', 'name']),
-        loadCategory('user_blueprints', 'seed_blueprints', 'Blueprints', ['blueprint_id'], 'id', ['name', 'title']),
-        loadCategory('user_consumibles', 'seed_consumables', 'Consumibles', ['consumable_id'], 'id', ['name', 'title']),
-        loadCategory('user_licenses', 'seed_licenses', 'Licencia', ['license_id'], 'id', ['name', 'title']),
-        loadCategory('user_badges_unlocked', 'seed_badges', 'Badges', ['badge_id'], 'id', ['name', 'title'])
+        if (exp.fleet_id && userFleets) {
+          const fleet = userFleets.find((f: any) => String(f.id) === String(exp.fleet_id));
+          if (fleet) {
+            const fleetMembers = [
+              ...(fleet.ships || []),
+              ...(fleet.tools || []),
+              ...(fleet.licenses || [])
+            ];
+            fleetMembers.forEach((a: any) => {
+              if (a.id) inFlightIds.add(String(a.id).trim().toLowerCase());
+              if (a.seed_id) inFlightIds.add(String(a.seed_id).trim().toLowerCase());
+              if (a.id_ship) inFlightIds.add(String(a.id_ship).trim().toLowerCase());
+              if (a.name) inFlightNames.add(String(a.name).trim().toLowerCase());
+            });
+          }
+        }
+      });
+
+      // 3. CARGAR TODAS LAS TABLAS DE ACTIVOS DEL USUARIO
+      const [
+        { data: userShips },
+        { data: userTools },
+        { data: userAstrobots },
+        { data: userStructures },
+        { data: userTech },
+        { data: userLicenses },
+        { data: userConsumables }
+      ] = await Promise.all([
+        supabase.from('user_ships').select('*, seed_ships(*)').eq('user_id', user.id),
+        supabase.from('user_tools').select('*, seed_tools(*)').eq('user_id', user.id),
+        supabase.from('user_astrobots').select('*, seed_astrobots(*)').eq('user_id', user.id),
+        supabase.from('user_structures').select('*, seed_structures(*)').eq('user_id', user.id),
+        supabase.from('user_technologies').select('*, seed_technologies(*)').eq('user_id', user.id),
+        supabase.from('user_licenses').select('*, seed_licenses(*)').eq('user_id', user.id),
+        supabase.from('user_consumibles').select('*, seed_consumables(*)').eq('user_id', user.id)
       ]);
 
-      setItems(allItems);
+      const combinedItems: InventoryItem[] = [];
+
+      const checkIsInFlight = (rowId?: any, seedId?: any, name?: string): boolean => {
+        const idStr = rowId ? String(rowId).trim().toLowerCase() : '';
+        const seedStr = seedId ? String(seedId).trim().toLowerCase() : '';
+        const nameStr = name ? String(name).trim().toLowerCase() : '';
+
+        return (
+          (idStr !== '' && inFlightIds.has(idStr)) ||
+          (seedStr !== '' && inFlightIds.has(seedStr)) ||
+          (nameStr !== '' && inFlightNames.has(nameStr))
+        );
+      };
+
+      // Mapear Naves
+      (userShips || []).forEach((s: any) => {
+        const seed = s.seed_ships || {};
+        const shipName = s.custom_name || s.name_ship || seed.ship_name || seed.name || `Nave #${s.id}`;
+        const realId = String(s.id);
+        const seedId = String(s.id_ship || seed.id || '');
+
+        combinedItems.push({
+          id: realId,
+          seed_id: seedId,
+          name: shipName,
+          fullname: shipName,
+          category: 'Spaceships',
+          type: 'Naves',
+          rarity: seed.rarity || 'COMMON',
+          faction: seed.company || seed.faction || 'NOVA',
+          level: s.current_level || s.level || 1,
+          stars: seed.stars || 1,
+          quantity: s.quantity || s.amount || 1,
+          unlocked: true,
+          favorite: Boolean(s.favorite),
+          is_in_flight: checkIsInFlight(realId, seedId, shipName),
+          avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || s.image_url),
+          description: seed.description || 'Nave espacial de combate e investigación.'
+        });
+      });
+
+      // Mapear Herramientas
+      (userTools || []).forEach((t: any) => {
+        const seed = t.seed_tools || {};
+        const toolName = t.name || seed.name || seed.title || `Tool #${t.id}`;
+        const realId = String(t.id);
+        const seedId = String(t.tool_id || seed.id || '');
+
+        combinedItems.push({
+          id: realId,
+          seed_id: seedId,
+          name: toolName,
+          fullname: toolName,
+          category: 'Tools',
+          type: 'Herramientas',
+          rarity: seed.rarity || 'COMMON',
+          faction: seed.faction || 'GD',
+          level: t.level || 1,
+          quantity: t.quantity || 1,
+          unlocked: true,
+          favorite: Boolean(t.favorite),
+          is_in_flight: checkIsInFlight(realId, seedId, toolName),
+          avatar_url: resolveImageUrl(seed.image_url || t.image_url),
+          description: seed.description || 'Herramienta de extracción de recursos.'
+        });
+      });
+
+      // Mapear Astrobots
+      (userAstrobots || []).forEach((a: any) => {
+        const seed = a.seed_astrobots || {};
+        const botName = a.name || seed.name || `Astrobot #${a.id}`;
+        const realId = String(a.id);
+        const seedId = String(a.astrobot_id || seed.id || '');
+
+        combinedItems.push({
+          id: realId,
+          seed_id: seedId,
+          name: botName,
+          fullname: botName,
+          category: 'Astrobots',
+          type: 'Astrobots',
+          rarity: seed.rarity || 'COMMON',
+          faction: 'GD',
+          level: a.level || 1,
+          quantity: a.quantity || 1,
+          unlocked: true,
+          favorite: Boolean(a.favorite),
+          is_in_flight: checkIsInFlight(realId, seedId, botName),
+          avatar_url: resolveImageUrl(seed.image_url || a.image_url),
+          description: seed.description || 'Unidad robótica autónoma de asistencia táctica.'
+        });
+      });
+
+      // Mapear Estructuras / Defensas
+      (userStructures || []).forEach((st: any) => {
+        const seed = st.seed_structures || {};
+        const structName = st.name || seed.name || seed.title || `Estructura #${st.id}`;
+        const realId = String(st.id);
+        const seedId = String(st.structure_id || seed.id || '');
+
+        combinedItems.push({
+          id: realId,
+          seed_id: seedId,
+          name: structName,
+          fullname: structName,
+          category: 'Structures',
+          type: 'Estructuras',
+          rarity: seed.rarity || 'COMMON',
+          faction: 'GD',
+          level: st.level || 1,
+          quantity: st.quantity || 1,
+          unlocked: true,
+          favorite: Boolean(st.favorite),
+          is_in_flight: false,
+          avatar_url: resolveImageUrl(seed.image_url || st.image_url),
+          description: seed.description || 'Infraestructura de defensa y desarrollo planetario.'
+        });
+      });
+
+      // Mapear Tecnologías
+      (userTech || []).forEach((tc: any) => {
+        const seed = tc.seed_technologies || {};
+        const techName = tc.name || seed.name || seed.title || `Tecnología #${tc.id}`;
+        const realId = String(tc.id);
+        const seedId = String(tc.technology_id || seed.id || '');
+
+        combinedItems.push({
+          id: realId,
+          seed_id: seedId,
+          name: techName,
+          fullname: techName,
+          category: 'Technologies',
+          type: 'Tecnología',
+          rarity: seed.rarity || 'COMMON',
+          faction: 'GD',
+          level: tc.level || 1,
+          quantity: tc.quantity || 1,
+          unlocked: true,
+          favorite: Boolean(tc.favorite),
+          is_in_flight: false,
+          avatar_url: resolveImageUrl(seed.image_url || tc.image_url),
+          description: seed.description || 'Avance científico y militar para la flota.'
+        });
+      });
+
+      // Mapear Licencias / Blueprints
+      (userLicenses || []).forEach((l: any) => {
+        const seed = l.seed_licenses || {};
+        const licName = l.name || seed.name || `Licencia #${l.id}`;
+        const realId = String(l.id);
+        const seedId = String(l.license_id || seed.id || '');
+
+        combinedItems.push({
+          id: realId,
+          seed_id: seedId,
+          name: licName,
+          fullname: licName,
+          category: 'Licencia',
+          type: 'Licencia',
+          rarity: seed.rarity || 'COMMON',
+          faction: 'GD',
+          level: 1,
+          quantity: l.quantity || 1,
+          unlocked: true,
+          favorite: Boolean(l.favorite),
+          is_in_flight: checkIsInFlight(realId, seedId, licName),
+          avatar_url: resolveImageUrl(seed.image_url || l.image_url),
+          description: seed.description || 'Permiso oficial de navegación e industrialización.'
+        });
+      });
+
+      // Mapear Consumibles
+      (userConsumables || []).forEach((co: any) => {
+        const seed = co.seed_consumables || {};
+        const consName = co.name || seed.name || `Consumible #${co.id}`;
+        const realId = String(co.id);
+        const seedId = String(co.consumable_id || seed.id || '');
+
+        combinedItems.push({
+          id: realId,
+          seed_id: seedId,
+          name: consName,
+          fullname: consName,
+          category: 'Consumibles',
+          type: 'Consumibles',
+          rarity: seed.rarity || 'COMMON',
+          faction: 'GD',
+          level: 1,
+          quantity: co.quantity || co.amount || 1,
+          unlocked: true,
+          favorite: Boolean(co.favorite),
+          is_in_flight: false,
+          avatar_url: resolveImageUrl(seed.image_url || co.image_url),
+          description: seed.description || 'Recurso consumible de apoyo logístico.'
+        });
+      });
+
+      setItems(combinedItems);
     } catch (err) {
-      console.error("Error al cargar inventario:", err);
+      console.error("Error al construir inventario unificado:", err);
     } finally {
       setLoading(false);
     }
-  }, [userId]);  // Re-ejecutar cuando cambie el usuario
+  }, []);
+
+  const toggleFavorite = async (itemId: string) => {
+    setItems(prev => prev.map(item => item.id === itemId ? { ...item, favorite: !item.favorite } : item));
+  };
 
   useEffect(() => {
     fetchInventory();
   }, [fetchInventory]);
 
-  const toggleFavorite = useCallback((id: string) => {
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, favorite: !item.favorite } : item))
-    );
-  }, []);
-
   return { items, loading, refreshInventory: fetchInventory, toggleFavorite };
-}
+};

@@ -17,15 +17,33 @@ import {
   Cpu,
   Rocket,
   Bot,
+  Wrench,
+  Building,
+  FileText,
+  Package,
   ArrowUpDown,
   X,
   AlertTriangle
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useMarketplace, type MarketListing } from '../hooks/useMarketplace';
+import { useInventory, type InventoryItem } from '../hooks/useInventory';
+
 export type { MarketListing } from '../hooks/useMarketplace';
 
 const GD_COIN_ASSET = "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/GD%20Coin.png";
+
+const resolveImageUrl = (rawUrl?: string): string => {
+  if (!rawUrl || typeof rawUrl !== 'string' || rawUrl.trim() === '') {
+    return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
+  }
+  const clean = rawUrl.trim();
+  if (clean.startsWith('http://') || clean.startsWith('https://')) return clean;
+  if (clean.startsWith('Assets') || clean.startsWith('Monedas') || clean.includes('Assets%20para')) {
+    return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/${clean.replace(/^\//, '')}`;
+  }
+  return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/galaxy-assets/${clean.replace(/^\//, '')}`;
+};
 
 interface MarketplaceViewProps {
   playerGems?: number;
@@ -39,21 +57,54 @@ interface MarketplaceViewProps {
 }
 
 type MarketTab = 'MARKET' | 'AUCTIONS' | 'SELL_ITEM' | 'MY_LISTINGS';
-type AssetCategory = 'ALL' | 'SHIPS' | 'TECH' | 'BLUEPRINTS' | 'RESOURCES' | 'ASTROBOTS';
+type AssetCategory = 'ALL' | 'SHIPS' | 'TOOLS' | 'STRUCTURES' | 'TECH' | 'BLUEPRINTS' | 'LICENSES' | 'ASTROBOTS' | 'CONSUMABLES';
 type RarityFilter = 'ALL' | 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY';
 type PriceSortOption = 'NONE' | 'LOW_TO_HIGH' | 'HIGH_TO_LOW';
-
 
 interface MyInventoryItem {
   id: string;
   title: string;
-  category: 'SHIPS' | 'TECH' | 'BLUEPRINTS' | 'RESOURCES' | 'ASTROBOTS';
+  category: AssetCategory;
   rarity: 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY';
   description: string;
   image_url: string;
   is_locked: boolean;
+  is_in_flight: boolean;
   amount?: number;
 }
+
+// 🌐 NORMALIZACIÓN ESTRICTA Y UNIFICADA DE CATEGORÍAS
+const normalizeCategory = (cat?: string, type?: string): AssetCategory => {
+  const raw = `${cat || ''} ${type || ''}`.toLowerCase().trim();
+  
+  if (['spaceships', 'ships', 'naves', 'nave', 'spaceship'].some(k => raw.includes(k))) return 'SHIPS';
+  if (['tools', 'tool', 'herramientas', 'herramienta'].some(k => raw.includes(k))) return 'TOOLS';
+  if (['structures', 'structure', 'estructuras', 'estructura', 'defense', 'defensa', 'defenses'].some(k => raw.includes(k))) return 'STRUCTURES';
+  if (['technologies', 'technology', 'tech', 'tecnología', 'tecnologia'].some(k => raw.includes(k))) return 'TECH';
+  if (['blueprints', 'blueprint', 'planos', 'plano'].some(k => raw.includes(k))) return 'BLUEPRINTS';
+  if (['licencia', 'license', 'licenses', 'licencias'].some(k => raw.includes(k))) return 'LICENSES';
+  if (['astrobots', 'astrobot', 'robot', 'robots'].some(k => raw.includes(k))) return 'ASTROBOTS';
+  if (['consumibles', 'consumables', 'resources', 'recursos', 'consumable'].some(k => raw.includes(k))) return 'CONSUMABLES';
+  
+  return 'SHIPS';
+};
+
+const normalizeRarity = (rar?: string): 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY' => {
+  const r = String(rar || 'COMMON').toUpperCase().trim();
+  if (['COMMON', 'RARE', 'EPIC', 'LEGENDARY'].includes(r)) return r as any;
+  if (r.includes('UNCOMMON')) return 'COMMON';
+  return 'COMMON';
+};
+
+const matchCategory = (itemCat?: string, targetCat?: AssetCategory, itemType?: string) => {
+  if (!targetCat || targetCat === 'ALL') return true;
+  return normalizeCategory(itemCat, itemType) === targetCat;
+};
+
+const matchRarity = (itemRar?: string, targetRar?: RarityFilter) => {
+  if (!targetRar || targetRar === 'ALL') return true;
+  return normalizeRarity(itemRar) === targetRar;
+};
 
 export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   playerGold = 0,
@@ -63,13 +114,15 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 }) => {
   const {
     listings: marketListings,
-    loading,
+    loading: marketLoading,
     publishItem,
     buyItem,
     cancelListing,
     refreshMarket: fetchMarketplaceData,
     currentUserId
   } = useMarketplace();
+
+  const { items: inventoryItems, loading: inventoryLoading, refreshInventory } = useInventory();
 
   const [activeTab, setActiveTab] = useState<MarketTab>('MARKET');
   const [selectedCategory, setSelectedCategory] = useState<AssetCategory>('ALL');
@@ -78,53 +131,55 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   const [rarityFilter, setRarityFilter] = useState<RarityFilter>('ALL');
   const [priceSort, setPriceSort] = useState<PriceSortOption>('NONE');
 
-  const [myInventory, setMyInventory] = useState<MyInventoryItem[]>([]); // inventario propio sigue cargándose localmente
+  const [myInventory, setMyInventory] = useState<MyInventoryItem[]>([]);
 
-
-  // Modal de Venta
+  // Modal de Publicación
   const [selectedItemToList, setSelectedItemToList] = useState<MyInventoryItem | null>(null);
   const [sellPrice, setSellPrice] = useState<number>(1000);
   const [sellIsAuction, setSellIsAuction] = useState<boolean>(false);
   const [auctionDuration, setAuctionDuration] = useState<'12h' | '24h' | '48h'>('24h');
   const [sellDescription, setSellDescription] = useState<string>('');
 
-  // Inventario propio: carga local (sólo naves propias para venta)
+  // 🎯 MAPEADO DE ACTIVOS PROPIOS A TODAS LAS CATEGORÍAS
   useEffect(() => {
-    if (!currentUserId) return;
-    const loadMyInventory = async () => {
+    const syncInventory = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || currentUserId;
+      if (!userId) return;
+
       const { data: dbListings } = await supabase
         .from('marketplace_listings')
         .select('inventory_item_id')
         .eq('status', 'ACTIVE')
-        .eq('seller_id', currentUserId);
+        .eq('seller_id', userId);
 
-      const { data: myShips } = await supabase
-        .from('user_ships')
-        .select('id, id_ship, seed_ships(name_ship, rarity, image_url, company)')
-        .eq('user_id', currentUserId);
+      const activeListingIds = new Set((dbListings || []).map((l: any) => String(l.inventory_item_id)));
 
-      const items: MyInventoryItem[] = [];
-      if (myShips) {
-        myShips.forEach((s: any) => {
-          const seed = s.seed_ships || {};
-          const isListed = dbListings?.some((l: any) => l.inventory_item_id === s.id);
-          items.push({
-            id: s.id,
-            title: seed.name_ship || 'NAVE DE COMBATE',
-            category: 'SHIPS',
-            rarity: (seed.rarity || 'COMMON').toUpperCase(),
-            description: `Unidad de combate estelar fabricada por ${seed.company || 'GD'}`,
-            image_url: seed.image_url || 'https://images.unsplash.com/photo-1541185933-ef5d8ed016c2?w=200',
-            is_locked: !!isListed
-          });
-        });
-      }
-      setMyInventory(items);
+      const formatted: MyInventoryItem[] = (inventoryItems || []).map((item) => {
+        const itemCat = normalizeCategory(item.category, item.type);
+        const itemRarity = normalizeRarity(item.rarity);
+        const isListed = activeListingIds.has(String(item.id));
+
+        return {
+          id: String(item.id),
+          title: item.name,
+          category: itemCat,
+          rarity: itemRarity,
+          description: item.description || `Activo estelar registrado en la flota.`,
+          image_url: resolveImageUrl(item.avatar_url || item.image_url),
+          is_locked: item.is_in_flight || isListed,
+          is_in_flight: Boolean(item.is_in_flight),
+          amount: item.quantity || 1
+        };
+      });
+
+      setMyInventory(formatted);
     };
-    loadMyInventory();
-  }, [currentUserId]);
 
-  // 🛡️ Handlers delegados al hook useMarketplace
+    syncInventory();
+  }, [inventoryItems, currentUserId, marketListings]);
+
+  // 🛡️ PUBLICAR ACTIVO EN EL MERCADO / SUBASTA
   const handleConfirmPublish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItemToList) return;
@@ -132,29 +187,74 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
       if (triggerNotification) triggerNotification("⚠️ INGRESA UN PRECIO VÁLIDO");
       return;
     }
+
     try {
-      await publishItem({
-        inventoryItemId: selectedItemToList.id,
-        title: selectedItemToList.title,
-        category: selectedItemToList.category,
-        rarity: selectedItemToList.rarity,
-        description: sellDescription.trim() || selectedItemToList.description,
-        price: sellPrice,
-        isAuction: sellIsAuction,
-        imageUrl: selectedItemToList.image_url
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || currentUserId;
+
+      if (!userId) {
+        throw new Error("Sesión no válida.");
+      }
+
+      let durationHours = 24;
+      if (auctionDuration === '12h') durationHours = 12;
+      if (auctionDuration === '48h') durationHours = 48;
+      
+      const auctionEndTime = sellIsAuction 
+        ? new Date(Date.now() + durationHours * 3600 * 1000).toISOString() 
+        : null;
+
+      if (publishItem) {
+        await publishItem({
+          inventoryItemId: selectedItemToList.id,
+          title: selectedItemToList.title,
+          category: selectedItemToList.category,
+          rarity: selectedItemToList.rarity,
+          description: sellDescription.trim() || selectedItemToList.description,
+          price: sellPrice,
+          isAuction: sellIsAuction,
+          imageUrl: selectedItemToList.image_url,
+          auctionEndTime
+        });
+      } else {
+        const { error } = await supabase.from('marketplace_listings').insert([{
+          seller_id: userId,
+          inventory_item_id: selectedItemToList.id,
+          title: selectedItemToList.title,
+          category: selectedItemToList.category,
+          rarity: selectedItemToList.rarity,
+          description: sellDescription.trim() || selectedItemToList.description,
+          price: sellPrice,
+          is_auction: sellIsAuction,
+          auction_end_time: auctionEndTime,
+          image_url: selectedItemToList.image_url,
+          status: 'ACTIVE'
+        }]);
+        if (error) throw error;
+      }
+
       setSelectedItemToList(null);
       setSellPrice(1000);
       setSellDescription('');
-      if (triggerNotification) triggerNotification(`🔒 ACTIVO REGISTRADO EN MERCADO P2P COMO ${sellIsAuction ? 'SUBASTA' : 'VENTA DIRECTA'}`);
+      setSellIsAuction(false);
+
+      if (fetchMarketplaceData) await fetchMarketplaceData();
+      if (refreshInventory) await refreshInventory();
+
+      if (triggerNotification) {
+        triggerNotification(`🔒 ACTIVO PUBLICADO COMO ${sellIsAuction ? 'SUBASTA EN VIVO' : 'VENTA DIRECTA'}`);
+      }
     } catch (err: any) {
-      if (triggerNotification) triggerNotification(`⛔ ERROR AL PUBLICAR: ${err.message}`);
+      console.error("Error al publicar activo:", err);
+      if (triggerNotification) triggerNotification(`⛔ ERROR AL PUBLICAR: ${err.message || 'Error de comunicación'}`);
     }
   };
 
   const handleCancelListing = async (listing: MarketListing) => {
     try {
       await cancelListing(listing.id);
+      if (fetchMarketplaceData) await fetchMarketplaceData();
+      if (refreshInventory) await refreshInventory();
       if (triggerNotification) triggerNotification("🔓 ACTIVO RETIRADO DEL MERCADO Y DESBLOQUEADO");
     } catch (err: any) {
       console.error("Error al cancelar oferta:", err);
@@ -165,6 +265,8 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
     try {
       await buyItem(item.id);
       if (setPlayerGold) setPlayerGold((prev: number) => Math.max(0, prev - item.price));
+      if (fetchMarketplaceData) await fetchMarketplaceData();
+      if (refreshInventory) await refreshInventory();
       if (triggerNotification) triggerNotification(`🎉 TRANSACCIÓN EXITOSA: Adquiriste "${item.title}"`);
     } catch (err: any) {
       if (triggerNotification) triggerNotification(`⛔ TRANSACCIÓN RECHAZADA: ${err.message}`);
@@ -172,13 +274,15 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   };
 
   const getFilteredAndSortedListings = () => {
-    let result = marketListings.filter((item) => {
-      if (activeTab === 'MARKET' && item.is_auction) return false;
-      if (activeTab === 'AUCTIONS' && !item.is_auction) return false;
-      if (activeTab === 'MY_LISTINGS' && item.seller_id !== currentUserId) return false;
+    let result = (marketListings || []).filter((item) => {
+      const isAuction = Boolean(item.is_auction || (item as any).isAuction);
 
-      if (selectedCategory !== 'ALL' && item.category !== selectedCategory) return false;
-      if (rarityFilter !== 'ALL' && item.rarity !== rarityFilter) return false;
+      if (activeTab === 'MARKET' && isAuction) return false;
+      if (activeTab === 'AUCTIONS' && !isAuction) return false;
+      if (activeTab === 'MY_LISTINGS' && String(item.seller_id) !== String(currentUserId)) return false;
+
+      if (!matchCategory(item.category, selectedCategory)) return false;
+      if (!matchRarity(item.rarity, rarityFilter)) return false;
 
       if (searchQuery.trim() !== '') {
         const q = searchQuery.toLowerCase();
@@ -198,9 +302,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   };
 
   const getFilteredMyInventory = () => {
-    return myInventory.filter((item) => {
-      if (selectedCategory !== 'ALL' && item.category !== selectedCategory) return false;
-      if (rarityFilter !== 'ALL' && item.rarity !== rarityFilter) return false;
+    return (myInventory || []).filter((item) => {
+      if (!matchCategory(item.category, selectedCategory)) return false;
+      if (!matchRarity(item.rarity, rarityFilter)) return false;
 
       if (searchQuery.trim() !== '') {
         const q = searchQuery.toLowerCase();
@@ -326,20 +430,24 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
       {/* ESTRUCTURA PRINCIPAL */}
       <div className="w-full flex flex-col md:flex-row gap-3.5 items-start">
+        {/* SIDEBAR DE TODAS LAS CATEGORÍAS DE ACTIVOS */}
         <div className="w-full md:w-52 shrink-0 bg-[#05070a] border border-cyan-500/20 p-3 rounded-xl flex flex-col gap-2">
           <div className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5 px-1 border-b border-cyan-950 pb-2">
             <Filter className="w-3.5 h-3.5 text-cyan-400" />
             <span>CATEGORÍAS</span>
           </div>
 
-          <div className="flex flex-col gap-1 max-h-[380px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-cyan-950">
+          <div className="flex flex-col gap-1 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
             {[
               { id: 'ALL', label: 'TODOS', icon: ShoppingBag },
               { id: 'SHIPS', label: 'NAVES', icon: Rocket },
+              { id: 'TOOLS', label: 'HERRAMIENTAS', icon: Wrench },
+              { id: 'STRUCTURES', label: 'ESTRUCTURAS / DEFENSA', icon: Building },
               { id: 'TECH', label: 'TECNOLOGÍA', icon: Cpu },
               { id: 'BLUEPRINTS', label: 'BLUEPRINTS', icon: Tag },
-              { id: 'RESOURCES', label: 'RECURSOS', icon: Layers },
-              { id: 'ASTROBOTS', label: 'ASTROBOTS', icon: Bot }
+              { id: 'LICENSES', label: 'LICENCIAS', icon: FileText },
+              { id: 'ASTROBOTS', label: 'ASTROBOTS', icon: Bot },
+              { id: 'CONSUMABLES', label: 'CONSUMIBLES / RECURSOS', icon: Package }
             ].map((cat) => {
               const isSelected = selectedCategory === cat.id;
               const IconComp = cat.icon;
@@ -366,10 +474,10 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
         {/* FEED PRINCIPAL */}
         {activeTab !== 'SELL_ITEM' ? (
-          <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5 max-h-[440px] overflow-y-auto pr-1.5 scrollbar-thin scrollbar-thumb-cyan-950">
+          <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5 max-h-[440px] overflow-y-auto pr-1.5 custom-scrollbar">
             {filteredListings.length === 0 ? (
               <div className="col-span-full p-12 text-center text-zinc-500 text-[10px] uppercase tracking-widest bg-[#05070a] border border-cyan-500/10 rounded-xl">
-                {loading ? 'CARGANDO PUBLICACIONES DE LA RED...' : 'NO HAY PUBLICACIONES REGISTRADAS'}
+                {marketLoading ? 'CARGANDO PUBLICACIONES DE LA RED...' : 'NO HAY PUBLICACIONES REGISTRADAS'}
               </div>
             ) : (
               filteredListings.map((item) => (
@@ -377,8 +485,14 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                   key={item.id}
                   className="bg-[#050910] border border-cyan-500/30 hover:border-cyan-400 p-3.5 rounded-xl shadow-xl flex flex-col justify-between gap-3 transition-all relative group"
                 >
-                  <div className="flex justify-end items-center border-b border-cyan-950 pb-2">
-                    <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase border ${
+                  <div className="flex justify-between items-center border-b border-cyan-950 pb-2">
+                    {item.is_auction && (
+                      <span className="px-2 py-0.5 rounded text-[7px] font-black uppercase bg-amber-950/80 text-amber-400 border border-amber-800 flex items-center gap-1">
+                        <Gavel className="w-3 h-3 text-amber-400" /> SUBASTA
+                      </span>
+                    )}
+
+                    <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase border ml-auto ${
                       item.rarity === 'LEGENDARY' ? 'bg-amber-950 text-amber-400 border-amber-800' :
                       item.rarity === 'EPIC' ? 'bg-purple-950 text-purple-300 border-purple-800' :
                       item.rarity === 'RARE' ? 'bg-cyan-950 text-cyan-300 border-cyan-800' :
@@ -390,7 +504,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
                   <div className="flex items-start gap-3">
                     <div className="w-14 h-14 bg-black border border-cyan-950 rounded-lg p-1 shrink-0 flex items-center justify-center overflow-hidden">
-                      <img src={item.image_url} alt={item.title} className="w-full h-full object-contain brightness-90 group-hover:scale-110 transition-transform" />
+                      <img src={resolveImageUrl(item.image_url)} alt={item.title} className="w-full h-full object-contain brightness-90 group-hover:scale-110 transition-transform" />
                     </div>
 
                     <div className="flex flex-col text-left flex-1">
@@ -401,7 +515,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
                   <div className="bg-[#020305] border border-cyan-950 p-2 rounded-lg flex justify-between items-center text-[9px]">
                     <div className="flex flex-col text-left">
-                      <span className="text-[7.5px] text-zinc-500 uppercase">PRECIO DIRECTO</span>
+                      <span className="text-[7.5px] text-zinc-500 uppercase">{item.is_auction ? 'PUJA ACTUAL / SALIDA' : 'PRECIO DIRECTO'}</span>
                       <div className="flex items-center gap-1 font-black text-amber-400 text-sm">
                         <span>{item.price.toLocaleString()}</span>
                         <img src={GD_COIN_ASSET} alt="GD Coin" className="w-3.5 h-3.5 object-contain" />
@@ -416,6 +530,13 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                     >
                       <Unlock className="w-3 h-3" /> RETIRAR Y DESBLOQUEAR
                     </button>
+                  ) : item.is_auction ? (
+                    <button
+                      onClick={() => handleBuyDirect(item)}
+                      className="w-full py-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:brightness-110 text-white font-black text-[8.5px] uppercase rounded-lg shadow-[0_0_10px_rgba(245,158,11,0.3)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Gavel className="w-3.5 h-3.5" /> PUJAR EN SUBASTA
+                    </button>
                   ) : (
                     <button
                       onClick={() => handleBuyDirect(item)}
@@ -429,10 +550,14 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             )}
           </div>
         ) : (
-          <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5 max-h-[440px] overflow-y-auto pr-1.5 scrollbar-thin scrollbar-thumb-cyan-950">
-            {filteredMyInventory.length === 0 ? (
+          <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5 max-h-[440px] overflow-y-auto pr-1.5 custom-scrollbar">
+            {inventoryLoading ? (
+              <div className="col-span-full p-12 text-center text-cyan-500 text-[10px] uppercase tracking-widest bg-[#05070a] border border-cyan-500/10 rounded-xl">
+                ESCANEAR ACTIVOS DEL JUGADOR...
+              </div>
+            ) : filteredMyInventory.length === 0 ? (
               <div className="col-span-full p-12 text-center text-zinc-500 text-[10px] uppercase tracking-widest bg-[#05070a] border border-cyan-500/10 rounded-xl">
-                NO TIENES ACTIVOS DISPONIBLES PARA VENDER
+                NO TIENES ACTIVOS DISPONIBLES EN ESTA CATEGORÍA
               </div>
             ) : (
               filteredMyInventory.map((item) => (
@@ -445,9 +570,13 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                   }`}
                 >
                   <div className="flex justify-between items-center border-b border-cyan-950 pb-2">
-                    {item.is_locked ? (
+                    {item.is_in_flight ? (
                       <span className="px-2 py-0.5 rounded text-[7px] font-black uppercase bg-red-950/80 text-red-400 border border-red-800 flex items-center gap-1">
-                        <Lock className="w-3 h-3 text-red-400" /> BLOQUEADO
+                        <Lock className="w-3 h-3 text-red-400" /> EN VUELO
+                      </span>
+                    ) : item.is_locked ? (
+                      <span className="px-2 py-0.5 rounded text-[7px] font-black uppercase bg-purple-950/80 text-purple-400 border border-purple-800 flex items-center gap-1">
+                        <Lock className="w-3 h-3 text-purple-400" /> PUBLICADO
                       </span>
                     ) : (
                       <span className="px-2 py-0.5 rounded text-[7px] font-black uppercase bg-emerald-950/80 text-emerald-400 border border-emerald-800 flex items-center gap-1">
@@ -462,7 +591,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
                   <div className="flex items-start gap-3">
                     <div className="w-14 h-14 bg-black border border-cyan-950 rounded-lg p-1 shrink-0 flex items-center justify-center overflow-hidden">
-                      <img src={item.image_url} alt={item.title} className="w-full h-full object-contain brightness-90 group-hover:scale-110 transition-transform" />
+                      <img src={resolveImageUrl(item.image_url)} alt={item.title} className="w-full h-full object-contain brightness-90 group-hover:scale-110 transition-transform" />
                     </div>
 
                     <div className="flex flex-col text-left flex-1">
@@ -473,7 +602,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
                   {item.is_locked ? (
                     <div className="bg-black/80 border border-zinc-800 p-2 rounded-lg text-center text-[8px] text-zinc-500 font-bold uppercase">
-                      PUBLICACIÓN ACTIVA EN EL MERCADO
+                      {item.is_in_flight ? "ACTIVO EN MISIÓN - NO REUTILIZABLE" : "PUBLICACIÓN ACTIVA EN EL MERCADO"}
                     </div>
                   ) : (
                     <button
@@ -494,7 +623,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
         )}
       </div>
 
-      {/* MODAL CONFIGURACIÓN DE VENTA */}
+      {/* MODAL CONFIGURACIÓN DE VENTA / SUBASTA */}
       <AnimatePresence>
         {selectedItemToList && (
           <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4 font-mono">
@@ -519,8 +648,34 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                 </button>
               </div>
 
+              {/* SELECTOR DE MODO: VENTA DIRECTA VS SUBASTA EN VIVO */}
+              <div className="grid grid-cols-2 gap-2 bg-black/60 p-1 rounded-xl border border-cyan-950 text-[9px] font-bold uppercase">
+                <button
+                  type="button"
+                  onClick={() => setSellIsAuction(false)}
+                  className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
+                    !sellIsAuction
+                      ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black shadow-[0_0_10px_rgba(6,182,212,0.2)]'
+                      : 'text-zinc-500 border-transparent hover:text-zinc-300'
+                  }`}
+                >
+                  <ShoppingBag className="w-3.5 h-3.5" /> VENTA DIRECTA
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSellIsAuction(true)}
+                  className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
+                    sellIsAuction
+                      ? 'bg-amber-950 text-amber-300 border-amber-500/60 font-black shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                      : 'text-zinc-500 border-transparent hover:text-zinc-300'
+                  }`}
+                >
+                  <Gavel className="w-3.5 h-3.5" /> SUBASTA EN VIVO
+                </button>
+              </div>
+
               <div className="p-3 bg-black/80 border border-cyan-950 rounded-xl flex items-center gap-3">
-                <img src={selectedItemToList.image_url} alt={selectedItemToList.title} className="w-12 h-12 object-contain" />
+                <img src={resolveImageUrl(selectedItemToList.image_url)} alt={selectedItemToList.title} className="w-12 h-12 object-contain" />
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold text-white uppercase">{selectedItemToList.title}</span>
                   <span className="text-[8px] text-cyan-400 uppercase">CATEGORÍA: {selectedItemToList.category} | RAREZA: {selectedItemToList.rarity}</span>
@@ -530,7 +685,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
               <form onSubmit={handleConfirmPublish} className="flex flex-col gap-3 text-[9px]">
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-1 text-zinc-400 font-bold uppercase">
-                    <span>PRECIO DE VENTA EN</span>
+                    <span>{sellIsAuction ? 'PRECIO DE SALIDA / PUJA INICIAL' : 'PRECIO DE VENTA DIRECTA'} EN</span>
                     <img src={GD_COIN_ASSET} alt="GD Coin" className="w-3.5 h-3.5 object-contain" />
                   </div>
                   <input
@@ -540,6 +695,28 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                     className="bg-black border border-cyan-950 focus:border-cyan-500 rounded-lg p-2 text-amber-400 font-black outline-none"
                   />
                 </div>
+
+                {sellIsAuction && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-zinc-400 font-bold uppercase">DURACIÓN DE LA SUBASTA</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['12h', '24h', '48h'] as const).map((dur) => (
+                        <button
+                          key={dur}
+                          type="button"
+                          onClick={() => setAuctionDuration(dur)}
+                          className={`py-1.5 rounded border text-[8.5px] font-bold uppercase cursor-pointer ${
+                            auctionDuration === dur
+                              ? 'bg-amber-950 text-amber-300 border-amber-500'
+                              : 'bg-black text-zinc-500 border-cyan-950 hover:text-white'
+                          }`}
+                        >
+                          {dur}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-1">
                   <label className="text-zinc-400 font-bold uppercase">DESCRIPCIÓN DE OFERTA</label>
@@ -554,9 +731,14 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-black text-[9.5px] uppercase rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all cursor-pointer flex items-center justify-center gap-2 mt-1"
+                  className={`w-full py-2.5 text-white font-black text-[9.5px] uppercase rounded-lg shadow transition-all cursor-pointer flex items-center justify-center gap-2 mt-1 ${
+                    sellIsAuction
+                      ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:brightness-110 shadow-[0_0_15px_rgba(245,158,11,0.3)]'
+                      : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                  }`}
                 >
-                  <Lock className="w-3.5 h-3.5" /> CONFIRMAR Y PUBLICAR EN MERCADO
+                  <Lock className="w-3.5 h-3.5" />
+                  {sellIsAuction ? 'CONFIRMAR Y PUBLICAR SUBASTA' : 'CONFIRMAR Y PUBLICAR VENTA DIRECTA'}
                 </button>
               </form>
             </motion.div>

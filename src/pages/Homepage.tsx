@@ -1,9 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Eye, Target, CheckCircle2, Clock,
-  Settings, X, Rocket, Layers, Cpu, Bot, Globe, Activity, Bell
-} from 'lucide-react';
+import { Eye, Settings, X, Bell } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ExpeditionsView } from '../components/ExpeditionsView';
 import { MarketplaceView } from '../components/MarketplaceView';
@@ -13,16 +10,13 @@ import { AllianceView } from '../components/AllianceView';
 import { CanView } from '../components/CanView';
 import { ProfileView } from '../components/ProfileView';
 import { NotificationsView } from '../components/NotificationsView';
+import { MissionView } from '../components/MissionView';
 import { ChatSystem } from '../components/ChatSystem';
 import { Header } from '../components/Header';
 import { miningService } from '../services/miningService';
 
 const GAME_ASSETS = {
   background: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20(Ambientes%20)/22.jpg",
-  crystal: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/Crystal.png",
-  metal: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/Metal.png",
-  deuterium: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/Deuterium.png",
-  gdCoin: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/GD%20Coin.png",
 };
 
 interface UserProfile {
@@ -40,19 +34,6 @@ interface UserProfile {
 interface HomepageProps {
   user: UserProfile;
   onLogout: () => void;
-}
-
-type MissionType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'EVENT' | 'LIMITED' | 'FLEET' | 'CLAN';
-
-interface Mission {
-  id: string;
-  type: MissionType;
-  title: string;
-  description: string;
-  progress: number;
-  maxProgress: number;
-  reward: string;
-  claimed: boolean;
 }
 
 interface SectorCard {
@@ -78,17 +59,16 @@ const cards: SectorCard[] = [
 ];
 
 export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
-  const [activeMissionType, setActiveMissionType] = useState<MissionType>('DAILY');
   const [activeTab, setActiveTab] = useState<"home" | "marketplace" | "phantom" | "can" | "inventory" | "mission">("home");
   const [activeWindow, setActiveWindow] = useState<"home" | "expeditions" | "expeditions_flights" | "alliance" | "profile" | "settings" | "notifications">("home");
 
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string>(user.avatarUrl || '');
   const [unreadNotifCount, setUnreadNotifCount] = useState<number>(0);
-  const [activeFlightsCount, setActiveFlightsCount] = useState<number>(0);
   const [utcTime, setUtcTime] = useState<string>(miningService.getFormattedUtcTime());
 
-  // 🎯 ESTADO PARA NOTIFICACIONES FLOTANTES (TOASTS)
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
+  const [activeFlights, setActiveFlights] = useState<any[]>([]);
+  const [notifiedFlightIds, setNotifiedFlightIds] = useState<Set<string>>(new Set());
 
   const [power, setPower] = useState(0);
   const [currencies, setCurrencies] = useState({ gd_coin: 0, quantum_credit: 0, phantom_coin: 0, halloween_coin: 0, xmas_coin: 0, valentine_coin: 0 });
@@ -97,9 +77,13 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     lunar_fiber: 0, infinite_core: 0, primal_token: 0, xenoplasm: 0, organium: 0, mana: 0, wood: 0
   });
 
-  // 🎯 MANEJADOR VISUAL DE NOTIFICACIONES
-  const handleTriggerNotification = (text: string, e?: any) => {
-    console.log("📢 [SYSTEM_NOTIFICATION]:", text);
+  const readyFlightsCount = useMemo(() => {
+    const nowMs = Date.now();
+    return activeFlights.filter(exp => new Date(exp.estimated_return_time).getTime() <= nowMs).length;
+  }, [activeFlights, utcTime]);
+
+  // 🎯 DISPARADOR DE COMUNICADOS CORREGIDO PARA USER_NOTIFICATIONS Y EXPEDITION_LOGS
+  const handleTriggerNotification = async (text: string, payloadOrExpId?: any) => {
     const id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
     const newToast: ToastNotification = {
       id,
@@ -108,7 +92,55 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     };
 
     setToasts(prev => [newToast, ...prev].slice(0, 4));
-    setUnreadNotifCount(prev => prev + 1);
+
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        let expIdStr: string | null = null;
+        let rewardsPayload: any = {};
+
+        if (typeof payloadOrExpId === 'string') {
+          expIdStr = payloadOrExpId;
+        } else if (payloadOrExpId && typeof payloadOrExpId === 'object') {
+          if (payloadOrExpId.expId) expIdStr = String(payloadOrExpId.expId);
+          if (payloadOrExpId.rewards) rewardsPayload = payloadOrExpId.rewards;
+        }
+
+        // 1. Insertar en user_notifications para la vista de Comunicaciones
+        await supabase.from('user_notifications').insert([{
+          user_id: authUser.id,
+          category: 'EXPEDITION',
+          box_type: 'EXPEDITION',
+          title: 'EXPEDICIÓN FINALIZADA',
+          message: text,
+          is_read: false
+        }]);
+
+        // 2. Si proviene de expedición, registrar en expedition_logs para la tarjeta de vuelo
+        if (expIdStr) {
+          await supabase.from('expedition_logs').insert([{
+            user_id: authUser.id,
+            expedition_id: expIdStr,
+            event_type: 'discovery',
+            title: 'MISION FINALIZADA',
+            message: text,
+            rewards_looted: rewardsPayload,
+            damage_sustained: 0
+          }]);
+        }
+
+        const { count } = await supabase
+          .from('user_notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', authUser.id)
+          .eq('is_read', false);
+
+        if (count !== null) setUnreadNotifCount(count);
+      }
+    } catch (err) {
+      console.error("Error al registrar notificación:", err);
+      setUnreadNotifCount(prev => prev + 1);
+    }
 
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
@@ -119,16 +151,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  const [missions, setMissions] = useState<Mission[]>([
-    { id: 'M-D1', type: 'DAILY', title: 'EXPEDICIÓN DE MINERÍA', description: 'Completar 3 expediciones de minería con éxito', progress: 3, maxProgress: 3, reward: '+50 CRISTALES', claimed: false },
-    { id: 'M-D2', type: 'DAILY', title: 'SINCRO DE C.A.N.', description: 'Escanear 1 cluster galáctico en el mapa estelar', progress: 1, maxProgress: 1, reward: '+100 GD COINS', claimed: true },
-    { id: 'M-D3', type: 'DAILY', title: 'COMERCIO INGAME', description: 'Realizar 1 compra o venta en el Marketplace', progress: 0, maxProgress: 1, reward: '+10 PHANTOM COINS', claimed: false }
-  ]);
-
-  const handleClaimMission = (missionId: string) => {
-    setMissions(prev => prev.map(m => m.id === missionId ? { ...m, claimed: true } : m));
-  };
-
   useEffect(() => {
     const timer = setInterval(() => {
       setUtcTime(miningService.getFormattedUtcTime());
@@ -136,10 +158,25 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     return () => clearInterval(timer);
   }, []);
 
-  // 🔄 CARGA Y SINCRONIZACIÓN CONTINUA DE RECURSOS / MONEDAS REALES + LISTENERS DE LOGS
+  useEffect(() => {
+    if (!activeFlights.length) return;
+    const nowMs = Date.now();
+    activeFlights.forEach((exp) => {
+      const returnMs = new Date(exp.estimated_return_time).getTime();
+      if (nowMs >= returnMs && !notifiedFlightIds.has(String(exp.id))) {
+        setNotifiedFlightIds(prev => new Set(prev).add(String(exp.id)));
+        handleTriggerNotification(
+          `🎉 ¡EXPEDICIÓN FINALIZADA! La flota ${exp.fleet_name || 'de expedición'} ha llegado a su destino (${exp.sector_name || 'SC'}). Reclama tus recompensas en Expeditions In Flight.`,
+          { expId: exp.id }
+        );
+      }
+    });
+  }, [utcTime, activeFlights, notifiedFlightIds]);
+
   useEffect(() => {
     let profileChannel: any;
-    let logsChannel: any;
+    let notifChannel: any;
+    let expeditionsChannel: any;
     let isMounted = true;
 
     const loadUserProfile = async (authUser: any) => {
@@ -187,6 +224,18 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       }
     };
 
+    const loadActiveExpeditions = async (userId: string) => {
+      const { data: expData } = await supabase
+        .from('active_expeditions')
+        .select('*')
+        .eq('user_id', userId)
+        .neq('status', 'CLAIMED');
+
+      if (expData && isMounted) {
+        setActiveFlights(expData);
+      }
+    };
+
     const initEngine = async () => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser || !isMounted) return;
@@ -196,23 +245,11 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         setCurrentAvatarUrl(savedAvatar);
       }
 
-      // Carga Inicial
       await loadUserProfile(authUser);
+      await loadActiveExpeditions(authUser.id);
 
-      // Expediciones
-      const { count: flightCount } = await supabase
-        .from('active_expeditions')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', authUser.id)
-        .eq('status', 'LAUNCHED');
-
-      if (flightCount !== null && flightCount !== undefined && isMounted) {
-        setActiveFlightsCount(flightCount);
-      }
-
-      // Notificaciones
       const { count: notifCount } = await supabase
-        .from('expedition_logs')
+        .from('user_notifications')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', authUser.id)
         .eq('is_read', false);
@@ -221,38 +258,41 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         setUnreadNotifCount(notifCount);
       }
 
-      // Suscripción Realtime Perfil
       profileChannel = supabase
         .channel(`economy_hud_stream_${authUser.id}`)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_profiles' }, (payload: any) => {
-          const updated = payload.new;
-          if (!updated || !isMounted) return;
-          if (updated.id === authUser.id || updated.user_id === authUser.id) {
-            loadUserProfile(authUser);
-          }
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_profiles' }, () => {
+          if (isMounted) loadUserProfile(authUser);
         })
         .subscribe();
 
-      // 🎯 SUSCRIPCIÓN REALTIME PARA EVENTOS/LOGS DE EXPEDICIÓN DEL USUARIO
-      logsChannel = supabase
-        .channel(`expedition_logs_stream_${authUser.id}`)
+      expeditionsChannel = supabase
+        .channel(`active_expeditions_stream_${authUser.id}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'active_expeditions', filter: `user_id=eq.${authUser.id}` }, () => {
+          if (isMounted) loadActiveExpeditions(authUser.id);
+        })
+        .subscribe();
+
+      notifChannel = supabase
+        .channel(`user_notifications_stream_${authUser.id}`)
         .on('postgres_changes', { 
           event: 'INSERT', 
           schema: 'public', 
-          table: 'expedition_logs',
+          table: 'user_notifications',
           filter: `user_id=eq.${authUser.id}`
         }, (payload: any) => {
-          const newLog = payload.new;
-          if (newLog && isMounted) {
-            handleTriggerNotification(`🛰️ [${newLog.event_type || 'ALERTA'}]: ${newLog.title || newLog.message}`);
+          const newNotif = payload.new;
+          if (newNotif && isMounted && !newNotif.is_read) {
+            setUnreadNotifCount(prev => prev + 1);
           }
         })
         .subscribe();
 
-      // Refresco automático cada 3 segundos
       const pollInterval = setInterval(() => {
-        if (isMounted) loadUserProfile(authUser);
-      }, 3000);
+        if (isMounted) {
+          loadUserProfile(authUser);
+          loadActiveExpeditions(authUser.id);
+        }
+      }, 4000);
 
       return () => clearInterval(pollInterval);
     };
@@ -262,7 +302,8 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     return () => {
       isMounted = false;
       if (profileChannel) supabase.removeChannel(profileChannel);
-      if (logsChannel) supabase.removeChannel(logsChannel);
+      if (notifChannel) supabase.removeChannel(notifChannel);
+      if (expeditionsChannel) supabase.removeChannel(expeditionsChannel);
     };
   }, []);
 
@@ -273,7 +314,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     >
       <div className="fixed inset-0 bg-black/55 backdrop-blur-[1px] z-0 pointer-events-none" />
 
-      {/* ─── CONTENEDOR FLOTANTE DE NOTIFICACIONES TOAST (Z-INDEX 100) ─── */}
       <div className="fixed top-14 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none font-mono">
         <AnimatePresence>
           {toasts.map(toast => (
@@ -309,7 +349,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         </AnimatePresence>
       </div>
 
-      {/* ─── BARRA SUPERIOR HEADER ─── */}
       <Header
         userProfile={{
           ...user,
@@ -360,31 +399,51 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         onOpenProfile={() => { setActiveTab('home'); setActiveWindow('profile'); }}
       />
 
-      {/* RELOJ UTC */}
       <div className="w-full px-6 pt-2 flex justify-start items-center z-20 pointer-events-none">
         <div className="flex items-center gap-2 font-mono text-[10px] text-cyan-400/80 font-bold tracking-widest uppercase">
           <span>{utcTime}</span>
         </div>
       </div>
 
-      {/* BARRA LATERAL DERECHA */}
       <div className="fixed right-6 top-24 flex flex-col items-center gap-3 z-30 font-mono">
-        <button onClick={() => { setActiveTab("home"); setActiveWindow("expeditions_flights"); }} className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer">
+        <button 
+          onClick={() => { setActiveTab("home"); setActiveWindow("expeditions_flights"); }} 
+          className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer relative hover:border-cyan-400 transition-all"
+        >
           <Eye className="w-5 h-5 text-cyan-400 animate-pulse" />
+          {readyFlightsCount > 0 ? (
+            <span className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full border border-emerald-300 animate-bounce shadow-[0_0_10px_#10b981]">
+              {readyFlightsCount}
+            </span>
+          ) : activeFlights.length > 0 ? (
+            <span className="absolute -top-1.5 -right-1.5 bg-cyan-950 text-cyan-300 text-[9px] font-black px-1.5 py-0.5 rounded-full border border-cyan-500">
+              {activeFlights.length}
+            </span>
+          ) : null}
         </button>
-        <button onClick={() => { setActiveTab("home"); setActiveWindow("notifications"); }} className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer">
+
+        <button 
+          onClick={() => { setActiveTab("home"); setActiveWindow("notifications"); }} 
+          className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer relative hover:border-cyan-400 transition-all"
+        >
           <Bell className="w-5 h-5 text-cyan-400" />
+          {unreadNotifCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full border border-red-400 shadow-[0_0_10px_#ef4444] animate-pulse">
+              {unreadNotifCount}
+            </span>
+          )}
         </button>
-        <button onClick={() => { setActiveTab("home"); setActiveWindow("settings"); }} className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer">
+
+        <button 
+          onClick={() => { setActiveTab("home"); setActiveWindow("settings"); }} 
+          className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer hover:border-cyan-400 transition-all"
+        >
           <Settings className="w-5 h-5 text-cyan-400" />
         </button>
       </div>
 
-      {/* CONTENIDO PRINCIPAL */}
       <div className="w-full max-w-7xl flex-1 overflow-y-auto px-8 py-4 z-10 flex flex-col items-center justify-start">
         <AnimatePresence mode="wait">
-          
-          {/* SECTOR HOME / TARJETAS */}
           {activeTab === "home" && (
             activeWindow === "home" ? (
               <motion.div key="sector-home-screen" className="w-full my-auto">
@@ -448,94 +507,11 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
             )
           )}
 
-          {/* SECTOR MISSION CENTER */}
           {activeTab === "mission" && (
-            <motion.div key="sector-mission-page" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full bg-[#080b0e] border border-cyan-500/30 p-6 sm:p-8 rounded-2xl font-mono text-left space-y-6 backdrop-blur-md shadow-2xl relative overflow-hidden">
-              <div className="flex justify-between items-center border-b border-cyan-900/50 pb-4">
-                <div className="flex items-center gap-3">
-                  <Target className="w-7 h-7 text-cyan-400 animate-pulse" />
-                  <div>
-                    <span className="text-[9px] font-mono text-cyan-400 tracking-widest block font-bold uppercase">
-                      SISTEMA DE PROGRESIVIDAD Y RECOMPENSAS
-                    </span>
-                    <h2 className="text-lg font-black tracking-widest text-white uppercase">
-                      MISSION CENTER
-                    </h2>
-                  </div>
-                </div>
-                <span className="text-[9px] text-zinc-400 bg-cyan-950 px-3 py-1 rounded border border-cyan-800/40 uppercase font-bold">
-                  SINCRO EN TIEMPO REAL
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 overflow-x-auto scrollbar-none border-b border-cyan-950 pb-3 text-[9px] uppercase font-bold tracking-wider">
-                {(['DAILY', 'WEEKLY', 'MONTHLY', 'EVENT', 'LIMITED', 'FLEET', 'CLAN'] as MissionType[]).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setActiveMissionType(type)}
-                    className={`px-4 py-2 rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 border ${
-                      activeMissionType === type
-                        ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black shadow-[0_0_12px_rgba(6,182,212,0.3)]'
-                        : 'bg-black/40 text-zinc-500 border-transparent hover:text-zinc-300'
-                    }`}
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-1 custom-scrollbar">
-                {missions.filter(m => m.type === activeMissionType).length === 0 ? (
-                  <div className="col-span-2 p-12 text-center text-zinc-600 text-[10px] uppercase tracking-widest">
-                    NO HAY MISIONES DISPONIBLES EN ESTA CATEGORÍA
-                  </div>
-                ) : (
-                  missions.filter(m => m.type === activeMissionType).map((mission) => {
-                    const isComplete = mission.progress >= mission.maxProgress;
-                    const pct = Math.min(100, Math.floor((mission.progress / mission.maxProgress) * 100));
-
-                    return (
-                      <div key={mission.id} className="p-4 bg-black/60 border border-cyan-950 hover:border-cyan-800 rounded-xl flex flex-col justify-between gap-3 relative transition-all">
-                        <div className="flex justify-between items-start gap-2">
-                          <div className="flex flex-col text-left">
-                            <span className="text-[11px] font-bold text-white uppercase tracking-wider">{mission.title}</span>
-                            <span className="text-[9px] text-zinc-400 mt-0.5 normal-case">{mission.description}</span>
-                          </div>
-                          <span className="text-[8.5px] font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20 shrink-0">{mission.reward}</span>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-[8px] text-zinc-500">
-                            <span>PROGRESO</span>
-                            <span className="text-cyan-400 font-bold">{mission.progress} / {mission.maxProgress} ({pct}%)</span>
-                          </div>
-                          <div className="w-full h-2 bg-neutral-900 rounded-full overflow-hidden p-0.5 border border-cyan-950">
-                            <div className="h-full bg-cyan-400 rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
-                          </div>
-                        </div>
-                        <div className="flex justify-end mt-1">
-                          {mission.claimed ? (
-                            <span className="text-[8.5px] font-bold text-zinc-500 uppercase flex items-center gap-1">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> RECLAMADO
-                            </span>
-                          ) : isComplete ? (
-                            <button
-                              onClick={() => handleClaimMission(mission.id)}
-                              className="px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white text-[8.5px] font-black uppercase rounded shadow-[0_0_10px_rgba(16,185,129,0.4)] cursor-pointer transition-all animate-pulse"
-                            >
-                              RECLAMAR RECOMPENSA
-                            </button>
-                          ) : (
-                            <span className="text-[8px] text-zinc-500 uppercase font-bold flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5 text-zinc-500" /> EN PROGRESO
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </motion.div>
+            <MissionView 
+              triggerNotification={handleTriggerNotification} 
+              onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} 
+            />
           )}
 
           {activeTab === "can" && <CanView />}

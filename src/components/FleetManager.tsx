@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Search, ChevronRight, Check, Zap, ArrowLeft, RefreshCw, Layers } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { useAuth } from "../context/AuthContext";
 import { InventoryItem } from "../lib/inventoryService";
 
 export interface SasoriFleet {
@@ -21,8 +20,18 @@ interface FleetManagerProps {
 }
 
 export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerNotification }) => {
-  const { user } = useAuth();
-  const userId = user?.id;
+  // UserProfile del AuthContext no expone `id` — obtenemos el UUID directamente de Supabase Auth
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const [viewMode, setViewMode] = useState<FleetViewMode>("LIST");
   const [fleets, setFleets] = useState<SasoriFleet[]>([]);
