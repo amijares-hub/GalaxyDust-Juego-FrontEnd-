@@ -161,7 +161,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   triggerNotification,
   onBack
 }) => {
-  const { items: characters, loading: isLoading, refreshInventory, toggleFavorite: toggleFav } = useInventory();
+  const { items: characters, loading: isLoading, error: loadError, refreshInventory, toggleFavorite: toggleFav } = useInventory();
   const { playSfx } = useAudioEngine();
 
   const [activeSidebarCategory, setActiveSidebarCategory] = useState<string>("All");
@@ -416,7 +416,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   </div>
                 ) : getFilteredCharacters.length === 0 ? (
                   <div className="col-span-2 md:col-span-5 flex items-center justify-center h-full text-zinc-500 text-[9px] font-mono uppercase tracking-widest py-12">
-                    {modsEnabled ? "NO HAY NAVES EN VUELO REGISTRADAS" : "NO HAY ASSETS DISPONIBLES EN ESTE SECTOR"}
+                    {loadError ? (
+                      <span className="text-red-500 font-bold">{loadError}</span>
+                    ) : (
+                      modsEnabled ? "NO HAY NAVES EN VUELO REGISTRADAS" : "NO HAY ASSETS DISPONIBLES EN ESTE SECTOR"
+                    )}
                   </div>
                 ) : (
                   getFilteredCharacters.map((char, idx) => {

@@ -39,6 +39,7 @@ export interface UseSasoriAuthReturn {
   successMessage: string | null;
   user: UserProfile | null;
   tempEmail: string;
+  isInitializing: boolean;
   setScreen: (screen: ScreenState) => void;
   submitLogin: (email: string, password: string, rememberMe: boolean) => Promise<boolean>;
   submitRegister: (email: string, password: string) => Promise<boolean>;
@@ -57,6 +58,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [tempEmail, setTempEmail] = useState<string>('');
+  const [isInitializing, setIsInitializing] = useState<boolean>(true);
 
   // 🛡️ HIDRATACIÓN Y CENTINELA DE SESIÓN ZERO-TRUST
   useEffect(() => {
@@ -81,25 +83,33 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     };
 
     const hydrateActiveSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
 
-      if (session && session.user && isMounted) {
-        const dbProfile = await fetchUserProfile(session.user.id);
-        if (!isMounted) return;
+        if (session && session.user && isMounted) {
+          const dbProfile = await fetchUserProfile(session.user.id);
+          if (!isMounted) return;
 
-        setUser({
-          email: session.user.email || '',
-          name: dbProfile?.username || session.user.email?.split('@')[0].toUpperCase() || 'PILOTO',
-          provider: (session.user.app_metadata.provider || 'password') as any,
-          registrationDate: dbProfile?.created_at ? new Date(dbProfile.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          mfaEnabled: dbProfile?.mfa_enabled ?? false,
-          verified: true,
-          avatarUrl: dbProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${session.user.email}`,
-          assignedToken: 'GD-SEC-' + session.user.id.slice(0, 8).toUpperCase(),
-        });
+          setUser({
+            email: session.user.email || '',
+            name: dbProfile?.username || session.user.email?.split('@')[0].toUpperCase() || 'PILOTO',
+            provider: (session.user.app_metadata.provider || 'password') as any,
+            registrationDate: dbProfile?.created_at ? new Date(dbProfile.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            mfaEnabled: dbProfile?.mfa_enabled ?? false,
+            verified: true,
+            avatarUrl: dbProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${session.user.email}`,
+            assignedToken: 'GD-SEC-' + session.user.id.slice(0, 8).toUpperCase(),
+          });
 
-        setScreenState('homepage');
-        setState('connected');
+          setScreenState('homepage');
+          setState('connected');
+        }
+      } catch (err) {
+        console.error("Error al hidratar sesión activa:", err);
+      } finally {
+        if (isMounted) {
+          setIsInitializing(false);
+        }
       }
     };
 
@@ -110,6 +120,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
         setUser(null);
         setScreenState('menu');
         setState('idle');
+        setIsInitializing(false);
       } else if (event === 'SIGNED_IN' && session?.user && isMounted) {
         const provider = session.user.app_metadata?.provider;
         if (provider && provider !== 'email') {
@@ -127,7 +138,10 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
             });
             setScreenState('homepage');
             setState('connected');
+            setIsInitializing(false);
           });
+        } else {
+          setIsInitializing(false);
         }
       }
     });
@@ -279,7 +293,6 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
       });
 
       if (error) {
-        // Fallback a verificación por email si el factor es OTP estándar
         const { error: emailOtpErr } = await supabase.auth.verifyOtp({
           email: authUser.email,
           token: code,
@@ -361,6 +374,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     successMessage,
     user,
     tempEmail,
+    isInitializing,
     setScreen,
     submitLogin,
     submitRegister,

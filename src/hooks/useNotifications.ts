@@ -121,8 +121,11 @@ export const useNotifications = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      const channelName = `realtime_notifs_stream_${user.id}`;
+      supabase.removeChannel(supabase.channel(channelName));
+
       channel = supabase
-        .channel(`realtime_notifications_stream_${user.id}`)
+        .channel(channelName)
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'expedition_logs', filter: `user_id=eq.${user.id}` },

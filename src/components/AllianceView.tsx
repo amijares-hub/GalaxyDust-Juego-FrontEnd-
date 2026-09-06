@@ -1,24 +1,20 @@
 import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { 
   RotateCcw, 
   Users, 
   ShieldAlert, 
   Wifi, 
-  Zap, 
-  Crosshair, 
   ChevronRight,
   UserCheck,
   Send,
   MessageSquare,
   Shield,
   Activity,
-  ArrowUpCircle,
-  Gem,
-  Award
+  ArrowUpCircle
 } from "lucide-react";
 import { Button } from "./ui/joly-button";
 import { supabase } from "../lib/supabase";
+import { useAudioEngine } from "../hooks/useAudioEngine";
 
 interface Member {
   id: string;
@@ -55,10 +51,12 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
   onBack,
   triggerNotification
 }) => {
+  const { playSfx } = useAudioEngine();
+
   const [allianceTechLevel, setAllianceTechLevel] = useState(4);
   const [techProgress, setTechProgress] = useState(45);
   const [chatInput, setChatInput] = useState("");
-  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [, setCurrentUserId] = useState<string>("");
   const [allianceName, setAllianceName] = useState<string>("VANGUARDIA GALÁCTICA");
 
   const [members, setMembers] = useState<Member[]>([]);
@@ -79,7 +77,7 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
         .eq('user_id', user.id)
         .maybeSingle();
 
-      let targetAllianceId = memberRecord?.alliance_id;
+      const targetAllianceId = memberRecord?.alliance_id;
 
       if (targetAllianceId) {
         const { data: alliance } = await supabase
@@ -163,46 +161,11 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
     fetchAllianceData();
   }, []);
 
-  const playSfxTone = (type: "click" | "success" | "msg") => {
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      if (type === "success") {
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(440, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
-        gain.gain.setValueAtTime(0.1, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-      } else if (type === "msg") {
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(600, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.1);
-        gain.gain.setValueAtTime(0.05, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-      } else {
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(800, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.08);
-        gain.gain.setValueAtTime(0.08, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
-      }
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.3);
-    } catch (err) {}
-  };
-
-  // 🛡️ DONACIÓN TECNOLÓGICA SECURE (RPC)
+  // 🛡️ DONACIÓN TECNOLÓGICA SECURE (RPC CON VALIDACIÓN SERVIDOR)
   const handleDonateTech = async (e: React.MouseEvent) => {
     if (playerGems < 50) {
       triggerNotification("⚠️ CRISTALES INSUFICIENTES (REQUERIDO: 50💎)", e);
-      playSfxTone("click");
+      playSfx(300);
       return;
     }
 
@@ -210,33 +173,38 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 🛡️ LLAMADA ZERO-TRUST AL SERVIDOR
+      // 🛡️ TRANSACCIÓN SERVIDOR ZERO-TRUST
       const { data, error } = await supabase.rpc('donate_alliance_tech_secure', {
         p_user_id: user.id
       });
 
       if (error) throw error;
 
-      // Actualizar estado React usando datos validados por el servidor
-      setPlayerGems(data.new_crystals);
-      setPlayerPower(data.new_power);
+      // 🎯 ACTUALIZACIÓN DE ESTADO ESTRICTAMENTE BASADA EN EL SERVIDOR
+      if (data && typeof data.new_crystals === 'number') {
+        setPlayerGems(data.new_crystals);
+      }
+      if (data && typeof data.new_power === 'number') {
+        setPlayerPower(data.new_power);
+      }
 
       setTechProgress(prev => {
         const next = prev + 15;
         if (next >= 100) {
           setAllianceTechLevel(l => l + 1);
           triggerNotification(`🚀 ¡NÚCLEO SUBIÓ DE NIVEL! BONO +5,000 POW APLICADO`, e);
-          playSfxTone("success");
+          playSfx(1200);
           return next - 100;
         }
         triggerNotification("🔋 APORTE TECNOLÓGICO REGISTRADO (+15% PROGRESO | +5,000 POW)", e);
-        playSfxTone("success");
+        playSfx(880);
         return next;
       });
 
       fetchAllianceData();
     } catch (err: any) {
       console.error("Error durante donación:", err);
+      playSfx(300);
       triggerNotification(`⛔ ERROR EN DONACIÓN: ${err.message}`, e);
     }
   };
@@ -258,10 +226,11 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
       if (error) throw error;
 
       setChatInput("");
-      playSfxTone("msg");
+      playSfx(660);
       fetchAllianceData();
     } catch (err) {
       console.error("Error al enviar mensaje:", err);
+      playSfx(300);
     }
   };
 
@@ -290,10 +259,7 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
       </div>
 
       <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 mt-2 max-w-6xl mx-auto">
-        
-        {/* COLUMNA IZQUIERDA: INFORMACIÓN Y MIEMBROS DE LA ALIANZA */}
         <div className="lg:col-span-8 flex flex-col gap-4">
-          
           <div className="bg-[#0b0c10]/80 border border-indigo-500/20 p-5 rounded-2xl backdrop-blur-md relative overflow-hidden flex flex-col sm:flex-row items-center justify-between shadow-[0_0_30px_rgba(99,102,241,0.05)]">
             <div className="absolute top-0 left-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[50px] pointer-events-none" />
             
@@ -385,9 +351,7 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: CHAT Y LOGS DE TERMINAL */}
         <div className="lg:col-span-4 flex flex-col bg-[#050608]/90 border border-[#E53E3E]/20 rounded-2xl backdrop-blur-md overflow-hidden min-h-[400px] shadow-[0_0_20px_rgba(229,62,62,0.05)] relative">
-          
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#E53E3E]/5 rounded-full blur-[40px] pointer-events-none" />
 
           <div className="px-4 py-3 border-b border-[#E53E3E]/20 bg-[#E53E3E]/5 flex items-center justify-between">
@@ -448,9 +412,7 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
               </button>
             </form>
           </div>
-
         </div>
-
       </div>
     </div>
   );

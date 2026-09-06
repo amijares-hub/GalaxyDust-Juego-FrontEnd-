@@ -20,6 +20,8 @@ export interface Asset {
   level?: number;
   effect?: number;
   skill_bonus?: number;
+  /** Habilidades del seed (ej. 'TOOL_SOLO_METAL') */
+  skills?: string[];
   
   min_metal_capacity?: number;
   max_metal_capacity?: number;
@@ -75,6 +77,7 @@ export interface Expedition {
   calculated_max_metal?: number;
   calculated_min_crystal?: number;
   calculated_max_crystal?: number;
+  expedition_snapshot?: any;
 }
 
 export interface ExpeditionHistoryRecord {
@@ -224,25 +227,71 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
   const leftMenuOptions: LeftMenuCategory[] = ['Fleets', 'Naves', 'Astrobots', 'Tools', 'Licencia', 'Consumibles'];
 
-  const inFlightAssetIds = useMemo(() => {
-    const ids = new Set<string>();
+  const { busyToolIds, busyShipIds, busyAssetIds } = useMemo(() => {
+    const toolIds = new Set<string>();
+    const shipIds = new Set<string>();
+    const allIds = new Set<string>();
+    
     activeExpeditions.forEach((exp: any) => {
+      if (exp.status === 'CLAIMED') return;
+      
+      let snap: any = {};
+      try {
+        if (typeof exp.expedition_snapshot === 'string') snap = JSON.parse(exp.expedition_snapshot);
+        else if (exp.expedition_snapshot) snap = exp.expedition_snapshot;
+      } catch (e) {}
+
+      // Leer ship_ids / tool_id del root o snapshot
+      const rawShipIds: string[] = exp.ship_ids ? (Array.isArray(exp.ship_ids) ? exp.ship_ids : [exp.ship_ids]) : (exp.ship_id ? [exp.ship_id] : snap.ship_ids || []);
+      const rawToolId: string | null = exp.tool_id || snap.tool_id || null;
+
+      rawShipIds.forEach(id => {
+        if (id) {
+          allIds.add(id.toString());
+          shipIds.add(id.toString());
+        }
+      });
+      if (rawToolId) {
+        allIds.add(rawToolId.toString());
+        toolIds.add(rawToolId.toString());
+      }
+
+      // Fallback a equipped_assets (formato antiguo/clásico)
       const assets = exp.equipped_assets || exp.assets || exp.ships || [];
       if (Array.isArray(assets)) {
         assets.forEach((a: any) => {
-          if (a.id) ids.add(a.id.toString());
+          if (a.id) allIds.add(a.id.toString());
+          if (a.seed_id) allIds.add(a.seed_id.toString());
+          
+          if (a.type && isShipAsset(a.type)) {
+            if (a.id) shipIds.add(a.id.toString());
+            if (a.seed_id) shipIds.add(a.seed_id.toString());
+          }
+          if (a.type && isToolAsset(a.type)) {
+            if (a.id) toolIds.add(a.id.toString());
+            if (a.seed_id) toolIds.add(a.seed_id.toString());
+          }
         });
       }
       if (exp.fleet_id) {
         const fleet = fleets.find(f => f.id === exp.fleet_id);
         if (fleet) {
-          (fleet.ships || []).forEach(s => ids.add(s.id.toString()));
-          (fleet.tools || []).forEach(t => ids.add(t.id.toString()));
-          (fleet.licenses || []).forEach(l => ids.add(l.id.toString()));
+          (fleet.ships || []).forEach(s => {
+            if (s.id) { allIds.add(s.id.toString()); shipIds.add(s.id.toString()); }
+            if (s.seed_id) { allIds.add(s.seed_id.toString()); shipIds.add(s.seed_id.toString()); }
+          });
+          (fleet.tools || []).forEach(t => {
+            if (t.id) { allIds.add(t.id.toString()); toolIds.add(t.id.toString()); }
+            if (t.seed_id) { allIds.add(t.seed_id.toString()); toolIds.add(t.seed_id.toString()); }
+          });
+          (fleet.licenses || []).forEach(l => {
+            if (l.id) allIds.add(l.id.toString());
+            if (l.seed_id) allIds.add(l.seed_id.toString());
+          });
         }
       }
     });
-    return ids;
+    return { busyToolIds: toolIds, busyShipIds: shipIds, busyAssetIds: allIds };
   }, [activeExpeditions, fleets]);
 
   const activeGcObject = useMemo(() => {
@@ -277,6 +326,23 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     return Number(modifierSum.toFixed(2));
   }, [activeGcObject, selectedAssets, selectedFleet, globalPassiveBonus]);
 
+  // ── Cambio C: Tool activa y skill TOOL_SOLO_METAL ──────────────────────────
+  const selectedTool = useMemo(() => {
+    return (
+      selectedAssets.find(a => isToolAsset(a.type))
+      ?? (selectedFleet?.tools?.[0] as Asset | undefined)
+      ?? null
+    );
+  }, [selectedAssets, selectedFleet]);
+
+  const toolSkills = useMemo(() => {
+    return selectedTool?.skills || [];
+  }, [selectedTool]);
+
+  const isSoloMetal = toolSkills.includes('TOOL_SOLO_METAL');
+  const isSoloCrystal = toolSkills.includes('TOOL_SOLO_CRYSTAL');
+  // ────────────────────────────────────────────────────────────────────────────
+
   const dynamicMiningRanges = useMemo(() => {
     let minMetal = Number(activeGcObject?.min_metal || 300);
     let maxMetal = Number(activeGcObject?.max_metal || 1200);
@@ -302,13 +368,17 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
     const modifierMult = 1.0 + (totalExpeditionProbability / 100.0);
 
+    // ── Cambio D: si TOOL_SOLO_METAL o TOOL_SOLO_CRYSTAL, forzar el otro a 0 ──
+    const isSoloMetalGlobal = allTools.some(t => (t.skills || []).includes('TOOL_SOLO_METAL'));
+    const isSoloCrystalGlobal = allTools.some(t => (t.skills || []).includes('TOOL_SOLO_CRYSTAL'));
+
     return {
-      minMetal: Math.floor(minMetal * modifierMult),
-      maxMetal: Math.floor(maxMetal * modifierMult),
-      minCrystal: Math.floor(minCrystal * modifierMult),
-      maxCrystal: Math.floor(maxCrystal * modifierMult),
-      canMineMetal: true,
-      canMineCrystal: true
+      minMetal: isSoloCrystalGlobal ? 0 : Math.floor(minMetal * modifierMult),
+      maxMetal: isSoloCrystalGlobal ? 0 : Math.floor(maxMetal * modifierMult),
+      minCrystal: isSoloMetalGlobal ? 0 : Math.floor(minCrystal * modifierMult),
+      maxCrystal: isSoloMetalGlobal ? 0 : Math.floor(maxCrystal * modifierMult),
+      canMineMetal: !isSoloCrystalGlobal,
+      canMineCrystal: !isSoloMetalGlobal
     };
   }, [activeGcObject, selectedAssets, selectedFleet, totalExpeditionProbability]);
 
@@ -684,6 +754,19 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
             const rawBonus = seed?.mining_bonus ?? seed?.expedition_bonus ?? seed?.success_bonus ?? seed?.effect ?? seed?.skill_bonus ?? 0;
             const realBonus = typeof rawBonus === 'number' ? rawBonus : (parseFloat(rawBonus) || 0);
 
+            // Leer habilidades del seed (soporta text[], jsonb array y jsonb objeto)
+            let parsedSkills: string[] = [];
+            if (seed?.skills) {
+              if (Array.isArray(seed.skills)) {
+                parsedSkills = seed.skills.map(String);
+              } else if (typeof seed.skills === 'object') {
+                // jsonb objeto: extraer claves o valores según convención
+                parsedSkills = Object.keys(seed.skills);
+              } else if (typeof seed.skills === 'string') {
+                try { parsedSkills = JSON.parse(seed.skills); } catch { parsedSkills = [seed.skills]; }
+              }
+            }
+
             assets.push({
               id: row.id?.toString() || targetId,
               seed_id: targetId,
@@ -697,6 +780,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               quantity: row.quantity || row.amount || 1,
               level: row.current_level || row.level || 1,
               effect: realBonus,
+              skills: parsedSkills,
               min_metal_capacity: seed?.min_metal_capacity,
               max_metal_capacity: seed?.max_metal_capacity,
               min_crystal_capacity: seed?.min_crystal_capacity,
@@ -772,8 +856,11 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      const channelName = `expedition_logs_realtime_${user.id}`;
+      supabase.removeChannel(supabase.channel(channelName));
+
       logsChannel = supabase
-        .channel(`expedition_logs_realtime_${user.id}`)
+        .channel(channelName)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'expedition_logs', filter: `user_id=eq.${user.id}` },
@@ -827,7 +914,15 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   };
 
   const toggleAssetSelection = (asset: Asset) => {
-    if (inFlightAssetIds.has(asset.id)) {
+    const isShip = isShipAsset(asset.type);
+    const isTool = isToolAsset(asset.type);
+    const isInFlight = busyAssetIds.has(asset.id) || 
+      (asset.seed_id && (
+        (isShip && busyShipIds.has(asset.seed_id)) || 
+        (isTool && busyToolIds.has(asset.seed_id))
+      ));
+
+    if (isInFlight) {
       playSfx(300);
       if (triggerNotification) triggerNotification("⛔ ESTE ACTIVO SE ENCUENTRA EN VUELO Y NO SE PUEDE SELECCIONAR");
       return;
@@ -892,25 +987,25 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         if (selectedFleet.licenses) deployedAssets.push(...selectedFleet.licenses);
       }
 
-      const payload = {
-        fleet_id: selectedFleet?.id || null,
-        fleet_name: fleetName,
-        sector_name: sectorName,
-        galaxy_cluster: selectedGC || "INARA",
-        star_cluster: scObj?.name || selectedSC || "STARCLUSTER GOAL",
-        sc_id: selectedSC || null,
-        applied_success_rate: totalExpeditionProbability,
-        duration_hours: duration,
-        risk_factor: isAdrift ? 40 : (selectedPlanet?.risk_factor || 15),
-        is_adrift: isAdrift,
-        
-        calculated_min_metal: dynamicMiningRanges.minMetal,
-        calculated_max_metal: dynamicMiningRanges.maxMetal,
-        calculated_min_crystal: dynamicMiningRanges.minCrystal,
-        calculated_max_crystal: dynamicMiningRanges.maxCrystal,
+      // ── Cambio F: Invocar launch_expedition_master_audit ──────────────────
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) throw new Error('Usuario no autenticado');
 
+      // Tool activa para el lanzamiento
+      const launchTool = selectedAssets.find(a => isToolAsset(a.type))
+        ?? (selectedFleet?.tools?.[0] as Asset | undefined)
+        ?? null;
+
+      // IDs de naves desplegadas (user_ships.id)
+      const launchShipIds = deployedAssets
+        .filter(a => isShipAsset(a.type))
+        .map(a => a.id)
+        .filter(Boolean);
+
+      const payload = {
         equipped_assets: deployedAssets.map(a => ({
           id: a.id,
+          seed_id: a.seed_id,
           name: a.name,
           image_url: a.image_url,
           type: a.type,
@@ -918,9 +1013,13 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         }))
       };
 
-      const { error } = await supabase.rpc('launch_expedition_secure', {
-        p_payload: payload
+      const { error } = await supabase.rpc('launch_expedition_master_audit', {
+        p_user_id:   currentUser.id,
+        p_cluster_id: selectedGC ?? null,
+        p_ship_ids:  launchShipIds,
+        p_tool_id:   launchTool?.seed_id ?? null
       });
+      // ─────────────────────────────────────────────────────────────────────
 
       if (error) throw error;
 
@@ -1217,12 +1316,66 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 }
 
                 const isFlightFinished = remainingMs === 0;
-                const deployedAssets = exp.equipped_assets || [];
+
+                let snap: any = {};
+                try {
+                  if (typeof exp.expedition_snapshot === 'string') {
+                    snap = JSON.parse(exp.expedition_snapshot);
+                  } else if (typeof exp.expedition_snapshot === 'object' && exp.expedition_snapshot !== null) {
+                    snap = exp.expedition_snapshot;
+                  }
+                } catch (e) {
+                  // ignore
+                }
+
+                let deployedAssets: Asset[] = [];
+                const rawShipIds: string[] = exp.ship_ids ? (Array.isArray(exp.ship_ids) ? exp.ship_ids : [exp.ship_ids]) : (exp.ship_id ? [exp.ship_id] : snap.ship_ids || []);
+                const rawToolId: string | null = exp.tool_id || snap.tool_id || null;
+
+                if ((rawShipIds.length > 0 || rawToolId) && inventoryAssets.length > 0) {
+                  rawShipIds.forEach(id => {
+                    const found = inventoryAssets.find(a => a.id === id || a.seed_id === id);
+                    if (found) deployedAssets.push(found);
+                    else deployedAssets.push({ id, name: `Nave: #${String(id).slice(0, 4)}...`, type: 'Naves', rarity: 'Common', collection: 'GD', image_url: 'https://placehold.co/100x100/111827/22d3ee?text=NAVE' });
+                  });
+                  if (rawToolId) {
+                    const found = inventoryAssets.find(a => a.id === rawToolId || a.seed_id === rawToolId);
+                    if (found) deployedAssets.push(found);
+                    else deployedAssets.push({ id: rawToolId, name: `Tool: #${String(rawToolId).slice(0, 4)}...`, type: 'Tools', rarity: 'Common', collection: 'GD', image_url: 'https://placehold.co/100x100/111827/f59e0b?text=TOOL' });
+                  }
+                } else {
+                  deployedAssets = exp.equipped_assets || [];
+                }
 
                 const displayMinMetal = exp.calculated_min_metal && exp.calculated_min_metal > 0 ? exp.calculated_min_metal : 300;
                 const displayMaxMetal = exp.calculated_max_metal && exp.calculated_max_metal > 0 ? exp.calculated_max_metal : 1200;
                 const displayMinCrystal = exp.calculated_min_crystal && exp.calculated_min_crystal > 0 ? exp.calculated_min_crystal : 150;
                 const displayMaxCrystal = exp.calculated_max_crystal && exp.calculated_max_crystal > 0 ? exp.calculated_max_crystal : 600;
+                const allowedRes = snap.allowed_resources || ['metal', 'crystal'];
+                const metalMult = typeof snap.metal_multiplier === 'number' ? snap.metal_multiplier : 1;
+                const crystalMult = typeof snap.crystal_multiplier === 'number' ? snap.crystal_multiplier : 1;
+                const deutMult = typeof snap.deuterium_multiplier === 'number' ? snap.deuterium_multiplier : 1;
+                const cargoCap = snap.total_cargo_capacity || 0;
+                const buffs = snap.active_buffs || [];
+
+                const baseMetalRate = displayMaxMetal / (totalDurationMs / 1000);
+                const baseCrystalRate = displayMaxCrystal / (totalDurationMs / 1000);
+                const elapsedSec = elapsedMs / 1000;
+
+                let liveMetal = allowedRes.includes('metal') ? (elapsedSec * baseMetalRate * metalMult) : 0;
+                let liveCrystal = allowedRes.includes('crystal') ? (elapsedSec * baseCrystalRate * crystalMult) : 0;
+                let liveDeut = allowedRes.includes('deuterium') ? (elapsedSec * (baseMetalRate * 0.1) * deutMult) : 0;
+
+                const totalMined = liveMetal + liveCrystal + liveDeut;
+                let isCargoFull = false;
+                if (cargoCap > 0 && totalMined >= cargoCap) {
+                  isCargoFull = true;
+                  const ratio = cargoCap / totalMined;
+                  liveMetal *= ratio;
+                  liveCrystal *= ratio;
+                  liveDeut *= ratio;
+                }
+
 
                 return (
                   <div key={exp.id} className="p-3.5 rounded-xl border border-cyan-500/40 bg-[#050910] shadow-lg flex flex-col justify-between gap-2.5 relative overflow-hidden">
@@ -1284,19 +1437,82 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                       </div>
                     )}
 
-                    <div className="bg-[#020508] p-2 rounded-lg border border-cyan-950 flex justify-between items-center text-[8px]">
-                      <span className="text-zinc-400 uppercase flex items-center gap-1 font-bold">
-                        <Pickaxe className="w-3 h-3 text-amber-400" /> RANGO ESTIMADO DE EXTRACCIÓN:
-                      </span>
-                      <div className="flex flex-col gap-0.5 font-mono font-bold text-[7px] text-right">
-                        <span className="text-zinc-300">
-                          Metal: <span className="text-cyan-300">[{displayMinMetal.toLocaleString()} ~ {displayMaxMetal.toLocaleString()}]</span>
+                    <div className="bg-[#020508] p-2 rounded-lg border border-cyan-950 flex flex-col gap-2 text-[8px]">
+                      <div className="flex justify-between items-center">
+                        <span className="text-zinc-400 uppercase flex items-center gap-1 font-bold">
+                          <Pickaxe className="w-3 h-3 text-amber-400" /> MINADO EN VIVO:
                         </span>
-                        <span className="text-zinc-300">
-                          Cristal: <span className="text-purple-300">[{displayMinCrystal.toLocaleString()} ~ {displayMaxCrystal.toLocaleString()}]</span>
-                        </span>
+                        <div className="flex items-center gap-1">
+                          {/* ── Cambio G: Badge MODO METAL PURO desde snapshot ── */}
+                          {allowedRes.length === 1 && allowedRes[0] === 'metal' && (
+                            <span className="text-[6px] bg-amber-950 text-amber-400 border border-amber-800 px-1.5 py-0.5 rounded font-black uppercase animate-pulse">
+                              MODO METAL PURO
+                            </span>
+                          )}
+                          {isCargoFull && (
+                            <span className="text-[7.5px] font-mono px-2 py-0.5 rounded font-black border bg-red-950 text-red-400 border-red-800 animate-pulse">
+                              BODEGA LLENA
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      
+                      <div className="grid grid-cols-3 gap-1 font-mono font-bold text-[7.5px] text-center">
+                        <div className="flex flex-col border border-cyan-950 bg-black/40 p-1 rounded">
+                          <span className="text-zinc-500">Metal</span>
+                          {!allowedRes.includes('metal') ? (
+                            <span className="text-red-500 text-[6px] mt-0.5">BLOQUEADO</span>
+                          ) : (
+                            <span className="text-cyan-300">{Math.floor(liveMetal).toLocaleString()}</span>
+                          )}
+                        </div>
+                        <div className="flex flex-col border border-cyan-950 bg-black/40 p-1 rounded">
+                          <span className="text-zinc-500">Cristal</span>
+                          {!allowedRes.includes('crystal') ? (
+                            <span className="text-red-500 text-[6px] mt-0.5">BLOQUEADO</span>
+                          ) : (
+                            <span className="text-purple-300">{Math.floor(liveCrystal).toLocaleString()}</span>
+                          )}
+                        </div>
+                        <div className="flex flex-col border border-cyan-950 bg-black/40 p-1 rounded">
+                          <span className="text-zinc-500">Deuterio</span>
+                          {!allowedRes.includes('deuterium') ? (
+                            <span className="text-red-500 text-[6px] mt-0.5">NO COMPATIBLE</span>
+                          ) : (
+                            <span className="text-emerald-300">{Math.floor(liveDeut).toLocaleString()}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {cargoCap > 0 && (
+                        <div className="flex flex-col gap-1 mt-1">
+                          <div className="flex justify-between text-[7px] text-zinc-500">
+                            <span>CAPACIDAD DE CARGA</span>
+                            <span>{Math.floor(totalMined).toLocaleString()} / {cargoCap.toLocaleString()}</span>
+                          </div>
+                          <div className="w-full h-1 bg-neutral-900 rounded-full overflow-hidden p-0.5 border border-cyan-950">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-300 ${isCargoFull ? 'bg-red-500' : 'bg-amber-400'}`} 
+                              style={{ width: `${Math.min(100, (totalMined / cargoCap) * 100)}%` }} 
+                            />
+                          </div>
+                        </div>
+                      )}
+                      
+                      {buffs.length > 0 && (
+                        <div className="mt-1 border-t border-cyan-950 pt-1.5">
+                          <span className="text-[7px] text-cyan-500 font-bold uppercase mb-1 block">Modificadores Activos:</span>
+                          <div className="flex flex-wrap gap-1">
+                            {buffs.map((buff: any, idx: number) => (
+                              <span key={idx} className="bg-cyan-950/60 border border-cyan-800 text-cyan-300 px-1 py-0.5 rounded text-[6.5px] uppercase">
+                                {buff.name || buff.type || 'BUFF'}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
+
 
                     <div className="p-2 bg-black/40 border border-cyan-950 rounded-lg text-[7.5px] space-y-1">
                       <span className="text-cyan-400 font-bold uppercase tracking-wider block">
@@ -1680,15 +1896,32 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
             </div>
 
             <div className="mt-auto space-y-2">
+               {/* ── Cambio E: Estimación con filtro TOOL_SOLO_METAL y TOOL_SOLO_CRYSTAL ── */}
                <div className="bg-[#020508] p-2 rounded-lg border border-cyan-900/50 flex flex-col gap-1 text-[7px] font-mono">
-                 <span className="text-cyan-400 font-bold uppercase mb-0.5">Rango Estimado de Extracción:</span>
-                 <div className="flex justify-between">
-                   <span className="text-zinc-400">Metal:</span>
-                   <span className="text-cyan-300 font-bold">[{dynamicMiningRanges.minMetal.toLocaleString()} ~ {dynamicMiningRanges.maxMetal.toLocaleString()}]</span>
+                 <div className="flex items-center justify-between mb-0.5">
+                   <span className="text-cyan-400 font-bold uppercase">Rango Estimado de Extracción:</span>
+                   {isSoloMetal && (
+                     <span className="text-[6px] bg-amber-950 text-amber-400 border border-amber-800 px-1 py-0.5 rounded font-black uppercase">SOLO METAL</span>
+                   )}
+                   {isSoloCrystal && (
+                     <span className="text-[6px] bg-purple-950 text-purple-400 border border-purple-800 px-1 py-0.5 rounded font-black uppercase">SOLO CRISTAL</span>
+                   )}
                  </div>
-                 <div className="flex justify-between">
+                 <div className="flex justify-between items-center">
+                   <span className="text-zinc-400">Metal:</span>
+                   {isSoloCrystal ? (
+                     <span className="text-red-500 font-black text-[6px] uppercase tracking-wide">DESACTIVADO POR TOOL</span>
+                   ) : (
+                     <span className="text-cyan-300 font-bold">[{dynamicMiningRanges.minMetal.toLocaleString()} ~ {dynamicMiningRanges.maxMetal.toLocaleString()}]</span>
+                   )}
+                 </div>
+                 <div className="flex justify-between items-center">
                    <span className="text-zinc-400">Cristal:</span>
-                   <span className="text-purple-300 font-bold">[{dynamicMiningRanges.minCrystal.toLocaleString()} ~ {dynamicMiningRanges.maxCrystal.toLocaleString()}]</span>
+                   {isSoloMetal ? (
+                     <span className="text-red-500 font-black text-[6px] uppercase tracking-wide">DESACTIVADO POR TOOL</span>
+                   ) : (
+                     <span className="text-purple-300 font-bold">[{dynamicMiningRanges.minCrystal.toLocaleString()} ~ {dynamicMiningRanges.maxCrystal.toLocaleString()}]</span>
+                   )}
                  </div>
                </div>
 
@@ -1760,16 +1993,26 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 ) : (
                   filteredInventory.map(asset => {
                     const isSelected = selectedAssets.some(a => a.id === asset.id);
-                    const isInFlight = inFlightAssetIds.has(asset.id);
+                    
+                    const isShip = isShipAsset(asset.type);
+                    const isTool = isToolAsset(asset.type);
+                    const isInFlight = busyAssetIds.has(asset.id) || 
+                      (asset.seed_id && (
+                        (isShip && busyShipIds.has(asset.seed_id)) || 
+                        (isTool && busyToolIds.has(asset.seed_id))
+                      ));
+
                     const effectVal = asset.effect || 0;
 
                     return (
                       <div
                         key={asset.id}
-                        onClick={() => toggleAssetSelection(asset)}
-                        className={`p-1.5 rounded-lg border flex items-center gap-2 transition-all ${
+                        onClick={() => {
+                          if (!isInFlight) toggleAssetSelection(asset);
+                        }}
+                        className={`p-1.5 rounded-lg border flex items-center gap-2 transition-all relative ${
                           isInFlight 
-                            ? 'bg-red-950/20 border-red-900/60 opacity-60 cursor-not-allowed' 
+                            ? 'bg-red-950/20 border-red-900/60 opacity-50 pointer-events-none' 
                             : isSelected 
                             ? 'bg-cyan-950/80 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.3)] cursor-pointer' 
                             : 'bg-[#050910] border-cyan-950 hover:border-cyan-800 cursor-pointer'
@@ -1780,6 +2023,13 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                           {isSelected && !isInFlight && (
                             <div className="absolute inset-0 bg-cyan-500/30 flex items-center justify-center">
                               <Check className="w-3.5 h-3.5 text-cyan-300 stroke-[3]" />
+                            </div>
+                          )}
+                          {isInFlight && (
+                            <div className="absolute inset-0 bg-red-900/40 flex items-center justify-center backdrop-blur-[1px]">
+                              <span className="text-[5px] text-white font-black uppercase text-center leading-tight shadow-black drop-shadow-md">
+                                EN MISIÓN
+                              </span>
                             </div>
                           )}
                         </div>

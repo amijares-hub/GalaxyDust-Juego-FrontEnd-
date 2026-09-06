@@ -137,12 +137,15 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
 
   useEffect(() => {
     fetchAllUserProfiles();
+    const profileChannelName = `public_user_profiles_changes_${Date.now()}`;
     const channel = supabase
-      .channel('public_user_profiles_changes')
+      .channel(profileChannelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_profiles' }, () => { fetchAllUserProfiles(); })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { 
+      supabase.removeChannel(channel); 
+    };
   }, []);
 
   const checkActiveCombat = async (userId: string) => {
@@ -186,21 +189,33 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
       return;
     }
 
-    let unsubscribe: () => void;
+    let isSubscribed = true;
+    let unsubscribeFn: (() => void) | null = null;
+
     async function initChat() {
       const history = await chatService.fetchHistory(channelId);
-      setMessages(history.slice(-100));
+      if (isSubscribed) {
+        setMessages(history.slice(-100));
+      }
 
-      unsubscribe = chatService.subscribeToChannel(channelId, (newMsg) => {
-        setMessages((prev) => [...prev.slice(-99), newMsg]);
-        if (!isOpen && newMsg.user_id !== currentUserId) {
-          setUnreadCount((prev) => prev + 1);
+      unsubscribeFn = chatService.subscribeToChannel(channelId, (newMsg) => {
+        if (isSubscribed) {
+          setMessages((prev) => [...prev.slice(-99), newMsg]);
+          if (!isOpen && newMsg.user_id !== currentUserId) {
+            setUnreadCount((prev) => prev + 1);
+          }
         }
       });
     }
 
     initChat();
-    return () => { if (unsubscribe) unsubscribe(); };
+
+    return () => {
+      isSubscribed = false;
+      if (unsubscribeFn) {
+        unsubscribeFn();
+      }
+    };
   }, [channelId, isOpen, currentUserId]);
 
   useEffect(() => {
@@ -298,7 +313,6 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
 
   return (
     <div className="fixed bottom-4 left-4 z-[9999] font-sans select-none">
-      
       {!isOpen && (
         <motion.button
           initial={{ scale: 0.8, opacity: 0 }}
@@ -394,7 +408,6 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
             )}
 
             <div className="flex-1 overflow-y-auto p-3 space-y-3 font-mono text-[9.5px] scrollbar-thin scrollbar-thumb-cyan-950">
-              
               {activeChannel === 'PRIVADO' && !activeDmPartner ? (
                 <div className="space-y-2">
                   <span className="text-[8px] font-mono text-cyan-400 uppercase tracking-widest block font-bold border-b border-cyan-950 pb-1">
@@ -543,7 +556,6 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
-
     </div>
   );
 };

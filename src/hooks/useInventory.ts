@@ -56,15 +56,19 @@ const resolveImageUrl = (rawUrl?: string): string => {
 export const useInventory = () => {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchInventory = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setItems([]);
         return;
       }
+      
+      console.log("Cargando inventario para user:", user.id);
 
       // 1. OBTENER EXPEDICIONES ACTIVAS EN VUELO
       const { data: activeExpeditions } = await supabase
@@ -112,6 +116,31 @@ export const useInventory = () => {
       });
 
       // 3. CARGAR TODAS LAS TABLAS DE ACTIVOS DEL USUARIO
+      const results = await Promise.all([
+        supabase.from('user_ships').select('*, seed_ships(*)').eq('user_id', user.id),
+        supabase.from('user_tools').select('*, seed_tools(*)').eq('user_id', user.id),
+        Promise.resolve({ data: [], error: null }), // user_astrobots
+        Promise.resolve({ data: [], error: null }), // user_structures
+        Promise.resolve({ data: [], error: null }), // user_technologies
+        Promise.resolve({ data: [], error: null }), // user_licenses
+        Promise.resolve({ data: [], error: null })  // user_consumibles
+      ]);
+
+      let dbErrorMsg = "";
+      results.forEach((res, index) => {
+        if (res.error) {
+          const tableName = ["user_ships", "user_tools", "user_astrobots", "user_structures", "user_technologies", "user_licenses", "user_consumibles"][index];
+          console.error(`Error cargando ${tableName}:`, res.error);
+          if (index === 0 || index === 1) { // Error crítico en Naves o Tools
+            dbErrorMsg += `Error en ${tableName}: ${res.error.message || 'Error desconocido'}. `;
+          }
+        }
+      });
+      
+      if (dbErrorMsg) {
+        setError(`ERROR DE CARGA DE BASE DE DATOS: ${dbErrorMsg}`);
+      }
+
       const [
         { data: userShips },
         { data: userTools },
@@ -120,15 +149,7 @@ export const useInventory = () => {
         { data: userTech },
         { data: userLicenses },
         { data: userConsumables }
-      ] = await Promise.all([
-        supabase.from('user_ships').select('*, seed_ships(*)').eq('user_id', user.id),
-        supabase.from('user_tools').select('*, seed_tools(*)').eq('user_id', user.id),
-        supabase.from('user_astrobots').select('*, seed_astrobots(*)').eq('user_id', user.id),
-        supabase.from('user_structures').select('*, seed_structures(*)').eq('user_id', user.id),
-        supabase.from('user_technologies').select('*, seed_technologies(*)').eq('user_id', user.id),
-        supabase.from('user_licenses').select('*, seed_licenses(*)').eq('user_id', user.id),
-        supabase.from('user_consumibles').select('*, seed_consumables(*)').eq('user_id', user.id)
-      ]);
+      ] = results;
 
       const combinedItems: InventoryItem[] = [];
 
@@ -147,7 +168,7 @@ export const useInventory = () => {
       // Mapear Naves
       (userShips || []).forEach((s: any) => {
         const seed = s.seed_ships || {};
-        const shipName = s.custom_name || s.name_ship || seed.ship_name || seed.name || `Nave #${s.id}`;
+        const shipName = s.custom_name || s.name_ship || seed.name || seed.ship_name || seed.title || seed.id || `Nave #${s.id}`;
         const realId = String(s.id);
         const seedId = String(s.id_ship || seed.id || '');
 
@@ -167,14 +188,15 @@ export const useInventory = () => {
           favorite: Boolean(s.favorite),
           is_in_flight: checkIsInFlight(realId, seedId, shipName),
           avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || s.image_url),
-          description: seed.description || 'Nave espacial de combate e investigación.'
+          description: seed.description || 'Nave espacial de combate e investigación.',
+          skills: seed.skills || []
         });
       });
 
       // Mapear Herramientas
       (userTools || []).forEach((t: any) => {
         const seed = t.seed_tools || {};
-        const toolName = t.name || seed.name || seed.title || `Tool #${t.id}`;
+        const toolName = t.name || seed.name || seed.tool_name || seed.title || seed.id || `Tool #${t.id}`;
         const realId = String(t.id);
         const seedId = String(t.tool_id || seed.id || '');
 
@@ -193,7 +215,8 @@ export const useInventory = () => {
           favorite: Boolean(t.favorite),
           is_in_flight: checkIsInFlight(realId, seedId, toolName),
           avatar_url: resolveImageUrl(seed.image_url || t.image_url),
-          description: seed.description || 'Herramienta de extracción de recursos.'
+          description: seed.description || 'Herramienta de extracción de recursos.',
+          skills: seed.skills || []
         });
       });
 
@@ -223,7 +246,7 @@ export const useInventory = () => {
         });
       });
 
-      // Mapear Estructuras / Defensas
+      // Mapear Estructuras
       (userStructures || []).forEach((st: any) => {
         const seed = st.seed_structures || {};
         const structName = st.name || seed.name || seed.title || `Estructura #${st.id}`;
@@ -275,7 +298,7 @@ export const useInventory = () => {
         });
       });
 
-      // Mapear Licencias / Blueprints
+      // Mapear Licencias
       (userLicenses || []).forEach((l: any) => {
         const seed = l.seed_licenses || {};
         const licName = l.name || seed.name || `Licencia #${l.id}`;
@@ -337,11 +360,13 @@ export const useInventory = () => {
 
   const toggleFavorite = async (itemId: string) => {
     setItems(prev => prev.map(item => item.id === itemId ? { ...item, favorite: !item.favorite } : item));
+    // Suscripción comentada por ahora
+    return () => {};
   };
 
   useEffect(() => {
     fetchInventory();
   }, [fetchInventory]);
 
-  return { items, loading, refreshInventory: fetchInventory, toggleFavorite };
+  return { items, loading, error, refreshInventory: fetchInventory, toggleFavorite };
 };

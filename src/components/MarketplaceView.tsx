@@ -8,12 +8,8 @@ import {
   Search,
   Filter,
   ChevronLeft,
-  Clock,
-  Shield,
-  Zap,
   Lock,
   Unlock,
-  Layers,
   Cpu,
   Rocket,
   Bot,
@@ -22,12 +18,11 @@ import {
   FileText,
   Package,
   ArrowUpDown,
-  X,
-  AlertTriangle
+  X
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useMarketplace, type MarketListing } from '../hooks/useMarketplace';
-import { useInventory, type InventoryItem } from '../hooks/useInventory';
+import { useInventory } from '../hooks/useInventory';
 
 export type { MarketListing } from '../hooks/useMarketplace';
 
@@ -73,7 +68,7 @@ interface MyInventoryItem {
   amount?: number;
 }
 
-// 🌐 NORMALIZACIÓN ESTRICTA DE CATEGORÍAS
+// 🌐 NORMALIZACIÓN ESTRICTA Y DETERMINISTA DE CATEGORÍAS
 const normalizeCategory = (cat?: string, type?: string): AssetCategory => {
   const upperCat = String(cat || '').toUpperCase().trim();
   if (['SHIPS', 'TOOLS', 'STRUCTURES', 'TECH', 'BLUEPRINTS', 'LICENSES', 'ASTROBOTS', 'CONSUMABLES'].includes(upperCat)) {
@@ -112,7 +107,6 @@ const matchRarity = (itemRar?: string, targetRar?: RarityFilter) => {
 };
 
 export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
-  playerGold = 0,
   setPlayerGold,
   onBack,
   triggerNotification
@@ -146,7 +140,6 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   const [auctionDuration, setAuctionDuration] = useState<'12h' | '24h' | '48h'>('24h');
   const [sellDescription, setSellDescription] = useState<string>('');
 
-  // 🎯 HIDRATACIÓN COMPLETA DE ACTIVOS DESDE SUPABASE Y HOOKS
   const syncInventory = async () => {
     setIsLocalLoading(true);
     try {
@@ -162,7 +155,6 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
       const activeListingIds = new Set((dbListings || []).map((l: any) => String(l.inventory_item_id)));
 
-      // 1. Cargar desde la base de datos directamente para evitar listas vacías
       const loadCat = async (userTable: string, seedTable: string, category: AssetCategory, fkCols: string[]) => {
         const { data: userRows } = await supabase.from(userTable).select('*').eq('user_id', userId);
         if (!userRows || userRows.length === 0) return [];
@@ -214,7 +206,6 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
       const directAssets = [...ships, ...tools, ...astrobots, ...consumables, ...licenses];
 
-      // 2. Integrar con useInventory como respaldo
       const hookAssets: MyInventoryItem[] = (inventoryItems || []).map((item) => {
         const itemCat = normalizeCategory(item.category, item.type);
         const itemRarity = normalizeRarity(item.rarity);
@@ -392,8 +383,6 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
   return (
     <div className="w-full max-w-7xl mx-auto bg-[#080b0e] border border-cyan-500/30 p-5 rounded-2xl shadow-2xl relative overflow-hidden font-mono text-left select-none flex flex-col gap-4 text-white">
-      
-      {/* ENCABEZADO SUPERIOR */}
       <div className="w-full bg-[#05070a] border border-cyan-500/30 p-3.5 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
         <div className="flex items-center gap-2.5">
           <button
@@ -440,7 +429,6 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
         </div>
       </div>
 
-      {/* FILTROS Y BÚSQUEDA */}
       <div className="w-full bg-[#05070a] border border-cyan-500/20 p-3 rounded-xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
         <div className="flex flex-wrap items-center gap-1 text-[8px] font-bold uppercase">
           {[
@@ -500,9 +488,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
         </div>
       </div>
 
-      {/* ESTRUCTURA PRINCIPAL */}
       <div className="w-full flex flex-col md:flex-row gap-3.5 items-start">
-        {/* SIDEBAR DE TODAS LAS CATEGORÍAS DE ACTIVOS */}
         <div className="w-full md:w-52 shrink-0 bg-[#05070a] border border-cyan-500/20 p-3 rounded-xl flex flex-col gap-2">
           <div className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5 px-1 border-b border-cyan-950 pb-2">
             <Filter className="w-3.5 h-3.5 text-cyan-400" />
@@ -544,7 +530,6 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
           </div>
         </div>
 
-        {/* FEED PRINCIPAL */}
         {activeTab !== 'SELL_ITEM' ? (
           <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5 max-h-[440px] overflow-y-auto pr-1.5 custom-scrollbar">
             {filteredListings.length === 0 ? (
@@ -695,7 +680,6 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
         )}
       </div>
 
-      {/* MODAL CONFIGURACIÓN DE VENTA / SUBASTA */}
       <AnimatePresence>
         {selectedItemToList && (
           <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4 font-mono">
@@ -720,7 +704,6 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                 </button>
               </div>
 
-              {/* SELECTOR DE MODO: VENTA DIRECTA VS SUBASTA EN VIVO */}
               <div className="grid grid-cols-2 gap-2 bg-black/60 p-1 rounded-xl border border-cyan-950 text-[9px] font-bold uppercase">
                 <button
                   type="button"
@@ -817,7 +800,6 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
           </div>
         )}
       </AnimatePresence>
-
     </div>
   );
 };

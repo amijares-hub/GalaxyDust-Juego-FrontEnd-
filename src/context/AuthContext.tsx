@@ -1,27 +1,20 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { useSasoriAuth, UseSasoriAuthReturn } from '../hooks/useSasoriAuth';
 
-// 🛰️ Contexto global de autenticación
 const AuthContext = createContext<UseSasoriAuthReturn | undefined>(undefined);
 
 interface AuthProviderProps {
   children: React.ReactNode;
 }
 
-/**
- * 🌌 PROVEEDOR GLOBAL DE AUTENTICACIÓN (AuthProvider)
- * Distribuye homogéneamente el estado de sesión hacia todas las vistas
- * centralizando las llamadas en el motor de `useSasoriAuth`.
- */
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const auth = useSasoriAuth();
 
-  // 🎯 ESTABILIZACIÓN DE REFERENCIA (MEMOIZACIÓN)
-  // Evita propagar re-renders a toda la aplicación si el objeto retornado no cambia sus valores clave.
   const value = useMemo(() => auth, [
     auth.screen,
     auth.state,
     auth.user,
+    auth.isInitializing,
     auth.errorMessage,
     auth.successMessage,
     auth.setScreen,
@@ -38,11 +31,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 };
 
-/**
- * 🛠️ HOOK CONSUMIDOR GLOBAL: `useAuth`
- * Permite a cualquier componente hijo acceder a las credenciales
- * del usuario y funciones de autenticación.
- */
 export const useAuth = (): UseSasoriAuthReturn => {
   const context = useContext(AuthContext);
   if (context === undefined) {

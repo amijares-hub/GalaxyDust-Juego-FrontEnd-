@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Search, ChevronRight, Check, Zap, ArrowLeft, RefreshCw, Layers } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { InventoryItem } from "../lib/inventoryService";
+import { useAudioEngine } from "../hooks/useAudioEngine";
 
 export interface SasoriFleet {
   id: string;
@@ -49,20 +50,7 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
   const [selectedConsumables, setSelectedConsumables] = useState<InventoryItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const playSfx = (freq: number) => {
-    try {
-      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
-      const ctx = new Ctx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(freq, ctx.currentTime);
-      gain.gain.setValueAtTime(0.08, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.start(); osc.stop(ctx.currentTime + 0.2);
-    } catch (_) {}
-  };
+  const { playSfx } = useAudioEngine();
 
   const loadFleets = async () => {
     if (!userId) return;

@@ -162,6 +162,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     let profileChannel: any;
     let logsChannel: any;
     let expeditionsChannel: any;
+    let pollInterval: any;
     let isMounted = true;
 
     const loadUserProfile = async (authUser: any) => {
@@ -262,20 +263,19 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         })
         .subscribe();
 
-      const pollInterval = setInterval(() => {
+      pollInterval = setInterval(() => {
         if (isMounted) {
           loadUserProfile(authUser);
           loadActiveExpeditions(authUser.id);
         }
-      }, 4000);
-
-      return () => clearInterval(pollInterval);
+      }, 5000);
     };
 
     initEngine();
 
     return () => {
       isMounted = false;
+      if (pollInterval) clearInterval(pollInterval);
       if (profileChannel) supabase.removeChannel(profileChannel);
       if (logsChannel) supabase.removeChannel(logsChannel);
       if (expeditionsChannel) supabase.removeChannel(expeditionsChannel);
@@ -490,8 +490,8 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           )}
 
           {activeTab === "can" && <CanView />}
-          {activeTab === "marketplace" && <MarketplaceView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} playerWood={resources.wood} setPlayerWood={() => { }} playerFood={resources.deuterium} setPlayerFood={() => { }} playerStone={resources.dark_matter} setPlayerStone={() => { }} playerOre={resources.metal} setPlayerOre={() => { }} onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />}
-          {activeTab === "phantom" && <PhantomStationView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />}
+          {activeTab === "marketplace" && <MarketplaceView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />}
+          {activeTab === "phantom" && <PhantomStationView onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />}
           {activeTab === "inventory" && <InventoryView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />}
         </AnimatePresence>
       </div>
