@@ -115,41 +115,28 @@ export const useInventory = () => {
         }
       });
 
-      // 3. CARGAR TODAS LAS TABLAS DE ACTIVOS DEL USUARIO
-      const results = await Promise.all([
-        supabase.from('user_ships').select('*, seed_ships(*)').eq('user_id', user.id),
-        supabase.from('user_tools').select('*, seed_tools(*)').eq('user_id', user.id),
+      // 3. CARGAR TODAS LAS TABLAS DE ACTIVOS DEL USUARIO (DESACOPLADO)
+      const [
+        { data: userShips },
+        { data: seedShips },
+        { data: userTools },
+        { data: seedTools },
+        { data: userAstrobots },
+        { data: userStructures },
+        { data: userTech },
+        { data: userLicenses },
+        { data: userConsumables }
+      ] = await Promise.all([
+        supabase.from('user_ships').select('*').eq('user_id', user.id),
+        supabase.from('seed_ships').select('*'),
+        supabase.from('user_tools').select('*').eq('user_id', user.id),
+        supabase.from('seed_tools').select('*'),
         Promise.resolve({ data: [], error: null }), // user_astrobots
         Promise.resolve({ data: [], error: null }), // user_structures
         Promise.resolve({ data: [], error: null }), // user_technologies
         Promise.resolve({ data: [], error: null }), // user_licenses
         Promise.resolve({ data: [], error: null })  // user_consumibles
       ]);
-
-      let dbErrorMsg = "";
-      results.forEach((res, index) => {
-        if (res.error) {
-          const tableName = ["user_ships", "user_tools", "user_astrobots", "user_structures", "user_technologies", "user_licenses", "user_consumibles"][index];
-          console.error(`Error cargando ${tableName}:`, res.error);
-          if (index === 0 || index === 1) { // Error crítico en Naves o Tools
-            dbErrorMsg += `Error en ${tableName}: ${res.error.message || 'Error desconocido'}. `;
-          }
-        }
-      });
-      
-      if (dbErrorMsg) {
-        setError(`ERROR DE CARGA DE BASE DE DATOS: ${dbErrorMsg}`);
-      }
-
-      const [
-        { data: userShips },
-        { data: userTools },
-        { data: userAstrobots },
-        { data: userStructures },
-        { data: userTech },
-        { data: userLicenses },
-        { data: userConsumables }
-      ] = results;
 
       const combinedItems: InventoryItem[] = [];
 
@@ -167,10 +154,10 @@ export const useInventory = () => {
 
       // Mapear Naves
       (userShips || []).forEach((s: any) => {
-        const seed = s.seed_ships || {};
+        const seed = (seedShips || []).find((ss: any) => ss.id === s.ship_id || ss.id === s.seed_id || ss.id === s.id_ship) || {};
         const shipName = s.custom_name || s.name_ship || seed.name || seed.ship_name || seed.title || seed.id || `Nave #${s.id}`;
         const realId = String(s.id);
-        const seedId = String(s.id_ship || seed.id || '');
+        const seedId = String(s.id_ship || s.ship_id || s.seed_id || seed.id || '');
 
         combinedItems.push({
           id: realId,
@@ -195,10 +182,10 @@ export const useInventory = () => {
 
       // Mapear Herramientas
       (userTools || []).forEach((t: any) => {
-        const seed = t.seed_tools || {};
+        const seed = (seedTools || []).find((st: any) => st.id === t.tool_id || st.id === t.seed_id || st.tool_id === t.tool_id) || {};
         const toolName = t.name || seed.name || seed.tool_name || seed.title || seed.id || `Tool #${t.id}`;
         const realId = String(t.id);
-        const seedId = String(t.tool_id || seed.id || '');
+        const seedId = String(t.tool_id || t.seed_id || seed.id || '');
 
         combinedItems.push({
           id: realId,
