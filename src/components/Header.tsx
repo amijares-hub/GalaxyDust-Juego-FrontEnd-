@@ -11,6 +11,21 @@ interface HeaderProps {
   onOpenProfile?: () => void;
 }
 
+// 🖼️ HELPER: Garantiza que la URL del avatar sea siempre pública y funcional
+// Respaldo garantizado vía CDN que NUNCA devuelve 404
+const SAFE_FALLBACK_AVATAR = 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop';
+
+const resolveAvatarUrl = (rawUrl?: string): string => {
+  if (!rawUrl || typeof rawUrl !== 'string' || rawUrl.trim() === '') {
+    return SAFE_FALLBACK_AVATAR;
+  }
+  const clean = rawUrl.trim();
+  if (clean.startsWith('http://') || clean.startsWith('https://')) {
+    return clean;
+  }
+  return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/galaxy-assets/${clean.replace(/^\//, '')}`;
+};
+
 // 🎯 COMPROBACIÓN FLEXIBLE DE PESTAÑAS (SOPORTA MAYÚSCULAS/MINÚSCULAS Y ALIAS)
 const isTabActive = (currentActive: string = '', tabId: string): boolean => {
   const cleanActive = currentActive.trim().toUpperCase();
@@ -121,11 +136,17 @@ export const Header: React.FC<HeaderProps> = ({
         title="Ver Perfil"
       >
         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-black border border-cyan-400/80 group-hover:border-cyan-300 flex items-center justify-center text-cyan-300 font-bold shadow-[0_0_8px_rgba(34,211,238,0.3)] transition-all overflow-hidden">
-          {userProfile?.avatar_url ? (
-            <img src={userProfile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-          ) : (
-            <User className="w-3.5 h-3.5 text-cyan-400" />
-          )}
+          <img
+            src={resolveAvatarUrl(userProfile?.avatar_url)}
+            alt="Piloto Avatar"
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              if (target.src !== SAFE_FALLBACK_AVATAR) {
+                target.src = SAFE_FALLBACK_AVATAR;
+              }
+            }}
+          />
         </div>
         <div className="flex flex-col text-left">
           <span className="text-[8.5px] sm:text-[10px] font-black text-white group-hover:text-cyan-200 uppercase tracking-wider truncate max-w-[70px] sm:max-w-[120px]">

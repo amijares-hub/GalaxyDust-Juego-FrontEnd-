@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAudioEngine } from '../hooks/useAudioEngine';
+import { CanAssetsModal, CanAssetItem } from './CanAssetsModal';
 
 interface CanViewProps {
   triggerNotification?: (text: string, e?: any) => void;
@@ -37,12 +38,14 @@ interface DiscoveredStar {
 export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
   const { playSfx } = useAudioEngine();
 
+  const [currentUserId, setCurrentUserId] = useState<string>('');
   const [canLevel, setCanLevel] = useState<number>(1);
   const [galacticPower, setGalacticPower] = useState<number>(0);
   const [isUpgrading, setIsUpgrading] = useState<boolean>(false);
   const [, setLoading] = useState<boolean>(true);
 
   // Modales
+  const [activeModalCategory, setActiveModalCategory] = useState<'Estructuras' | 'Tecnologias' | 'Insignias' | null>(null);
   const [showAmiModal, setShowAmiModal] = useState<boolean>(false);
   const [showStatsModal, setShowStatsModal] = useState<boolean>(false);
   const [showSkillsModal, setShowSkillsModal] = useState<boolean>(false);
@@ -50,14 +53,11 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
   // Vuelos activos
   const [activeFlightsCount, setActiveFlightsCount] = useState<number>(0);
 
-  // Conteo de activos
-  const [assetCounts, setAssetCounts] = useState({
-    structures: 0,
-    tech: 0,
-    badges: 0,
-    totalDiscoveredStars: 0,
-    maxBadgeSlots: 5
-  });
+  // Lista unificada de activos C.A.N. para los modales
+  const [canAssetsList, setCanAssetsList] = useState<CanAssetItem[]>([]);
+
+  // Conteo de activos descubiertos
+  const [totalDiscoveredStars, setTotalDiscoveredStars] = useState<number>(0);
 
   // Habilidades activas reales
   const [activeSkills, setActiveSkills] = useState<ActiveSkillItem[]>([]);
@@ -85,7 +85,6 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
     }
   };
 
-  // 🛡️ CÁLCULO ESTRICTO DE PRODUCCIÓN REAL (SIN VALORES MOCK)
   const calculateRealProduction = async (user_id: string, current_can_level: number) => {
     try {
       const { data: userStructures } = await supabase
@@ -93,6 +92,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
         .select(`
           id, 
           current_level,
+          is_equipped,
           seed_structures (
             structure_name,
             structure_type,
@@ -110,7 +110,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
 
       if (userStructures && userStructures.length > 0) {
         userStructures.forEach((item: any) => {
-          if (!item.seed_structures) return;
+          if (!item.seed_structures || item.is_equipped === false) return;
           const type = (item.seed_structures.structure_type || '').toLowerCase();
           const scoreBase = item.seed_structures.power_score_base || 0;
           const dailyProd = (item.current_level || 1) * (scoreBase * 2.5);
@@ -141,7 +141,9 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Perfil y Nivel CAN Real
+      setCurrentUserId(user.id);
+
+      // 1. Perfil y Nivel CAN
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('*')
@@ -163,25 +165,86 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
 
       setActiveFlightsCount(flights || 0);
 
-      // 3. Conteo de activos real
-      const { count: strCount } = await supabase.from('user_structures').select('id', { count: 'exact', head: true }).eq('user_id', user.id);
-      const { count: techCount } = await supabase.from('user_technologies').select('id', { count: 'exact', head: true }).eq('user_id', user.id);
-      const { count: bdgCount } = await supabase.from('user_badges_unlocked').select('id', { count: 'exact', head: true }).eq('user_id', user.id);
-      
+      // 3. Cargar Assets C.A.N. para Modales e Inventario
+      const unifiedAssets: CanAssetItem[] = [];
+
+      // Estructuras
+      const { data: rawStructures } = await supabase
+        .from('user_structures')
+        .select('*, seed_structures(*)')
+        .eq('user_id', user.id);
+
+      if (rawStructures) {
+        rawStructures.forEach((s: any) => {
+          const seed = s.seed_structures;
+          unifiedAssets.push({
+            id: s.id,
+            seed_id: s.structure_id,
+            name: seed?.structure_name || `Estructura #${s.id}`,
+            type: 'Estructuras',
+            description: seed?.description || '',
+            effect_bonus: seed?.power_score_base || 0,
+            image_url: seed?.image_url,
+            is_equipped: s.is_equipped !== false,
+            level: s.current_level || 1
+          });
+        });
+      }
+
+      // Tecnologías
+      const { data: rawTech } = await supabase
+        .from('user_technologies')
+        .select('*, seed_technologies(*)')
+        .eq('user_id', user.id);
+
+      if (rawTech) {
+        rawTech.forEach((t: any) => {
+          const seed = t.seed_technologies;
+          unifiedAssets.push({
+            id: t.id,
+            seed_id: t.technology_id,
+            name: seed?.technology_name || `Tecnología #${t.id}`,
+            type: 'Tecnologias',
+            description: seed?.description || '',
+            effect_bonus: seed?.power_score_base || 0,
+            image_url: seed?.image_url,
+            is_equipped: t.is_equipped !== false
+          });
+        });
+      }
+
+      // Insignias
+      const { data: rawBadges } = await supabase
+        .from('user_badges_unlocked')
+        .select('*, seed_badges(*)')
+        .eq('user_id', user.id);
+
+      if (rawBadges) {
+        rawBadges.forEach((b: any) => {
+          const seed = b.seed_badges;
+          unifiedAssets.push({
+            id: b.id,
+            seed_id: b.badge_id,
+            name: seed?.name || `Insignia #${b.badge_id}`,
+            type: 'Insignias',
+            description: seed?.description || '',
+            effect_bonus: seed?.mining_bonus || 0,
+            image_url: seed?.image_url,
+            is_equipped: b.is_equipped !== false
+          });
+        });
+      }
+
+      setCanAssetsList(unifiedAssets);
+
+      // 4. Estrellas Mapeadas A.M.I.
       const { count: starsCount } = await supabase
         .from('user_discovered_stars')
         .select('id', { count: 'exact', head: true })
         .eq('discoverer_id', user.id);
 
-      setAssetCounts({
-        structures: strCount || 0,
-        tech: techCount || 0,
-        badges: bdgCount || 0,
-        totalDiscoveredStars: starsCount || 0,
-        maxBadgeSlots: 5
-      });
+      setTotalDiscoveredStars(starsCount || 0);
 
-      // 4. Obtener sistemas cartografiados reales de A.M.I. con orden global
       const { data: starsData } = await supabase
         .from('user_discovered_stars')
         .select('*')
@@ -202,19 +265,14 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
         setDiscoveredStars([]);
       }
 
-      // 5. Cargar habilidades reales
+      // 5. Cargar habilidades activas reales de assets EQUIPADOS
       const skillsToParse: ActiveSkillItem[] = [
         { id: 'sk-can-1', source: 'CAN', assetName: 'C.A.N. MATRIX LEVEL', effectTitle: 'Producción Global', effectDescription: `+${(profile?.level || 1) * 5}% Producción Diaria de Recursos` },
         { id: 'sk-can-2', source: 'CAN', assetName: 'C.A.N. MATRIX LEVEL', effectTitle: 'Slots Tácticos Adicionales', effectDescription: `+${(profile?.level || 1) * 2} Espacios de Almacenamiento Táctico` }
       ];
 
-      const { data: structuresWithSkills } = await supabase
-        .from('user_structures')
-        .select(`current_level, seed_structures (structure_name, image_url, skills)`)
-        .eq('user_id', user.id);
-
-      if (structuresWithSkills) {
-        structuresWithSkills.forEach((item: any) => {
+      if (rawStructures) {
+        rawStructures.filter((s: any) => s.is_equipped !== false).forEach((item: any) => {
           if (!item.seed_structures || !item.seed_structures.skills) return;
           const skillsArray = Array.isArray(item.seed_structures.skills) ? item.seed_structures.skills : [];
           
@@ -233,13 +291,8 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
         });
       }
 
-      const { data: techWithSkills } = await supabase
-        .from('user_technologies')
-        .select(`seed_technologies (technology_name, image_url, skills, rarity)`)
-        .eq('user_id', user.id);
-
-      if (techWithSkills) {
-        techWithSkills.forEach((item: any) => {
+      if (rawTech) {
+        rawTech.filter((t: any) => t.is_equipped !== false).forEach((item: any) => {
           if (!item.seed_technologies || !item.seed_technologies.skills) return;
           const skillsArray = Array.isArray(item.seed_technologies.skills) ? item.seed_technologies.skills : [];
           
@@ -299,6 +352,18 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
       setIsUpgrading(false);
     }
   };
+
+  const equippedStructuresCount = useMemo(() => {
+    return canAssetsList.filter(a => a.type === 'Estructuras' && a.is_equipped).length;
+  }, [canAssetsList]);
+
+  const equippedTechCount = useMemo(() => {
+    return canAssetsList.filter(a => a.type === 'Tecnologias' && a.is_equipped).length;
+  }, [canAssetsList]);
+
+  const equippedBadgesCount = useMemo(() => {
+    return canAssetsList.filter(a => a.type === 'Insignias' && a.is_equipped).length;
+  }, [canAssetsList]);
 
   const skillGridItems = useMemo(() => {
     return activeSkills.map((sk) => (
@@ -396,19 +461,49 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
             <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider block text-center mb-2 border-b border-cyan-950 pb-1">
               ASSETS ACTIVADOS
             </span>
+
+            {/* TRES BOTONES INTERACTIVOS */}
             <div className="grid grid-cols-3 gap-2 items-center">
-              <div className="bg-[#050910] border border-cyan-900 rounded-lg p-2.5 text-center flex flex-col items-center justify-center">
-                <span className="text-[14px] font-black text-white">{assetCounts.structures}</span>
-                <span className="text-[8px] font-bold text-zinc-300 uppercase mt-1">STRUCTURES</span>
-              </div>
-              <div className="bg-[#050910] border border-cyan-900 rounded-lg p-2.5 text-center flex flex-col items-center justify-center">
-                <span className="text-[14px] font-black text-white">{assetCounts.tech}</span>
-                <span className="text-[8px] font-bold text-zinc-300 uppercase mt-1">TECH</span>
-              </div>
-              <div className="bg-[#050910] border border-cyan-900 rounded-lg p-2.5 text-center flex flex-col items-center justify-center">
-                <span className="text-[14px] font-black text-cyan-300">{assetCounts.badges} / {assetCounts.maxBadgeSlots}</span>
-                <span className="text-[8px] font-bold text-zinc-300 uppercase mt-1">BADGES</span>
-              </div>
+              
+              {/* BOTÓN 1: ESTRUCTURAS */}
+              <button
+                onClick={() => { playSfx(660); setActiveModalCategory('Estructuras'); }}
+                className="bg-[#050910] border border-cyan-900 hover:border-cyan-400 transition-all rounded-lg p-2.5 text-center flex flex-col items-center justify-center cursor-pointer hover:scale-[1.02] active:scale-95 group shadow-md"
+              >
+                <span className="text-[14px] font-black text-white group-hover:text-cyan-300 transition-colors">
+                  {equippedStructuresCount}
+                </span>
+                <span className="text-[8px] font-bold text-zinc-300 group-hover:text-cyan-400 uppercase mt-1">
+                  STRUCTURES
+                </span>
+              </button>
+
+              {/* BOTÓN 2: TECNOLOGÍAS */}
+              <button
+                onClick={() => { playSfx(660); setActiveModalCategory('Tecnologias'); }}
+                className="bg-[#050910] border border-cyan-900 hover:border-cyan-400 transition-all rounded-lg p-2.5 text-center flex flex-col items-center justify-center cursor-pointer hover:scale-[1.02] active:scale-95 group shadow-md"
+              >
+                <span className="text-[14px] font-black text-white group-hover:text-cyan-300 transition-colors">
+                  {equippedTechCount}
+                </span>
+                <span className="text-[8px] font-bold text-zinc-300 group-hover:text-cyan-400 uppercase mt-1">
+                  TECH
+                </span>
+              </button>
+
+              {/* BOTÓN 3: INSIGNIAS */}
+              <button
+                onClick={() => { playSfx(660); setActiveModalCategory('Insignias'); }}
+                className="bg-[#050910] border border-cyan-900 hover:border-cyan-400 transition-all rounded-lg p-2.5 text-center flex flex-col items-center justify-center cursor-pointer hover:scale-[1.02] active:scale-95 group shadow-md"
+              >
+                <span className="text-[14px] font-black text-cyan-300 group-hover:text-white transition-colors">
+                  {equippedBadgesCount} / 5
+                </span>
+                <span className="text-[8px] font-bold text-zinc-300 group-hover:text-cyan-400 uppercase mt-1">
+                  BADGES
+                </span>
+              </button>
+
             </div>
           </div>
 
@@ -439,7 +534,6 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
         {/* COLUMNA 3: A.M.I. & STATS */}
         <div className="lg:col-span-4 flex flex-col justify-between gap-3.5">
           
-          {/* CAJA A.M.I. */}
           <div
             onClick={() => { playSfx(660); setShowAmiModal(true); }}
             className="flex-1 bg-black/80 border-2 border-cyan-500 hover:border-cyan-300 p-4 rounded-xl flex flex-col items-center justify-center text-center gap-1.5 cursor-pointer transition-all shadow-[0_0_15px_rgba(6,182,212,0.25)] hover:scale-[1.02] active:scale-95 group"
@@ -447,11 +541,10 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
             <Globe className="w-7 h-7 text-cyan-400 animate-pulse group-hover:scale-110 transition-transform" />
             <div className="text-[13px] font-black text-white uppercase tracking-widest">A.M.I.</div>
             <div className="text-sm font-bold text-cyan-300 mt-1">
-              {assetCounts.totalDiscoveredStars.toLocaleString()} <span className="text-[8px] text-cyan-500 uppercase">ESTRELLAS MAPEADAS</span>
+              {totalDiscoveredStars.toLocaleString()} <span className="text-[8px] text-cyan-500 uppercase">ESTRELLAS MAPEADAS</span>
             </div>
           </div>
 
-          {/* CAJA STATS & PRODUCCIÓN DIARIA */}
           <div
             onClick={() => { playSfx(660); setShowStatsModal(true); }}
             className="flex-1 bg-black/80 border-2 border-purple-500 hover:border-purple-300 p-4 rounded-xl flex flex-col items-center justify-center text-center gap-1.5 cursor-pointer transition-all shadow-[0_0_15px_rgba(168,85,247,0.25)] hover:scale-[1.02] active:scale-95 group"
@@ -464,7 +557,18 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
 
       </div>
 
-      {/* MODAL 1: A.M.I. (TARJETAS DINÁMICAS DESDE BD) */}
+      {/* MODAL DESPLEGABLE DE ASSETS (ESTRUCTURAS, TECH, BADGES) */}
+      <CanAssetsModal
+        isOpen={activeModalCategory !== null}
+        onClose={() => setActiveModalCategory(null)}
+        category={activeModalCategory}
+        assets={canAssetsList}
+        userId={currentUserId}
+        onRefresh={fetchCanData}
+        triggerNotification={triggerNotification}
+      />
+
+      {/* MODAL 1: A.M.I. */}
       {showAmiModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 font-mono text-white">
           <div className="w-full max-w-3xl bg-[#080b0e] border border-cyan-500/50 rounded-2xl p-5 text-left space-y-4 shadow-2xl">

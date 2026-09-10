@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthView } from './components/AuthView';
 import { Homepage } from './pages/Homepage';
 import { RefreshCw } from 'lucide-react';
 import { LandscapeGuard } from './components/ui/LandscapeGuard';
+import { GamePreloader } from './components/GamePreloader';
 
 function AppContent() {
   const { user, logout, isInitializing } = useAuth();
+  const [isPreloaderFinished, setIsPreloaderFinished] = useState(false);
 
   if (isInitializing) {
     return (
@@ -20,6 +22,11 @@ function AppContent() {
   }
 
   if (user) {
+    // Si el usuario se ha autenticado pero la precarga multimedia no ha terminado
+    if (!isPreloaderFinished) {
+      return <GamePreloader onComplete={() => setIsPreloaderFinished(true)} />;
+    }
+
     return <Homepage user={user as any} onLogout={logout} />;
   }
 

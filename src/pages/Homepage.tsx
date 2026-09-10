@@ -56,6 +56,19 @@ const isValidUUID = (str?: string | null): boolean => {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
 };
 
+const SAFE_FALLBACK_AVATAR = 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop';
+
+const resolveAvatarUrl = (rawUrl?: string): string => {
+  if (!rawUrl || typeof rawUrl !== 'string' || rawUrl.trim() === '') {
+    return SAFE_FALLBACK_AVATAR;
+  }
+  const clean = rawUrl.trim();
+  if (clean.startsWith('http://') || clean.startsWith('https://')) {
+    return clean;
+  }
+  return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/galaxy-assets/${clean.replace(/^\//, '')}`;
+};
+
 const cards: SectorCard[] = [
   { id: "expedition", title: "EXPEDITION", description: "Venture into the unknown, explore, farm, and dominate the galaxy.", imageSrc: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop", targetWindow: "expeditions" },
   { id: "alliance", title: "ALLIANCE", description: "Coordinate your power. Expand your dominion.", imageSrc: "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=800&auto=format&fit=crop", targetWindow: "alliance" },
@@ -65,7 +78,11 @@ const cards: SectorCard[] = [
 
 export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<"home" | "marketplace" | "phantom" | "can" | "inventory" | "mission">("home");
-  const [activeWindow, setActiveWindow] = useState<"home" | "expeditions" | "expeditions_flights" | "alliance" | "profile" | "settings" | "notifications">("home");
+  const [activeWindow, setActiveWindow] = useState<"home" | "expeditions" | "alliance" | "profile" | "settings">("home");
+
+  // 🎯 POPUPS OVERLAY INDEPENDIENTES (MANTIENEN LA NAVEGACIÓN Y PESTAÑA DEL HEADER)
+  const [showFlightsModal, setShowFlightsModal] = useState<boolean>(false);
+  const [showNotificationsModal, setShowNotificationsModal] = useState<boolean>(false);
 
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string>(user.avatarUrl || '');
   const [unreadNotifCount, setUnreadNotifCount] = useState<number>(0);
@@ -110,15 +127,17 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           if (payloadOrExpId.rewards) rewardsPayload = payloadOrExpId.rewards;
         }
 
-        await supabase.from('expedition_logs').insert([{
-          user_id: authUser.id,
-          expedition_id: validExpId,
-          event_type: 'discovery',
-          title: 'EXPEDICIÓN FINALIZADA',
-          message: text,
-          rewards_looted: rewardsPayload,
-          damage_sustained: 0
-        }]);
+        if (validExpId) {
+          await supabase.from('expedition_logs').insert([{
+            user_id: authUser.id,
+            expedition_id: validExpId,
+            event_type: 'discovery',
+            title: 'EXPEDICIÓN FINALIZADA',
+            message: text,
+            rewards_looted: rewardsPayload,
+            damage_sustained: 0
+          }]);
+        }
 
         setUnreadNotifCount(prev => prev + 1);
       }
@@ -182,7 +201,11 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       }
 
       if (profile && isMounted) {
-        if (profile.avatar_url) setCurrentAvatarUrl(profile.avatar_url);
+        if (profile.avatar_url) {
+          const validUrl = resolveAvatarUrl(profile.avatar_url);
+          setCurrentAvatarUrl(validUrl);
+          try { localStorage.setItem(`user_avatar_${authUser.id}`, validUrl); } catch {}
+        }
         setPower(parseFloat(profile.power_score || 0));
         setCurrencies({
           gd_coin: parseFloat(profile.gd_coin || 0),
@@ -289,6 +312,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     >
       <div className="fixed inset-0 bg-black/55 backdrop-blur-[1px] z-0 pointer-events-none" />
 
+      {/* TOASTS SUPERIORES DERECHA */}
       <div className="fixed top-14 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none font-mono">
         <AnimatePresence>
           {toasts.map(toast => (
@@ -324,6 +348,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         </AnimatePresence>
       </div>
 
+      {/* HEADER PRINCIPAL DE NAVEGACIÓN */}
       <Header
         userProfile={{
           ...user,
@@ -356,7 +381,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           activeTab === 'inventory' ? 'INVENTORY' :
           activeTab === 'mission' ? 'MISSION' :
           activeTab === 'can' ? 'CAN' :
-          (activeWindow === 'expeditions' || activeWindow === 'expeditions_flights') ? 'EXPEDITIONS' :
+          activeWindow === 'expeditions' ? 'EXPEDITIONS' :
           'MAIN'
         }
         onSelectTab={(tab) => {
@@ -369,7 +394,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           else if (tab === 'MISSION') { setActiveTab('mission'); setActiveWindow('home'); }
         }}
         unreadNotificationsCount={unreadNotifCount}
-        onOpenNotifications={() => { setActiveTab('home'); setActiveWindow('notifications'); }}
+        onOpenNotifications={() => setShowNotificationsModal(true)}
         onOpenSettings={() => { setActiveTab('home'); setActiveWindow('settings'); }}
         onOpenProfile={() => { setActiveTab('home'); setActiveWindow('profile'); }}
       />
@@ -380,10 +405,12 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         </div>
       </div>
 
+      {/* BOTONES ACCESO RÁPIDO Y POPUPS (OJITO Y CAMPANA NO CAMBIAN PESTAÑA EN HEADER) */}
       <div className="fixed right-6 top-24 flex flex-col items-center gap-3 z-30 font-mono">
         <button 
-          onClick={() => { setActiveTab("home"); setActiveWindow("expeditions_flights"); }} 
-          className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer relative hover:border-cyan-400 transition-all"
+          onClick={() => setShowFlightsModal(true)} 
+          className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer relative hover:border-cyan-400 transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+          title="Expeditions in Flight"
         >
           <Eye className="w-5 h-5 text-cyan-400 animate-pulse" />
           {readyFlightsCount > 0 ? (
@@ -398,8 +425,9 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         </button>
 
         <button 
-          onClick={() => { setActiveTab("home"); setActiveWindow("notifications"); }} 
-          className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer relative hover:border-cyan-400 transition-all"
+          onClick={() => setShowNotificationsModal(true)} 
+          className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer relative hover:border-cyan-400 transition-all shadow-md"
+          title="Notificaciones"
         >
           <Bell className="w-5 h-5 text-cyan-400" />
           {unreadNotifCount > 0 && (
@@ -417,6 +445,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         </button>
       </div>
 
+      {/* ÁREA DE CONTENIDO */}
       <div className="w-full max-w-7xl flex-1 overflow-y-auto px-8 py-4 z-10 flex flex-col items-center justify-start">
         <AnimatePresence mode="wait">
           {activeTab === "home" && (
@@ -463,12 +492,8 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
               </motion.div>
             ) : activeWindow === "expeditions" ? (
               <ExpeditionsView initialView="selection" triggerNotification={handleTriggerNotification} />
-            ) : activeWindow === "expeditions_flights" ? (
-              <ExpeditionsView initialView="flights" onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />
             ) : activeWindow === "alliance" ? (
               <AllianceView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />
-            ) : activeWindow === "notifications" ? (
-              <NotificationsView onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />
             ) : (
               <ProfileView 
                 onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} 
@@ -495,6 +520,42 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           {activeTab === "inventory" && <InventoryView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />}
         </AnimatePresence>
       </div>
+
+      {/* 🎯 VENTANA POPUP 1: EXPEDITIONS IN FLIGHT (OVERLAY FLOTANTE SOBRE CUALQUIER PANTALLA) */}
+      <AnimatePresence>
+        {showFlightsModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-5xl relative"
+            >
+              <ExpeditionsView 
+                initialView="flights" 
+                onBack={() => setShowFlightsModal(false)} 
+                triggerNotification={handleTriggerNotification}
+              />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 🎯 VENTANA POPUP 2: NOTIFICACIONES (OVERLAY FLOTANTE SOBRE CUALQUIER PANTALLA) */}
+      <AnimatePresence>
+        {showNotificationsModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-3xl relative bg-[#080b0e] border border-cyan-500/40 rounded-2xl p-4 shadow-[0_0_50px_rgba(6,182,212,0.2)]"
+            >
+              <NotificationsView onBack={() => setShowNotificationsModal(false)} triggerNotification={handleTriggerNotification} />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <ChatSystem userAllianceName={user.allianceName} triggerNotification={handleTriggerNotification} />
     </main>

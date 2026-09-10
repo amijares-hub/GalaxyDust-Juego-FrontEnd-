@@ -12,6 +12,20 @@ interface ProfileViewProps {
   onProfileUpdate?: (updatedFields: { avatar_url?: string; badge_name?: string; badge_image?: string }) => void;
 }
 
+// Respaldo garantizado vía CDN que NUNCA devuelve 404
+const SAFE_FALLBACK_AVATAR = 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop';
+
+const resolveAvatarUrl = (rawUrl?: string): string => {
+  if (!rawUrl || typeof rawUrl !== 'string' || rawUrl.trim() === '') {
+    return SAFE_FALLBACK_AVATAR;
+  }
+  const clean = rawUrl.trim();
+  if (clean.startsWith('http://') || clean.startsWith('https://')) {
+    return clean;
+  }
+  return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/galaxy-assets/${clean.replace(/^\//, '')}`;
+};
+
 const GAME_AVATARS = [
   "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Avatares%20de%20Comandantes/1.png",
   "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Avatares%20de%20Comandantes/2.png",
@@ -96,7 +110,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
       ? localStorage.getItem(`user_badge_image_${hookProfile.id}`)
       : null;
 
-    const realAvatar = hookProfile.avatar_url || hookProfile.avatar || savedAvatar || GAME_AVATARS[0];
+    const realAvatar = resolveAvatarUrl(hookProfile.avatar_url || hookProfile.avatar || savedAvatar || GAME_AVATARS[0]);
     const realBadgeName = hookProfile.badge_name || savedBadgeName || GAME_BADGES[0].name;
     const realBadgeImage = hookProfile.badge_image || savedBadgeImage || GAME_BADGES[0].image;
 
@@ -157,7 +171,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
 
   const handleOpenAvatarModal = () => {
     playSfx(660);
-    setTempSelectedAvatar(profileData.avatar_url || GAME_AVATARS[0]);
+    setTempSelectedAvatar(resolveAvatarUrl(profileData.avatar_url || GAME_AVATARS[0]));
     setIsAvatarModalOpen(true);
   };
 
@@ -174,25 +188,26 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
     if (!tempSelectedAvatar) return;
     playSfx(1200);
 
-    setProfileData((prev: any) => ({ ...prev, avatar_url: tempSelectedAvatar }));
+    const validAvatar = resolveAvatarUrl(tempSelectedAvatar);
+    setProfileData((prev: any) => ({ ...prev, avatar_url: validAvatar }));
     setIsAvatarModalOpen(false);
 
     if (onProfileUpdate) {
-      onProfileUpdate({ avatar_url: tempSelectedAvatar });
+      onProfileUpdate({ avatar_url: validAvatar });
     }
 
     window.dispatchEvent(new CustomEvent('profile_updated', {
-      detail: { avatar_url: tempSelectedAvatar }
+      detail: { avatar_url: validAvatar }
     }));
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        localStorage.setItem(`user_avatar_${user.id}`, tempSelectedAvatar);
-        localStorage.setItem('user_avatar', tempSelectedAvatar);
+        localStorage.setItem(`user_avatar_${user.id}`, validAvatar);
+        localStorage.setItem('user_avatar', validAvatar);
 
         const { error } = await supabase.rpc('update_user_profile_customization_secure', {
-          p_avatar_url: tempSelectedAvatar
+          p_avatar_url: validAvatar
         });
 
         if (error) throw error;
@@ -282,11 +297,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
             className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-black border-2 border-cyan-400/80 hover:border-cyan-300 flex items-center justify-center overflow-hidden shrink-0 shadow-[0_0_15px_rgba(34,211,238,0.3)] cursor-pointer group"
             title="Cambiar Avatar"
           >
-            {profileData.avatar_url ? (
-              <img src={profileData.avatar_url} alt="Avatar" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-            ) : (
-              <User className="w-8 h-8 text-cyan-400" />
-            )}
+            <img 
+              src={resolveAvatarUrl(profileData.avatar_url)} 
+              alt="Avatar" 
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                if (target.src !== SAFE_FALLBACK_AVATAR) {
+                  target.src = SAFE_FALLBACK_AVATAR;
+                }
+              }}
+            />
             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
               <Edit3 className="w-5 h-5 text-cyan-300" />
             </div>
@@ -455,18 +476,29 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
 
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 sm:gap-2.5 py-2 max-h-[190px] sm:max-h-[300px] overflow-y-auto pr-1.5 custom-scrollbar">
               {GAME_AVATARS.map((url, idx) => {
-                const isSelected = tempSelectedAvatar === url;
+                const resolvedUrl = resolveAvatarUrl(url);
+                const isSelected = tempSelectedAvatar === resolvedUrl || tempSelectedAvatar === url;
                 return (
                   <div
                     key={idx}
-                    onClick={() => { playSfx(660); setTempSelectedAvatar(url); }}
+                    onClick={() => { playSfx(660); setTempSelectedAvatar(resolvedUrl); }}
                     className={`relative w-full aspect-square rounded-xl bg-black border-2 cursor-pointer overflow-hidden transition-all hover:scale-102 ${
                       isSelected 
                         ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.7)]' 
                         : 'border-cyan-950 hover:border-cyan-700 opacity-60 hover:opacity-100'
                     }`}
                   >
-                    <img src={url} alt={`Avatar ${idx + 1}`} className="w-full h-full object-cover" />
+                    <img 
+                      src={resolvedUrl} 
+                      alt={`Avatar ${idx + 1}`} 
+                      className="w-full h-full object-cover" 
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        if (target.src !== SAFE_FALLBACK_AVATAR) {
+                          target.src = SAFE_FALLBACK_AVATAR;
+                        }
+                      }}
+                    />
                     {isSelected && (
                       <div className="absolute top-2 right-2 bg-cyan-500 text-black rounded-full p-1 shadow-md">
                         <Check className="w-3.5 h-3.5 stroke-[3]" />

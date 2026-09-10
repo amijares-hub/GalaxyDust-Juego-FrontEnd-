@@ -115,27 +115,50 @@ export const useInventory = () => {
         }
       });
 
-      // 3. CARGAR TODAS LAS TABLAS DE ACTIVOS DEL USUARIO (DESACOPLADO)
+      // Helper para consultas seguras
+      const safeQuery = async (tableName: string, filterUserId = false) => {
+        try {
+          let q = supabase.from(tableName).select('*');
+          if (filterUserId) q = q.eq('user_id', user.id);
+          const { data, error } = await q;
+          if (error) return [];
+          return data || [];
+        } catch {
+          return [];
+        }
+      };
+
+      // 3. CARGAR TODAS LAS TABLAS DE ACTIVOS DEL USUARIO (CONECTADO Y COMPLETO)
       const [
-        { data: userShips },
-        { data: seedShips },
-        { data: userTools },
-        { data: seedTools },
-        { data: userAstrobots },
-        { data: userStructures },
-        { data: userTech },
-        { data: userLicenses },
-        { data: userConsumables }
+        userShips,
+        seedShips,
+        userTools,
+        seedTools,
+        userAstrobots,
+        seedAstrobots,
+        userStructures,
+        seedStructures,
+        userTech,
+        seedTech,
+        userBadges,
+        seedBadges,
+        userLicenses,
+        userConsumables
       ] = await Promise.all([
-        supabase.from('user_ships').select('*').eq('user_id', user.id),
-        supabase.from('seed_ships').select('*'),
-        supabase.from('user_tools').select('*').eq('user_id', user.id),
-        supabase.from('seed_tools').select('*'),
-        Promise.resolve({ data: [], error: null }), // user_astrobots
-        Promise.resolve({ data: [], error: null }), // user_structures
-        Promise.resolve({ data: [], error: null }), // user_technologies
-        Promise.resolve({ data: [], error: null }), // user_licenses
-        Promise.resolve({ data: [], error: null })  // user_consumibles
+        safeQuery('user_ships', true),
+        safeQuery('seed_ships'),
+        safeQuery('user_tools', true),
+        safeQuery('seed_tools'),
+        safeQuery('user_astrobots', true),
+        safeQuery('seed_astrobots'),
+        safeQuery('user_structures', true),
+        safeQuery('seed_structures'),
+        safeQuery('user_technologies', true),
+        safeQuery('seed_technologies'),
+        safeQuery('user_badges_unlocked', true),
+        safeQuery('seed_badges'),
+        safeQuery('user_licenses', true),
+        safeQuery('user_consumibles', true)
       ]);
 
       const combinedItems: InventoryItem[] = [];
@@ -209,10 +232,10 @@ export const useInventory = () => {
 
       // Mapear Astrobots
       (userAstrobots || []).forEach((a: any) => {
-        const seed = a.seed_astrobots || {};
-        const botName = a.name || seed.name || `Astrobot #${a.id}`;
+        const seed = (seedAstrobots || []).find((sa: any) => sa.id === a.astrobot_id || sa.id === a.seed_id) || {};
+        const botName = a.name || seed.name || seed.astrobot_name || `Astrobot #${a.id}`;
         const realId = String(a.id);
-        const seedId = String(a.astrobot_id || seed.id || '');
+        const seedId = String(a.astrobot_id || a.seed_id || seed.id || '');
 
         combinedItems.push({
           id: realId,
@@ -222,23 +245,23 @@ export const useInventory = () => {
           category: 'Astrobots',
           type: 'Astrobots',
           rarity: seed.rarity || 'COMMON',
-          faction: 'GD',
+          faction: seed.company || seed.faction || 'GD',
           level: a.level || 1,
           quantity: a.quantity || 1,
           unlocked: true,
           favorite: Boolean(a.favorite),
           is_in_flight: checkIsInFlight(realId, seedId, botName),
-          avatar_url: resolveImageUrl(seed.image_url || a.image_url),
+          avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || a.image_url),
           description: seed.description || 'Unidad robótica autónoma de asistencia táctica.'
         });
       });
 
       // Mapear Estructuras
       (userStructures || []).forEach((st: any) => {
-        const seed = st.seed_structures || {};
-        const structName = st.name || seed.name || seed.title || `Estructura #${st.id}`;
+        const seed = (seedStructures || []).find((ss: any) => ss.id === st.structure_id || ss.id === st.seed_id) || {};
+        const structName = st.name || seed.structure_name || seed.name || seed.title || st.structure_id || `Estructura #${st.id}`;
         const realId = String(st.id);
-        const seedId = String(st.structure_id || seed.id || '');
+        const seedId = String(st.structure_id || st.seed_id || seed.id || '');
 
         combinedItems.push({
           id: realId,
@@ -248,23 +271,24 @@ export const useInventory = () => {
           category: 'Structures',
           type: 'Estructuras',
           rarity: seed.rarity || 'COMMON',
-          faction: 'GD',
-          level: st.level || 1,
+          faction: seed.company || seed.faction || 'GD',
+          level: st.current_level || st.level || 1,
           quantity: st.quantity || 1,
           unlocked: true,
           favorite: Boolean(st.favorite),
           is_in_flight: false,
-          avatar_url: resolveImageUrl(seed.image_url || st.image_url),
-          description: seed.description || 'Infraestructura de defensa y desarrollo planetario.'
+          avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || st.image_url),
+          description: seed.description || 'Infraestructura de defensa y desarrollo planetario.',
+          power_score: seed.power_score_base || 100
         });
       });
 
       // Mapear Tecnologías
       (userTech || []).forEach((tc: any) => {
-        const seed = tc.seed_technologies || {};
-        const techName = tc.name || seed.name || seed.title || `Tecnología #${tc.id}`;
+        const seed = (seedTech || []).find((st: any) => st.id === tc.technology_id || st.id === tc.seed_id) || {};
+        const techName = tc.name || seed.technology_name || seed.name || seed.title || tc.technology_id || `Tecnología #${tc.id}`;
         const realId = String(tc.id);
-        const seedId = String(tc.technology_id || seed.id || '');
+        const seedId = String(tc.technology_id || tc.seed_id || seed.id || '');
 
         combinedItems.push({
           id: realId,
@@ -274,14 +298,42 @@ export const useInventory = () => {
           category: 'Technologies',
           type: 'Tecnología',
           rarity: seed.rarity || 'COMMON',
-          faction: 'GD',
+          faction: seed.company || seed.faction || 'GD',
           level: tc.level || 1,
           quantity: tc.quantity || 1,
           unlocked: true,
           favorite: Boolean(tc.favorite),
           is_in_flight: false,
-          avatar_url: resolveImageUrl(seed.image_url || tc.image_url),
-          description: seed.description || 'Avance científico y militar para la flota.'
+          avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || tc.image_url),
+          description: seed.description || 'Avance científico y militar para la flota.',
+          power_score: seed.power_score_base || 100
+        });
+      });
+
+      // Mapear Insignias (Badges)
+      (userBadges || []).forEach((b: any) => {
+        const seed = (seedBadges || []).find((sb: any) => sb.id === b.badge_id || sb.id === b.seed_id) || {};
+        const badgeName = b.name || seed.name || b.badge_id || `Insignia #${b.id}`;
+        const realId = String(b.id);
+        const seedId = String(b.badge_id || b.seed_id || seed.id || '');
+
+        combinedItems.push({
+          id: realId,
+          seed_id: seedId,
+          name: badgeName,
+          fullname: badgeName,
+          category: 'Badges',
+          type: 'Insignia',
+          rarity: seed.rarity || 'RARE',
+          faction: seed.company || 'GD',
+          level: 1,
+          quantity: 1,
+          unlocked: true,
+          favorite: Boolean(b.favorite),
+          is_in_flight: false,
+          avatar_url: resolveImageUrl(seed.image_url || b.image_url),
+          description: seed.description || 'Insignia de honor y logro galáctico.',
+          power_score: seed.mining_bonus || 50
         });
       });
 
@@ -347,7 +399,6 @@ export const useInventory = () => {
 
   const toggleFavorite = async (itemId: string) => {
     setItems(prev => prev.map(item => item.id === itemId ? { ...item, favorite: !item.favorite } : item));
-    // Suscripción comentada por ahora
     return () => {};
   };
 
