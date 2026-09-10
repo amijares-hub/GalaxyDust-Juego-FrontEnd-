@@ -84,11 +84,17 @@ export interface ExpeditionHistoryRecord {
   galaxy_cluster: string;
   sector_name?: string;
   star_cluster?: string;
+  sc_id?: string;
   status: string;
   metal_mined?: number;
   crystal_mined?: number;
   dark_matter_mined?: number;
   created_at: string;
+  equipped_assets?: Asset[];
+  expedition_snapshot?: any;
+  ship_ids?: string[];
+  tool_id?: string;
+  fleet_id?: string;
 }
 
 export interface ExpeditionLog {
@@ -390,23 +396,23 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     return parts.join(' > ') || 'SELECCIONA COORDENADAS GALÁCTICAS';
   };
 
-  const resolveExpeditionAssets = (exp: Expedition): Asset[] => {
+  const resolveExpeditionAssets = (exp: Expedition | ExpeditionHistoryRecord): Asset[] => {
     let snap: any = {};
     try {
       if (typeof exp.expedition_snapshot === 'string') snap = JSON.parse(exp.expedition_snapshot);
       else if (exp.expedition_snapshot) snap = exp.expedition_snapshot;
     } catch (e) {}
 
-    const rawEquipped = exp.equipped_assets || exp.assets || snap.equipped_assets || snap.assets;
+    const rawEquipped = exp.equipped_assets || (exp as any).assets || snap.equipped_assets || snap.assets;
     if (Array.isArray(rawEquipped) && rawEquipped.length > 0) {
       return rawEquipped.map(a => {
         const found = inventoryAssets.find(inv => String(inv.id) === String(a.id) || String(inv.seed_id) === String(a.seed_id));
         return found || {
           id: String(a.id || Math.random()),
-          name: a.name || a.title || 'Activo de Flota',
+          name: a.name || a.title || a.ship_name || a.custom_name || 'Activo de Flota',
           type: a.type || 'Naves',
           rarity: a.rarity || 'Common',
-          collection: 'GD',
+          collection: a.collection || 'GD',
           image_url: resolveImageUrl(a.image_url || a.avatar_url)
         };
       });
@@ -417,13 +423,36 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     const toolId: string | null = exp.tool_id || snap.tool_id || null;
 
     shipIds.forEach(id => {
+      if (!id) return;
       const found = inventoryAssets.find(inv => String(inv.id) === String(id) || String(inv.seed_id) === String(id));
-      if (found) resolvedList.push(found);
+      if (found) {
+        resolvedList.push(found);
+      } else {
+        resolvedList.push({
+          id: String(id),
+          name: `Nave #${String(id).slice(0, 4)}`,
+          type: 'Naves',
+          rarity: 'Common',
+          collection: 'GD',
+          image_url: resolveImageUrl(undefined)
+        });
+      }
     });
 
     if (toolId) {
       const found = inventoryAssets.find(inv => String(inv.id) === String(toolId) || String(inv.seed_id) === String(toolId));
-      if (found) resolvedList.push(found);
+      if (found) {
+        resolvedList.push(found);
+      } else {
+        resolvedList.push({
+          id: String(toolId),
+          name: `Tool #${String(toolId).slice(0, 4)}`,
+          type: 'Tools',
+          rarity: 'Common',
+          collection: 'GD',
+          image_url: resolveImageUrl(undefined)
+        });
+      }
     }
 
     if (exp.fleet_id && fleets.length > 0) {
@@ -431,6 +460,31 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
       if (fleet) {
         if (fleet.ships) resolvedList.push(...fleet.ships);
         if (fleet.tools) resolvedList.push(...fleet.tools);
+      }
+    }
+
+    if (resolvedList.length === 0 && snap) {
+      if (snap.tool_specs) {
+        resolvedList.push({
+          id: String(snap.tool_specs.id || Math.random()),
+          name: snap.tool_specs.name || 'Herramienta de Extracción',
+          type: 'Tools',
+          rarity: snap.tool_specs.rarity || 'Common',
+          collection: 'GD',
+          image_url: resolveImageUrl(snap.tool_specs.image_url || snap.tool_specs.avatar_url)
+        });
+      }
+      if (snap.ships_specs && Array.isArray(snap.ships_specs)) {
+        snap.ships_specs.forEach((s: any) => {
+          resolvedList.push({
+            id: String(s.id || Math.random()),
+            name: s.name || s.ship_name || 'Nave de Combate',
+            type: 'Naves',
+            rarity: s.rarity || 'Common',
+            collection: 'GD',
+            image_url: resolveImageUrl(s.image_url || s.avatar_url)
+          });
+        });
       }
     }
 
@@ -606,11 +660,17 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
           fleet_name: row.fleet_name || 'FLOTA IMPERIAL',
           galaxy_cluster: row.galaxy_cluster || 'INARA',
           sector_name: row.sector_name || 'SECTOR MINERO',
+          sc_id: row.sc_id || row.sector_name,
           status: row.status || 'CLAIMED',
           metal_mined: Number(row.metal_mined || row.metal || 0),
           crystal_mined: Number(row.crystal_mined || row.crystal || 0),
           dark_matter_mined: Number(row.dark_matter_mined || row.dark_matter || 0),
-          created_at: row.created_at || new Date().toISOString()
+          created_at: row.created_at || new Date().toISOString(),
+          equipped_assets: row.equipped_assets,
+          expedition_snapshot: row.expedition_snapshot,
+          ship_ids: row.ship_ids,
+          tool_id: row.tool_id,
+          fleet_id: row.fleet_id
         });
       });
 
@@ -622,11 +682,17 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
             fleet_name: exp.fleet_name || 'FLOTA IMPERIAL',
             galaxy_cluster: exp.galaxy_cluster || 'INARA',
             sector_name: exp.sector_name || 'SECTOR MINERO',
+            sc_id: exp.sc_id || exp.sector_name,
             status: exp.status || 'CLAIMED',
             metal_mined: Number(exp.calculated_min_metal || 300),
             crystal_mined: Number(exp.calculated_min_crystal || 150),
             dark_matter_mined: 0,
-            created_at: exp.launch_time || exp.created_at || new Date().toISOString()
+            created_at: exp.launch_time || exp.created_at || new Date().toISOString(),
+            equipped_assets: exp.equipped_assets,
+            expedition_snapshot: exp.expedition_snapshot,
+            ship_ids: exp.ship_ids,
+            tool_id: exp.tool_id,
+            fleet_id: exp.fleet_id
           });
         }
       });
@@ -645,17 +711,25 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               fleet_name: log.title || 'MISION COMPLETADA',
               galaxy_cluster: 'INARA',
               sector_name: log.message?.includes('EN ') ? log.message.split('EN ')[1]?.split(':')[0] : 'SECTOR EXPLORADO',
+              sc_id: log.message?.includes('EN ') ? log.message.split('EN ')[1]?.split(':')[0] : 'SECTOR EXPLORADO',
               status: 'CLAIMED',
               metal_mined: metal,
               crystal_mined: crystal,
               dark_matter_mined: darkMatter,
-              created_at: log.created_at || new Date().toISOString()
+              created_at: log.created_at || new Date().toISOString(),
+              equipped_assets: log.equipped_assets,
+              expedition_snapshot: log.expedition_snapshot,
+              ship_ids: log.ship_ids,
+              tool_id: log.tool_id,
+              fleet_id: log.fleet_id
             });
           } else {
             const existing = unifiedHistoryMap.get(key)!;
             if (metal > 0) existing.metal_mined = metal;
             if (crystal > 0) existing.crystal_mined = crystal;
             if (darkMatter > 0) existing.dark_matter_mined = darkMatter;
+            if (log.equipped_assets && !existing.equipped_assets) existing.equipped_assets = log.equipped_assets;
+            if (log.expedition_snapshot && !existing.expedition_snapshot) existing.expedition_snapshot = log.expedition_snapshot;
           }
         }
       });
@@ -1271,32 +1345,135 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 NO HAY HISTORIAL DE EXPEDICIONES REGISTRADO
               </div>
             ) : (
-              completedHistory.map((exp) => (
-                <div key={exp.id} className="p-3.5 rounded-xl border border-cyan-500/30 bg-[#050910] shadow-lg flex flex-col justify-between gap-2.5 relative overflow-hidden">
-                  <div className="flex justify-between items-start">
-                    <div className="flex flex-col">
-                      <span className="text-[10.5px] font-black text-white uppercase truncate">{exp.fleet_name || 'FLOTA IMPERIAL'}</span>
-                      <span className="text-[8px] text-cyan-400 font-bold uppercase">{exp.galaxy_cluster} / {exp.sector_name || 'SECTOR'}</span>
+              completedHistory.map((exp) => {
+                const isExpanded = expandedExpeditionId === exp.id;
+                const deployedAssets = resolveExpeditionAssets(exp);
+
+                let shipCount = 0;
+                let toolCount = 0;
+                let astrobotCount = 0;
+                let fleetCount = exp.fleet_id ? 1 : 0;
+
+                deployedAssets.forEach((a) => {
+                  if (isShipAsset(a.type || '')) shipCount++;
+                  if (isToolAsset(a.type || '')) toolCount++;
+                  if (String(a.type || '').toLowerCase().includes('astrobot')) astrobotCount++;
+                });
+
+                return (
+                  <div
+                    key={exp.id}
+                    className="w-full bg-[#0a121d] border border-cyan-500/40 rounded-xl p-2.5 flex flex-col gap-2 shadow-[0_0_12px_rgba(6,182,212,0.1)] text-white text-[10px] font-mono tracking-wider transition-all"
+                  >
+                    {/* FILA 1: HEADER & STATUS */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-cyan-900/50 pb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="px-1.5 py-0.5 bg-emerald-500 text-black font-black text-[8.5px] rounded uppercase shadow-[0_0_8px_rgba(16,185,129,0.5)]">
+                          CLAIMED
+                        </span>
+                        <span className="font-extrabold text-white text-[11px]">
+                          EXPEDITION #{exp.id.substring(0, 4)} {exp.sc_id || exp.sector_name || 'SECTOR 1'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[9px]">
+                        <span className="text-zinc-500 text-[8px]">
+                          REGISTRADO: {new Date(exp.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="text-[7.5px] font-mono px-2 py-0.5 rounded font-black border bg-emerald-950 text-emerald-400 border-emerald-800">
+                          FINALIZADO Y RECLAMADO
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-[7.5px] font-mono px-2 py-0.5 rounded font-black border bg-emerald-950 text-emerald-400 border-emerald-800">
-                      FINALIZADO Y RECLAMADO
-                    </span>
-                  </div>
-                  <div className="bg-[#020508] p-2 rounded-lg border border-cyan-950 flex justify-between items-center text-[8px]">
-                    <span className="text-zinc-400 uppercase font-bold flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-amber-400" /> BOTÍN EXTRAÍDO:
-                    </span>
-                    <div className="flex flex-col gap-0.5 font-mono font-bold text-[7.5px] text-right text-amber-300">
-                      <span>Metal: +{Number(exp.metal_mined || 0).toLocaleString()}</span>
-                      <span>Cristal: +{Number(exp.crystal_mined || 0).toLocaleString()}</span>
-                      {Number(exp.dark_matter_mined || 0) > 0 && <span>M.O.: +{Number(exp.dark_matter_mined).toLocaleString()}</span>}
+
+                    {/* FILA 2: RESUMEN Y BOTÓN MORE INFO */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                      <div className="text-[9.5px] font-bold text-cyan-200 uppercase tracking-widest">
+                        Fleets: <span className="text-white">{fleetCount}</span> | Ships: <span className="text-cyan-300">{shipCount}</span> | Astrobots: <span className="text-emerald-400">{astrobotCount}</span> | Tools: <span className="text-amber-400">{toolCount}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => toggleMoreInfo(exp.id)}
+                          className="px-3 py-1 bg-emerald-800/80 hover:bg-emerald-700 text-emerald-100 border border-emerald-500 font-black text-[9px] uppercase tracking-wider rounded flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                        >
+                          <span>MORE INFO</span>
+                          {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </button>
+                      </div>
                     </div>
+
+                    {/* ACORDEÓN DROPDOWN: BOTÍN FINAL Y ACTIVOS UTILIZADOS */}
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="w-full bg-[#04080f] border-t border-cyan-900/60 p-3 mt-1 rounded-b-xl flex flex-col gap-3"
+                        >
+                          {/* RECURSOS EXTRAÍDOS */}
+                          <div className="flex flex-col gap-1.5">
+                            <span className="text-[8px] font-black text-amber-400 uppercase tracking-widest flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-amber-400" /> BOTÍN EXTRAÍDO Y REGISTRADO
+                            </span>
+                            <div className="grid grid-cols-3 gap-2 font-mono text-[8.5px] text-center">
+                              <div className="bg-black/60 border border-cyan-950 p-2 rounded flex flex-col">
+                                <span className="text-zinc-500">METAL</span>
+                                <span className="text-cyan-300 font-black text-[10px]">+{Number(exp.metal_mined || 0).toLocaleString()}</span>
+                              </div>
+                              <div className="bg-black/60 border border-cyan-950 p-2 rounded flex flex-col">
+                                <span className="text-zinc-500">CRISTAL</span>
+                                <span className="text-purple-300 font-black text-[10px]">+{Number(exp.crystal_mined || 0).toLocaleString()}</span>
+                              </div>
+                              <div className="bg-black/60 border border-cyan-950 p-2 rounded flex flex-col">
+                                <span className="text-zinc-500">MATERIA OSCURA</span>
+                                <span className="text-emerald-400 font-black text-[10px]">+{Number(exp.dark_matter_mined || 0).toLocaleString()}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* ACTIVOS Y EQUIPAMIENTO EN FLOTA */}
+                          <div className="flex flex-col gap-1.5">
+                            <span className="text-[8px] font-black text-cyan-400 uppercase tracking-widest flex items-center gap-1">
+                              <Layers className="w-3 h-3 text-cyan-400" /> ACTIVOS Y EQUIPAMIENTO UTILIZADO ({deployedAssets.length})
+                            </span>
+
+                            {deployedAssets.length === 0 ? (
+                              <span className="text-[7.5px] text-zinc-600 uppercase italic p-2 bg-black/40 rounded">
+                                SIN ACTIVOS DETALLADOS EN EL HISTORIAL
+                              </span>
+                            ) : (
+                              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                                {deployedAssets.map((item, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="bg-black/70 border border-cyan-900/60 p-1.5 rounded-lg flex flex-col items-center text-center gap-1 relative"
+                                  >
+                                    <div className="w-8 h-8 rounded bg-cyan-950/40 border border-cyan-800 overflow-hidden">
+                                      <img
+                                        src={item.image_url}
+                                        alt={item.name}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </div>
+                                    <span className="text-[7.5px] font-bold text-white uppercase truncate w-full">
+                                      {item.name}
+                                    </span>
+                                    <span className="text-[6.5px] text-cyan-400 uppercase font-mono">
+                                      {item.type}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                  <div className="text-[7px] text-zinc-500 font-mono text-right">
-                    REGISTRADO: {new Date(exp.created_at).toLocaleString()}
-                  </div>
-                </div>
-              ))
+                );
+              })
             )
           ) : getFilteredFlights().length === 0 ? (
             <div className="col-span-full p-12 text-center text-zinc-500 text-[10px] uppercase tracking-widest bg-[#05070a] border border-cyan-500/10 rounded-xl">
@@ -1531,6 +1708,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   // 🎯 VISTA 2: MAPA ORIGINAL DE SELECCIÓN Y CONFIGURACIÓN
   return (
     <div className="w-full max-w-7xl mx-auto bg-[#080b0e] border border-cyan-500/30 p-2 sm:p-4 rounded-xl shadow-2xl relative font-mono text-left select-none flex flex-col gap-2 my-1 text-white">
+
       <div className="w-full bg-[#05070a] border border-cyan-500/30 p-3 rounded-xl flex justify-between items-center shrink-0">
         <div className="flex flex-col gap-0.5 text-left">
           <h1 className="text-sm font-black tracking-widest text-white uppercase flex items-center gap-2">
@@ -1553,91 +1731,242 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
       {!isDispatchPanelActive ? (
         <div className="w-full flex-1 flex flex-col md:flex-row gap-3.5 overflow-hidden items-stretch">
+
           <div className="w-full md:w-[320px] shrink-0 border border-cyan-500/20 bg-[#05070a] rounded-xl p-3 flex flex-col justify-between shadow-2xl h-[480px]">
             <div className="flex flex-col gap-2">
+              
               <div className="flex items-center justify-between border-b border-cyan-950 pb-2 text-left">
                 <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-cyan-400 animate-bounce" />
                   <span className="text-[11px] font-black tracking-widest text-white uppercase">SELECCIONA COORDENADAS GC</span>
                 </div>
+
                 {(selectedGC || selectedGAL || selectedSC || selectedSS || selectedPlanet) && (
-                  <button onClick={handleStepBack} className="flex items-center gap-1 px-2.5 py-1 border border-cyan-500/40 text-cyan-300 text-[8px] font-extrabold uppercase rounded-lg bg-cyan-950/80 cursor-pointer">
-                    <CornerUpLeft className="w-3 h-3" /> VOLVER
+                  <button
+                    onClick={handleStepBack}
+                    className="flex items-center gap-1 px-2.5 py-1 border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 text-[8px] font-extrabold tracking-widest uppercase rounded-lg bg-cyan-950/80 hover:bg-cyan-900/90 transition-all cursor-pointer shadow-md"
+                  >
+                    <CornerUpLeft className="w-3 h-3 text-cyan-400" /> VOLVER
                   </button>
                 )}
               </div>
 
               <div className="grid grid-cols-5 gap-1 bg-black/60 p-1 rounded-lg border border-cyan-950 text-[8.5px] font-bold text-center uppercase">
-                {(['GC', 'GAL', 'SC', 'SS', 'PLANETA'] as const).map(tab => (
-                  <button
-                    key={tab}
-                    onClick={() => { playSfx(660); setCurrentStep(tab); }}
-                    className={`py-1.5 rounded text-[8px] border font-bold ${currentStep === tab ? 'bg-cyan-950 text-cyan-300 border-cyan-500/80' : 'bg-black/40 text-zinc-400 border-cyan-950'}`}
-                  >
-                    {tab}
-                  </button>
-                ))}
+                {([
+                  { id: 'GC', label: 'GC', isUnlocked: true, isSelected: selectedGC !== null },
+                  { id: 'GAL', label: 'GAL', isUnlocked: selectedGC !== null, isSelected: selectedGAL !== null },
+                  { id: 'SC', label: 'SC', isUnlocked: selectedGAL !== null, isSelected: selectedSC !== null },
+                  { id: 'SS', label: 'SS', isUnlocked: selectedSC !== null && dbStarSystems.length > 0, isSelected: selectedSS !== null },
+                  { id: 'PLANETA', label: 'PLANETA', isUnlocked: selectedSS !== null && dbPlanets.length > 0, isSelected: selectedPlanet !== null }
+                ] as const).map((tab) => {
+                  const isCurrent = currentStep === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      disabled={!tab.isUnlocked}
+                      onClick={() => {
+                        playSfx(660);
+                        setCurrentStep(tab.id as SelectionStep);
+                      }}
+                      className={`py-1.5 rounded transition-all cursor-pointer flex items-center justify-center gap-0.5 border ${
+                        isCurrent
+                          ? 'bg-cyan-950 text-cyan-300 border-cyan-500/80 font-black shadow-[0_0_8px_rgba(6,182,212,0.3)]'
+                          : tab.isSelected
+                          ? 'bg-cyan-950/40 text-cyan-400 border-cyan-800/60 font-bold'
+                          : tab.isUnlocked
+                          ? 'bg-black/40 text-zinc-400 border-cyan-950/80 hover:border-cyan-800/60'
+                          : 'bg-black/20 text-zinc-700 border-zinc-900 cursor-not-allowed'
+                      }`}
+                    >
+                      {!tab.isUnlocked && <Lock className="w-2.5 h-2.5 text-zinc-700" />}
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="p-1 flex flex-col gap-1.5 max-h-[310px] overflow-y-auto pr-1 custom-scrollbar">
                 {currentStep === 'GC' && (
-                  gcList.map(gc => (
-                    <div
-                      key={gc.id}
-                      onClick={() => { playSfx(880); setSelectedGC(gc.id); setCurrentStep('GAL'); }}
-                      className={`p-2.5 rounded-lg border text-[9px] font-bold uppercase cursor-pointer ${selectedGC === gc.id ? 'bg-cyan-950 border-cyan-400 text-cyan-300' : 'bg-[#0a0f14] border-cyan-950 text-zinc-300'}`}
-                    >
-                      {gc.name}
+                  gcList.length === 0 ? (
+                    <div className="p-8 text-center text-zinc-600 text-[9px] uppercase italic">
+                      {loading ? 'Cargando Clústeres...' : 'No hay Galaxy Clusters registrados.'}
                     </div>
-                  ))
+                  ) : (
+                    gcList.map((gc) => {
+                      const reqCheck = checkGCRequirements(gc);
+                      const isSelected = selectedGC === gc.id;
+                      const reqs = gc.entry_requirements || {};
+
+                      return (
+                        <div
+                          key={gc.id}
+                          onClick={() => {
+                            if (!reqCheck.allowed) {
+                              playSfx(300);
+                              if (triggerNotification) triggerNotification(`🔒 ${reqCheck.reason}`);
+                              return;
+                            }
+                            playSfx(880);
+                            setSelectedGC(gc.id);
+                            setSelectedGAL(null);
+                            setSelectedSC(null);
+                            setSelectedSS(null);
+                            setSelectedPlanet(null);
+                            setCurrentStep('GAL');
+                          }}
+                          className={`w-full p-2.5 rounded-lg border text-[9px] font-bold uppercase transition-all flex flex-col gap-1 cursor-pointer ${
+                            isSelected
+                              ? 'bg-cyan-950 text-cyan-300 border-cyan-500/80 shadow-lg'
+                              : reqCheck.allowed
+                              ? 'bg-[#0a0f14] text-zinc-300 border-cyan-950 hover:border-cyan-800'
+                              : 'bg-black/80 text-zinc-600 border-zinc-900 cursor-not-allowed'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-extrabold text-white">{gc.name}</span>
+                            {!reqCheck.allowed
+                              ? <Lock className="w-3 h-3 text-red-500 shrink-0" />
+                              : <span className="text-[7.5px] bg-cyan-950 text-cyan-400 px-1.5 py-0.5 rounded font-black">OK</span>
+                            }
+                          </div>
+                          <div className="text-[7px] text-zinc-400 font-mono space-y-0.5">
+                            {reqs.prev_gc && (
+                              <p className={reqCheck.allowed ? "text-emerald-400" : "text-amber-400 font-bold"}>
+                                • Req: {reqs.required_prev_count || 0} exp. en {reqs.prev_gc} ({completedCountsByGC[reqs.prev_gc] || 0}/{reqs.required_prev_count || 0})
+                              </p>
+                            )}
+                            <p>
+                              • Req: {reqs.require_ship ? 'Nave ' : ''}
+                              {reqs.require_tool ? '+ Tool ' : ''}
+                              {reqs.require_license ? '+ Licencia ' : ''}
+                              {reqs.require_non_nft ? '+ Nave NO-NFT' : ''}
+                            </p>
+                            <p className="text-zinc-600">• ID: {gc.id}</p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )
                 )}
 
                 {currentStep === 'GAL' && (
-                  dbGalaxies.map(gal => (
-                    <button
-                      key={gal.id}
-                      onClick={() => { playSfx(880); setSelectedGAL(gal.id); setCurrentStep('SC'); }}
-                      className={`w-full p-2.5 rounded-lg border text-[9.5px] font-bold uppercase text-left ${selectedGAL === gal.id ? 'bg-cyan-950 border-cyan-500 text-cyan-300' : 'bg-[#0a0f14] border-cyan-950 text-zinc-300'}`}
-                    >
-                      {gal.name}
-                    </button>
-                  ))
+                  dbGalaxies.length === 0 ? (
+                    <div className="p-4 text-center text-zinc-600 text-[9px] uppercase italic">No hay galaxias en este GC.</div>
+                  ) : (
+                    dbGalaxies.map((gal) => {
+                      const isSelected = selectedGAL === gal.id;
+                      return (
+                        <button 
+                          key={gal.id} 
+                          onClick={() => {
+                            playSfx(880);
+                            setSelectedGAL(gal.id);
+                            setSelectedSC(null);
+                            setSelectedSS(null);
+                            setSelectedPlanet(null);
+                            setCurrentStep('SC');
+                          }} 
+                          className={`w-full p-2.5 rounded-lg border text-[9.5px] font-bold uppercase cursor-pointer text-left transition-all ${
+                            isSelected ? 'bg-cyan-950 text-cyan-300 border-cyan-500 shadow-md' : 'bg-[#0a0f14] border-cyan-950 text-zinc-300 hover:border-cyan-800'
+                          }`}
+                        >
+                          {gal.name}
+                        </button>
+                      );
+                    })
+                  )
                 )}
 
                 {currentStep === 'SC' && (
-                  dbStarClusters.map(sc => (
-                    <button
-                      key={sc.id}
-                      onClick={() => { playSfx(880); setSelectedSC(sc.id); setCurrentStep('SS'); }}
-                      className={`w-full p-2.5 rounded-lg border text-[9.5px] font-bold uppercase text-left ${selectedSC === sc.id ? 'bg-cyan-950 border-cyan-500 text-cyan-300' : 'bg-[#0a0f14] border-cyan-950 text-zinc-300'}`}
-                    >
-                      {sc.name}
-                    </button>
-                  ))
+                  dbStarClusters.length === 0 ? (
+                    <div className="p-4 text-center text-zinc-600 text-[9px] uppercase italic">No hay Star Clusters en esta galaxia.</div>
+                  ) : (
+                    dbStarClusters.map((sc) => {
+                      const isSelected = selectedSC === sc.id;
+                      return (
+                        <button 
+                          key={sc.id} 
+                          onClick={() => {
+                            playSfx(880);
+                            setSelectedSC(sc.id);
+                          }} 
+                          className={`w-full p-2.5 rounded-lg border text-[9.5px] font-bold uppercase cursor-pointer text-left transition-all ${
+                            isSelected ? 'bg-cyan-950 text-cyan-300 border-cyan-500 shadow-md' : 'bg-[#0a0f14] border-cyan-950 text-zinc-300 hover:border-cyan-800'
+                          }`}
+                        >
+                          {sc.name}
+                        </button>
+                      );
+                    })
+                  )
                 )}
 
                 {currentStep === 'SS' && (
-                  dbStarSystems.map(ss => (
-                    <button
-                      key={ss.id}
-                      onClick={() => { playSfx(880); setSelectedSS(ss.id); setCurrentStep('PLANETA'); }}
-                      className={`w-full p-2.5 rounded-lg border text-[9.5px] font-bold uppercase text-left ${selectedSS === ss.id ? 'bg-cyan-950 border-cyan-500 text-cyan-300' : 'bg-[#0a0f14] border-cyan-950 text-zinc-300'}`}
-                    >
-                      {ss.name}
-                    </button>
-                  ))
+                  dbStarSystems.length === 0 ? (
+                    <div className="p-4 text-center text-zinc-600 text-[9px] uppercase italic space-y-2">
+                      <p>No se han descubierto sistemas solares en este SC.</p>
+                      <button
+                        onClick={() => { playSfx(660); setCurrentStep('SC'); }}
+                        className="px-3 py-1 bg-cyan-950 border border-cyan-800 text-cyan-300 text-[8px] font-bold rounded cursor-pointer"
+                      >
+                        ← Volver a SC y Enviar Misión de Reconocimiento
+                      </button>
+                    </div>
+                  ) : (
+                    dbStarSystems.map((ss) => {
+                      const isSelected = selectedSS === ss.id;
+                      return (
+                        <button 
+                          key={ss.id} 
+                          onClick={() => {
+                            playSfx(880);
+                            setSelectedSS(ss.id);
+                            setCurrentStep('PLANETA');
+                          }} 
+                          className={`w-full p-2.5 rounded-lg border text-[9.5px] font-bold uppercase cursor-pointer text-left ${
+                            isSelected ? 'bg-cyan-950 text-cyan-300 border-cyan-500' : 'bg-[#0a0f14] border-cyan-950 text-zinc-300 hover:border-cyan-800'
+                          }`}
+                        >
+                          {ss.name}
+                        </button>
+                      );
+                    })
+                  )
                 )}
 
                 {currentStep === 'PLANETA' && (
-                  dbPlanets.map(planet => (
-                    <div
-                      key={planet.id}
-                      onClick={() => { playSfx(880); setSelectedPlanet(planet); setIsDispatchPanelActive(true); }}
-                      className={`p-2.5 rounded-lg border cursor-pointer text-left ${selectedPlanet?.id === planet.id ? 'bg-cyan-950 border-cyan-400' : 'bg-[#0a0f14] border-cyan-950'}`}
-                    >
-                      <span className="text-[9.5px] font-extrabold text-white uppercase">{planet.name}</span>
+                  dbPlanets.length === 0 ? (
+                    <div className="p-3 bg-cyan-950/20 border border-cyan-900/50 rounded-xl text-center space-y-2">
+                      <p className="text-[8px] text-zinc-400 uppercase">Sin planetas registrados en este sistema.</p>
+                      <button onClick={() => { playSfx(880); setIsAdrift(true); setIsDispatchPanelActive(true); }} className="w-full py-2 bg-gradient-to-r from-cyan-600 to-teal-600 text-white font-black text-[8.5px] uppercase rounded-lg shadow cursor-pointer">
+                        CONFIGURAR FLOTA EN DERIVA
+                      </button>
                     </div>
-                  ))
+                  ) : (
+                    dbPlanets.map((planet) => {
+                      const isSelected = selectedPlanet?.id === planet.id;
+                      return (
+                        <div 
+                          key={planet.id} 
+                          onClick={() => {
+                            playSfx(880);
+                            setSelectedPlanet(planet);
+                            setIsAdrift(false);
+                            setIsDispatchPanelActive(true);
+                          }} 
+                          className={`p-2.5 rounded-lg border cursor-pointer text-left space-y-1 transition-all ${
+                            isSelected ? 'bg-cyan-950 border-cyan-400' : 'bg-[#0a0f14] border-cyan-950 hover:border-cyan-800'
+                          }`}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9.5px] font-extrabold text-white uppercase">{planet.name}</span>
+                            <span className="text-[7.5px] bg-cyan-950 text-cyan-400 px-1.5 py-0.5 rounded font-bold uppercase">{planet.type}</span>
+                          </div>
+                          <p className="text-[7.5px] text-zinc-400">⏱️ Tiempo: {planet.duration_hours || 2}h | ⚠️ Riesgo: {planet.risk_factor || 15}%</p>
+                        </div>
+                      );
+                    })
+                  )
                 )}
               </div>
             </div>
@@ -1648,48 +1977,90 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
           </div>
 
           <div className="flex-1 border border-cyan-500/30 bg-[#05070a] rounded-xl overflow-hidden flex flex-col h-full shadow-2xl">
+            
             <div className="h-[70%] w-full relative overflow-hidden flex items-center justify-center bg-black/40">
               {isInaraSelected && (
                 <video
+                  key="gc-presentation-video-top"
                   src="https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/GCs,Galaxias%20y%20demas/GC1.webm"
-                  autoPlay loop muted playsInline className="w-full h-full object-cover"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover pointer-events-none border-0 outline-none"
                 />
               )}
             </div>
+
             <div className="h-[30%] w-full border-t border-cyan-500/30 flex items-center justify-center p-4 bg-[#020508]/80">
               {selectedSC && (
                 <button
                   onClick={() => { playSfx(880); setIsDispatchPanelActive(true); }}
-                  className="px-8 py-3.5 bg-gradient-to-r from-cyan-600 to-teal-600 border border-cyan-400 text-white text-[11px] font-black uppercase rounded-lg shadow-lg cursor-pointer"
+                  className="px-8 py-3.5 bg-gradient-to-r from-cyan-600 to-teal-600 border border-cyan-400 text-white text-[11px] font-black uppercase rounded-lg shadow-lg cursor-pointer hover:brightness-110 active:scale-95 transition-all"
                 >
                   EQUIPAR Y DESPLEGAR MISIÓN
                 </button>
               )}
             </div>
+
           </div>
+
         </div>
       ) : (
         <div className="w-full flex-1 flex flex-col md:flex-row gap-3.5 h-[480px]">
-          <div className="w-full md:w-[240px] border border-cyan-500/20 bg-[#05070a] rounded-xl p-3 flex flex-col justify-between h-full">
+          <div className="w-full md:w-[240px] border border-cyan-500/20 bg-[#05070a] rounded-xl shrink-0 p-3 flex flex-col justify-between h-full">
             <div className="flex flex-col gap-1">
-              <span className="text-[8px] font-bold text-zinc-400 uppercase px-1 pb-1 border-b border-cyan-950">SELECCIONAR CATEGORÍA</span>
-              {leftMenuOptions.map(opt => (
+              <span className="text-[8px] font-bold text-zinc-400 uppercase px-1 pb-1 border-b border-cyan-950">
+                SELECCIONAR CATEGORÍA
+              </span>
+              {leftMenuOptions.map((opt) => (
                 <button
                   key={opt}
-                  onClick={() => { playSfx(660); setCurrentLeftCategory(opt); }}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-[9.5px] font-bold uppercase border cursor-pointer ${currentLeftCategory === opt ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black' : 'bg-[#0a0f14] text-zinc-400 border-transparent'}`}
+                  onClick={() => { playSfx(660); setCurrentLeftCategory(opt as LeftMenuCategory); }}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-[9.5px] font-bold uppercase border cursor-pointer flex items-center gap-2 ${
+                    currentLeftCategory === opt ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black' : 'bg-[#0a0f14] text-zinc-400 border-transparent hover:text-zinc-200'
+                  }`}
                 >
-                  {opt}
+                  {getCategoryIcon(opt as LeftMenuCategory)}
+                  <span>{opt}</span>
                 </button>
               ))}
             </div>
 
             <div className="mt-auto space-y-2">
+               <div className="bg-[#020508] p-2 rounded-lg border border-cyan-900/50 flex flex-col gap-1 text-[7px] font-mono">
+                 <div className="flex items-center justify-between mb-0.5">
+                   <span className="text-cyan-400 font-bold uppercase">Rango Estimado de Extracción:</span>
+                   {isSoloMetal && (
+                     <span className="text-[6px] bg-amber-950 text-amber-400 border border-amber-800 px-1 py-0.5 rounded font-black uppercase">SOLO METAL</span>
+                   )}
+                   {isSoloCrystal && (
+                     <span className="text-[6px] bg-purple-950 text-purple-400 border border-purple-800 px-1 py-0.5 rounded font-black uppercase">SOLO CRISTAL</span>
+                   )}
+                 </div>
+                 <div className="flex justify-between items-center">
+                   <span className="text-zinc-400">Metal:</span>
+                   {isSoloCrystal ? (
+                     <span className="text-red-500 font-black text-[6px] uppercase tracking-wide">DESACTIVADO POR TOOL</span>
+                   ) : (
+                     <span className="text-cyan-300 font-bold">[{dynamicMiningRanges.minMetal.toLocaleString()} ~ {dynamicMiningRanges.maxMetal.toLocaleString()}]</span>
+                   )}
+                 </div>
+                 <div className="flex justify-between items-center">
+                   <span className="text-zinc-400">Cristal:</span>
+                   {isSoloMetal ? (
+                     <span className="text-red-500 font-black text-[6px] uppercase tracking-wide">DESACTIVADO POR TOOL</span>
+                   ) : (
+                     <span className="text-purple-300 font-bold">[{dynamicMiningRanges.minCrystal.toLocaleString()} ~ {dynamicMiningRanges.maxCrystal.toLocaleString()}]</span>
+                   )}
+                 </div>
+               </div>
+
               <button
-                onClick={() => setIsStartJourneyOpen(true)}
-                className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-teal-600 text-white font-black text-[10px] uppercase rounded-lg border border-cyan-400 shadow-lg cursor-pointer"
+                onClick={handleOpenJourneyModal}
+                className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-teal-600 text-white font-black text-[10px] uppercase rounded-lg border border-cyan-400 shadow-lg cursor-pointer hover:brightness-110 active:scale-95 transition-all"
               >
-                CONFIRMAR Y LANZAR ({totalExpeditionProbability}%)
+                {selectedPlanet ? "CONFIRMAR MINADO" : "CONFIRMAR RECONOCIMIENTO"} ({totalExpeditionProbability}%)
               </button>
             </div>
           </div>
@@ -1699,26 +2070,234 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider">
                 DISPONIBLES: {currentLeftCategory.toUpperCase()} ({filteredInventory.length})
               </span>
+
+              {currentLeftCategory !== 'Fleets' && (
+                <div className="relative w-52">
+                  <Search className="absolute left-2.5 top-2 w-3 h-3 text-cyan-500" />
+                  <input
+                    type="text"
+                    placeholder="BUSCAR POR NOMBRE..."
+                    value={assetSearchQuery}
+                    onChange={(e) => setAssetSearchQuery(e.target.value)}
+                    className="w-full bg-[#0a0f14] border border-cyan-900 rounded-md pl-7 pr-2 py-1 text-[8px] text-cyan-200 placeholder-zinc-600 outline-none uppercase font-mono focus:border-cyan-500 transition-colors"
+                  />
+                  {assetSearchQuery && (
+                    <button onClick={() => setAssetSearchQuery('')} className="absolute right-2 top-1.5 text-zinc-500 hover:text-white">
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex-1 border border-cyan-950/60 bg-black/40 rounded-xl p-1.5 overflow-hidden flex flex-col">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[145px] pr-1 custom-scrollbar">
-                {filteredInventory.map(asset => {
-                  const isSelected = selectedAssets.some(a => a.id === asset.id);
-                  return (
-                    <div
-                      key={asset.id}
-                      onClick={() => toggleAssetSelection(asset)}
-                      className={`p-1.5 rounded-lg border flex items-center gap-2 cursor-pointer ${isSelected ? 'bg-cyan-950/80 border-cyan-400' : 'bg-[#050910] border-cyan-950'}`}
-                    >
-                      <div className="w-8 h-8 rounded bg-black border border-cyan-950 overflow-hidden">
-                        <img src={asset.image_url} alt={asset.name} className="w-full h-full object-cover" />
-                      </div>
-                      <span className="text-[8px] font-black text-white truncate">{asset.name}</span>
+                {currentLeftCategory === 'Fleets' ? (
+                  fleets.length === 0 ? (
+                    <div className="col-span-full p-6 text-center text-zinc-600 text-[8.5px] uppercase tracking-widest">
+                      NO HAY FLOTAS REGISTRADAS EN TU PERFIL
                     </div>
-                  );
-                })}
+                  ) : (
+                    fleets.map(fleet => {
+                      const isSelected = selectedFleet?.id === fleet.id;
+                      return (
+                        <div
+                          key={fleet.id}
+                          onClick={() => {
+                            playSfx(880);
+                            setSelectedFleet(isSelected ? null : fleet);
+                          }}
+                          className={`p-2 rounded-lg border cursor-pointer flex flex-col justify-between transition-all ${
+                            isSelected ? 'bg-cyan-950/90 border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.3)]' : 'bg-[#050910] border-cyan-950 hover:border-cyan-800'
+                          }`}
+                        >
+                          <span className="text-[8.5px] font-black text-white uppercase truncate">{fleet.name}</span>
+                          <span className="text-[7px] text-cyan-400 font-mono mt-1">PODER: {fleet.total_power_score} POW</span>
+                        </div>
+                      );
+                    })
+                  )
+                ) : filteredInventory.length === 0 ? (
+                  <div className="col-span-full p-6 text-center text-zinc-600 text-[8.5px] uppercase tracking-widest">
+                    {assetSearchQuery ? `SIN COINCIDENCIAS PARA "${assetSearchQuery.toUpperCase()}"` : `SIN ACTIVOS EN [${currentLeftCategory.toUpperCase()}]`}
+                  </div>
+                ) : (
+                  filteredInventory.map(asset => {
+                    const isSelected = selectedAssets.some(a => a.id === asset.id);
+                    
+                    const isShip = isShipAsset(asset.type);
+                    const isTool = isToolAsset(asset.type);
+                    const isInFlight = busyAssetIds.has(asset.id) || 
+                      (asset.seed_id && (
+                        (isShip && busyShipIds.has(asset.seed_id)) || 
+                        (isTool && busyToolIds.has(asset.seed_id))
+                      ));
+
+                    const effectVal = asset.effect || 0;
+
+                    return (
+                      <div
+                        key={asset.id}
+                        onClick={() => {
+                          if (!isInFlight) toggleAssetSelection(asset);
+                        }}
+                        className={`p-1.5 rounded-lg border flex items-center gap-2 transition-all relative ${
+                          isInFlight 
+                            ? 'bg-red-950/20 border-red-900/60 opacity-50 pointer-events-none' 
+                            : isSelected 
+                            ? 'bg-cyan-950/80 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.3)] cursor-pointer' 
+                            : 'bg-[#050910] border-cyan-950 hover:border-cyan-800 cursor-pointer'
+                        }`}
+                      >
+                        <div className="w-8 h-8 rounded bg-black border border-cyan-950 shrink-0 overflow-hidden relative">
+                          <img src={asset.image_url} className={`w-full h-full object-cover ${isInFlight ? 'grayscale' : ''}`} alt={asset.name} />
+                          {isSelected && !isInFlight && (
+                            <div className="absolute inset-0 bg-cyan-500/30 flex items-center justify-center">
+                              <Check className="w-3.5 h-3.5 text-cyan-300 stroke-[3]" />
+                            </div>
+                          )}
+                          {isInFlight && (
+                            <div className="absolute inset-0 bg-red-900/40 flex items-center justify-center backdrop-blur-[1px]">
+                              <span className="text-[5px] text-white font-black uppercase text-center leading-tight shadow-black drop-shadow-md">
+                                EN MISIÓN
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
+                          <span className="text-[8px] font-black text-white truncate">{asset.name}</span>
+                          {isInFlight ? (
+                            <span className="text-[6.5px] text-red-400 font-mono font-black uppercase">EN VUELO</span>
+                          ) : effectVal !== 0 ? (
+                            <span className={`text-[6.5px] font-mono font-bold ${effectVal > 0 ? 'text-cyan-400' : 'text-red-400'}`}>
+                              {effectVal > 0 ? `+${effectVal.toFixed(1)}%` : `${effectVal.toFixed(1)}%`}
+                            </span>
+                          ) : (
+                            <span className="text-[6.5px] text-zinc-500 font-mono uppercase">{asset.rarity}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
+            </div>
+
+            <div className="border border-cyan-500/40 bg-black/60 rounded-xl p-2 flex flex-col gap-1.5 shrink-0">
+              <div className="flex justify-between items-center px-1">
+                <span className="text-[8.5px] font-black text-amber-400 uppercase tracking-wider">
+                  ACTIVOS SELECCIONADOS PARA DESPLIEGUE ({selectedAssets.length + (selectedFleet ? 1 : 0)})
+                </span>
+                {(selectedAssets.length > 0 || selectedFleet) && (
+                  <button
+                    onClick={() => {
+                      playSfx(440);
+                      setSelectedAssets([]);
+                      setSelectedFleet(null);
+                    }}
+                    className="text-[7.5px] text-red-400 hover:text-red-300 font-bold uppercase flex items-center gap-1 cursor-pointer"
+                  >
+                    <Trash2 className="w-2.5 h-2.5" /> LIMPIAR SELECCIÓN
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-[145px] overflow-y-auto pr-1 custom-scrollbar p-1 bg-[#020508] rounded-lg border border-cyan-950">
+                {selectedFleet && (
+                  <div
+                    onClick={() => { playSfx(440); setSelectedFleet(null); }}
+                    className="p-1.5 rounded-lg border border-purple-500/60 bg-purple-950/40 cursor-pointer flex items-center gap-2 hover:border-purple-400 transition-all"
+                  >
+                    <div className="w-8 h-8 rounded bg-purple-900/60 border border-purple-800 shrink-0 flex items-center justify-center font-black text-purple-200 text-[10px]">
+                      FLT
+                    </div>
+                    <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
+                      <span className="text-[8px] font-black text-white truncate">{selectedFleet.name}</span>
+                      <span className="text-[6.5px] text-purple-300 font-mono font-bold">FLOTA EQUIPADA</span>
+                    </div>
+                  </div>
+                )}
+
+                {selectedAssets.length === 0 && !selectedFleet ? (
+                  <div className="col-span-full py-4 text-center text-zinc-600 text-[8px] uppercase italic">
+                    HAZ CLIC EN LOS ACTIVOS DE ARRIBA PARA AÑADIRLOS A ESTA EXPEDICIÓN
+                  </div>
+                ) : (
+                  selectedAssets.map(asset => {
+                    const effectVal = asset.effect || 0;
+                    return (
+                      <div
+                        key={`selected-${asset.id}`}
+                        onClick={() => toggleAssetSelection(asset)}
+                        className="p-1.5 rounded-lg border border-cyan-500/60 bg-cyan-950/60 cursor-pointer flex items-center gap-2 hover:border-cyan-300 transition-all relative group"
+                      >
+                        <div className="w-8 h-8 rounded bg-black border border-cyan-900 shrink-0 overflow-hidden">
+                          <img src={asset.image_url} className="w-full h-full object-cover" alt={asset.name} />
+                        </div>
+                        <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
+                          <span className="text-[8px] font-black text-white truncate">{asset.name}</span>
+                          {effectVal !== 0 ? (
+                            <span className={`text-[6.5px] font-mono font-bold ${effectVal > 0 ? 'text-cyan-300' : 'text-red-300'}`}>
+                              {effectVal > 0 ? `+${effectVal.toFixed(1)}%` : `${effectVal.toFixed(1)}%`}
+                            </span>
+                          ) : (
+                            <span className="text-[6.5px] text-cyan-400/70 font-mono uppercase">{asset.type}</span>
+                          )}
+                        </div>
+                        <div className="absolute -top-1 -right-1 bg-red-950 border border-red-500 text-red-300 rounded-full w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <X className="w-2.5 h-2.5" />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <div className="p-2.5 bg-[#020508] border border-cyan-950 rounded-lg flex justify-between items-center text-[9.5px] shrink-0">
+              <span className="text-zinc-400 font-bold uppercase">
+                {selectedPlanet ? "EFICIENCIA DE EXTRACCIÓN APLICADA:" : "PROBABILIDAD DE DESCUBRIMIENTO DE SS:"}
+              </span>
+              <span className={`font-black text-xs ${totalExpeditionProbability >= 0 ? 'text-amber-400' : 'text-red-400'}`}>
+                {totalExpeditionProbability}%
+              </span>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {showToolRequiredModal && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-4 font-mono">
+          <div className="w-full max-w-md bg-[#080b0e] border-2 border-cyan-500/80 rounded-2xl p-6 text-center space-y-4 shadow-[0_0_35px_rgba(6,182,212,0.3)]">
+            <h3 className="text-sm font-black text-white uppercase tracking-widest pt-2">
+              HERRAMIENTA (TOOL) REQUERIDA
+            </h3>
+            
+            <p className="text-[9.5px] text-zinc-300 leading-relaxed font-sans normal-case bg-black/50 p-3 rounded-xl border border-cyan-950">
+              Para desplegar esta expedición en el clúster es obligatorio equipar al menos una <strong className="text-cyan-400">Herramienta (Tool)</strong> de extracción en la flota.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <button
+                onClick={() => {
+                  playSfx(880);
+                  setShowToolRequiredModal(false);
+                  setCurrentLeftCategory('Tools');
+                }}
+                className="py-2.5 bg-gradient-to-r from-cyan-600 to-teal-600 text-white text-[9px] font-black uppercase rounded-lg border border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.3)] cursor-pointer hover:brightness-110 active:scale-95 transition-all"
+              >
+                SELECCIONAR TOOL
+              </button>
+              <button
+                onClick={() => {
+                  playSfx(440);
+                  setShowToolRequiredModal(false);
+                }}
+                className="py-2.5 bg-black border border-zinc-800 text-zinc-400 text-[9px] font-bold uppercase rounded-lg hover:text-white cursor-pointer"
+              >
+                ENTENDIDO
+              </button>
             </div>
           </div>
         </div>
@@ -1727,15 +2306,47 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
       {isStartJourneyOpen && (
         <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 font-mono">
           <div className="w-full max-w-md bg-[#080b0e] border border-cyan-500/40 rounded-2xl p-6 text-center space-y-4">
-            <h3 className="text-lg font-black text-white uppercase">¿DESPLEGAR EXPEDICIÓN EN EL CLÚSTER?</h3>
-            {launchError && <div className="p-2 bg-red-950 border border-red-500 text-red-300 text-[9px] uppercase">{launchError}</div>}
+            <h3 className="text-lg font-black text-white uppercase">¿INICIAR EXPEDICIÓN EN STAR CLUSTER?</h3>
+            <p className="text-xs text-amber-400 font-bold">
+              {selectedPlanet ? "MODIFICADOR NETO:" : "PROBABILIDAD ESTIMADA:"} {totalExpeditionProbability}%
+            </p>
+            
+            {launchError && (
+              <div className="p-3 bg-red-950/80 border border-red-500 text-red-300 text-[9px] uppercase font-bold rounded-lg">
+                {launchError}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3 pt-2">
-              <button onClick={executeLaunchTransaction} disabled={loading} className="py-2.5 bg-cyan-950 border border-cyan-500 text-cyan-300 text-[10px] font-black uppercase rounded-lg">CONFIRMAR</button>
-              <button onClick={() => setIsStartJourneyOpen(false)} className="py-2.5 bg-black border border-zinc-800 text-zinc-500 text-[10px] font-black uppercase rounded-lg">CANCELAR</button>
+              <button onClick={executeLaunchTransaction} disabled={loading} className="py-2.5 bg-cyan-950 border border-cyan-500 text-cyan-300 text-[10px] font-black uppercase rounded-lg hover:bg-cyan-900 cursor-pointer">CONFIRMAR VIAJE</button>
+              <button onClick={() => { playSfx(440); setIsStartJourneyOpen(false); }} className="py-2.5 bg-black border border-zinc-800 text-zinc-500 text-[10px] font-black uppercase rounded-lg hover:bg-zinc-900 cursor-pointer">CANCELAR</button>
             </div>
           </div>
         </div>
       )}
+
+      {isRewardSummaryOpen && (
+        <div className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4 font-mono">
+          <div className="w-[480px] bg-[#080b0e] border border-cyan-500/40 rounded-xl flex flex-col overflow-hidden shadow-2xl h-[320px]">
+            <div className="w-full grid grid-cols-3 bg-[#05070a] border-b border-cyan-950 text-center text-[10px] font-black uppercase">
+              <button onClick={() => setActiveRewardTab('ITEMS')} className={`py-2.5 ${activeRewardTab === 'ITEMS' ? 'bg-[#0a0f14] text-cyan-400' : 'text-zinc-500'}`}>ITEMS (1)</button>
+              <button onClick={() => setActiveRewardTab('CURRENCIES')} className={`py-2.5 ${activeRewardTab === 'CURRENCIES' ? 'bg-cyan-500 text-black font-black' : 'text-zinc-500'}`}>RECURSOS</button>
+              <button onClick={() => setActiveRewardTab('LTD_CUR')} className={`py-2.5 ${activeRewardTab === 'LTD_CUR' ? 'bg-[#0a0f14] text-cyan-400' : 'text-zinc-500'}`}>LTD</button>
+            </div>
+            <div className="flex-1 p-6 flex items-center justify-center bg-black/40">
+              {activeRewardTab === 'ITEMS' && (
+                <div className="w-80 border border-cyan-500/40 bg-[#05070a] rounded-xl flex flex-col items-center p-4 text-center gap-3">
+                  <span className="text-[10px] font-black text-cyan-400 uppercase">{currentRewardDrop ? currentRewardDrop.rarity : 'RARE'}</span>
+                  <div className="text-4xl">{currentRewardDrop ? currentRewardDrop.icon : '💎'}</div>
+                  <span className="text-[10px] font-bold text-white uppercase">{currentRewardDrop ? currentRewardDrop.name : 'BOTÍN OBTENIDO'}</span>
+                </div>
+              )}
+            </div>
+            <button onClick={handleAcceptRewardsClose} className="w-full py-2.5 bg-cyan-950 hover:bg-cyan-900 border-t border-cyan-950 text-cyan-300 text-[11px] font-black uppercase cursor-pointer">ACEPTAR</button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
