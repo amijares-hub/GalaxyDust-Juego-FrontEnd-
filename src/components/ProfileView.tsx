@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  User, Swords, CheckCircle2, Lock, ArrowLeft, X, Edit3, Award, Check
+  User, Swords, CheckCircle2, Lock, ArrowLeft, X, Edit3, Award, Check, LogOut
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { usePlayerProfile } from '../hooks/usePlayerProfile';
@@ -314,9 +314,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
           </div>
 
           <div className="flex flex-col text-left gap-1.5">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base sm:text-lg font-black text-white uppercase">{profileData.username}</h2>
               <span className="text-[8px] font-black bg-cyan-950 border border-cyan-500/60 text-cyan-300 px-2 py-0.5 rounded uppercase">LVL {profileData.level}</span>
+              
+              {/* BOTÓN CERRAR SESIÓN */}
+              <button
+                onClick={async () => {
+                  playSfx(440);
+                  await supabase.auth.signOut();
+                  window.location.reload();
+                }}
+                className="ml-2 px-3 py-1 bg-red-950/70 hover:bg-red-900/90 border border-red-500/60 hover:border-red-400 text-red-300 text-[8.5px] font-mono font-black uppercase tracking-wider rounded-lg shadow-[0_0_10px_rgba(239,68,68,0.2)] transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <LogOut className="w-3 h-3 text-red-400" />
+                <span>CERRAR SESIÓN</span>
+              </button>
             </div>
 
             <div className="w-full max-w-xs space-y-1">
