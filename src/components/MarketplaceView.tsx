@@ -68,7 +68,6 @@ interface MyInventoryItem {
   amount?: number;
 }
 
-// 🌐 NORMALIZACIÓN ESTRICTA Y DETERMINISTA DE CATEGORÍAS
 const normalizeCategory = (cat?: string, type?: string): AssetCategory => {
   const upperCat = String(cat || '').toUpperCase().trim();
   if (['SHIPS', 'TOOLS', 'STRUCTURES', 'TECH', 'BLUEPRINTS', 'LICENSES', 'ASTROBOTS', 'CONSUMABLES'].includes(upperCat)) {
@@ -76,7 +75,6 @@ const normalizeCategory = (cat?: string, type?: string): AssetCategory => {
   }
 
   const raw = `${cat || ''} ${type || ''}`.toLowerCase().trim();
-  
   if (['spaceships', 'ships', 'naves', 'nave', 'spaceship', 'ship'].some(k => raw.includes(k))) return 'SHIPS';
   if (['tools', 'tool', 'herramientas', 'herramienta'].some(k => raw.includes(k))) return 'TOOLS';
   if (['structures', 'structure', 'estructuras', 'estructura', 'defense', 'defensa', 'defenses'].some(k => raw.includes(k))) return 'STRUCTURES';
@@ -133,7 +131,6 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   const [myInventory, setMyInventory] = useState<MyInventoryItem[]>([]);
   const [isLocalLoading, setIsLocalLoading] = useState<boolean>(false);
 
-  // Modal de Publicación
   const [selectedItemToList, setSelectedItemToList] = useState<MyInventoryItem | null>(null);
   const [sellPrice, setSellPrice] = useState<number>(1000);
   const [sellIsAuction, setSellIsAuction] = useState<boolean>(false);
@@ -162,7 +159,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
         const { data: seedRows } = await supabase.from(seedTable).select('*');
         const seedMap = new Map<string, any>();
         (seedRows || []).forEach((s: any) => {
-          [s.id, s.ship_id, s.id_ship, s.tool_id, s.astrobot_id, s.license_id, s.consumable_id].forEach(k => {
+          [s.id, s.ship_id, s.id_ship, s.tool_id, s.astrobot_id, s.license_id, s.consumable_id, s.technology_id].forEach(k => {
             if (k !== undefined && k !== null) seedMap.set(String(k), s);
           });
         });
@@ -180,7 +177,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
           const rawImg = seed?.image_url || seed?.avatar_url || seed?.avatar || row.image_url;
           const finalImg = resolveImageUrl(rawImg);
           const rarity = normalizeRarity(seed?.rarity || row.rarity);
-          const isListed = activeListingIds.has(String(row.id));
+          const isListed = activeListingIds.has(String(row.id)) || (targetId ? activeListingIds.has(targetId) : false);
 
           return {
             id: String(row.id),
@@ -196,15 +193,16 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
         });
       };
 
-      const [ships, tools, astrobots, consumables, licenses] = await Promise.all([
+      const [ships, tools, astrobots, consumables, licenses, techs] = await Promise.all([
         loadCat('user_ships', 'seed_ships', 'SHIPS', ['id_ship', 'ship_id', 'id']),
         loadCat('user_tools', 'seed_tools', 'TOOLS', ['tool_id', 'id']),
         loadCat('user_astrobots', 'seed_astrobots', 'ASTROBOTS', ['astrobot_id', 'id']),
         loadCat('user_consumibles', 'seed_consumables', 'CONSUMABLES', ['consumable_id', 'id']),
-        loadCat('user_licenses', 'seed_licenses', 'LICENSES', ['license_id', 'id'])
+        loadCat('user_licenses', 'seed_licenses', 'LICENSES', ['license_id', 'id']),
+        loadCat('user_technologies', 'seed_technologies', 'TECH', ['technology_id', 'tech_id', 'id'])
       ]);
 
-      const directAssets = [...ships, ...tools, ...astrobots, ...consumables, ...licenses];
+      const directAssets = [...ships, ...tools, ...astrobots, ...consumables, ...licenses, ...techs];
 
       const hookAssets: MyInventoryItem[] = (inventoryItems || []).map((item) => {
         const itemCat = normalizeCategory(item.category, item.type);
@@ -239,7 +237,6 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
     syncInventory();
   }, [inventoryItems, currentUserId, marketListings]);
 
-  // 🛡️ PUBLICAR ACTIVO EN EL MERCADO / SUBASTA
   const handleConfirmPublish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItemToList) return;
@@ -337,12 +334,25 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   };
 
   const getFilteredAndSortedListings = () => {
+    const validInventoryIds = new Set(myInventory.map(i => String(i.id)));
+
     let result = (marketListings || []).filter((item) => {
       const isAuction = Boolean(item.is_auction || (item as any).isAuction);
 
       if (activeTab === 'MARKET' && isAuction) return false;
       if (activeTab === 'AUCTIONS' && !isAuction) return false;
       if (activeTab === 'MY_LISTINGS' && String(item.seller_id) !== String(currentUserId)) return false;
+
+      // 🛡️ REGLA AUTOMÁTICA DE INTEGRIDAD Y AUTO-CURACIÓN:
+      // Si la publicación me pertenece pero el activo ya no existe en mi inventario, se auto-elimina de DB
+      if (String(item.seller_id) === String(currentUserId) && !isLocalLoading) {
+        const itemId = String(item.inventory_item_id || item.id);
+        const existsInInventory = validInventoryIds.has(itemId);
+        if (!existsInInventory) {
+          supabase.from('marketplace_listings').delete().eq('id', item.id).then();
+          return false;
+        }
+      }
 
       if (!matchCategory(item.category, selectedCategory)) return false;
       if (!matchRarity(item.rarity, rarityFilter)) return false;
