@@ -22,10 +22,17 @@ export interface Asset {
   effect?: number;
   skill_bonus?: number;
   skills?: string[];
+  attack?: number;
+  defense?: number;
+  cargo_capacity?: number;
+  speed?: number;
+  fuel_consumption?: number;
   min_metal_capacity?: number;
   max_metal_capacity?: number;
   min_crystal_capacity?: number;
   max_crystal_capacity?: number;
+  can_mine_metal?: boolean;
+  can_mine_crystal?: boolean;
   min_metal_bonus?: number;
   max_metal_bonus?: number;
   min_crystal_bonus?: number;
@@ -327,6 +334,26 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
     return Number(modifierSum.toFixed(2));
   }, [activeGcObject, selectedAssets, selectedFleet, globalPassiveBonus]);
+
+  const fleetStats = useMemo(() => {
+    if (!selectedAssets || selectedAssets.length === 0) {
+      return { attack: 0, defense: 0, cargo: 0, speed: 0, fuel: 0 };
+    }
+    return selectedAssets.reduce((acc, item: any) => {
+      const attack = Number(item.attack || item.power_score || item.power || item.seed?.attack || 0);
+      const defense = Number(item.defense || item.shield || item.health || item.seed?.defense || 0);
+      const cargo = Number(item.cargo_capacity || item.capacity || item.cargo || item.seed?.cargo_capacity || 0);
+      const speed = Number(item.speed || item.ship_speed || item.seed?.speed || 0);
+      const fuel = Number(item.fuel_consumption || item.deuterium_cost || item.fuel || item.seed?.fuel_consumption || 0);
+      return {
+        attack: acc.attack + attack,
+        defense: acc.defense + defense,
+        cargo: acc.cargo + cargo,
+        speed: acc.speed === 0 ? speed : Math.min(acc.speed, speed),
+        fuel: acc.fuel + fuel
+      };
+    }, { attack: 0, defense: 0, cargo: 0, speed: 0, fuel: 0 });
+  }, [selectedAssets]);
 
   const selectedTool = useMemo(() => {
     return (
@@ -879,6 +906,11 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               level: row.current_level || row.level || 1,
               effect: realBonus,
               skills: parsedSkills,
+              attack: Number(seed?.attack || seed?.power_score || seed?.power || row.attack || 0),
+              defense: Number(seed?.defense || seed?.shield || seed?.health || seed?.hp || row.defense || 0),
+              cargo_capacity: Number(seed?.cargo_capacity || seed?.capacity || seed?.cargo || row.cargo_capacity || row.cargo || 0),
+              speed: Number(seed?.speed || seed?.ship_speed || row.speed || 0),
+              fuel_consumption: Number(seed?.fuel_consumption || seed?.deuterium_cost || seed?.fuel || row.fuel_consumption || 0),
               min_metal_capacity: seed?.min_metal_capacity,
               max_metal_capacity: seed?.max_metal_capacity,
               min_crystal_capacity: seed?.min_crystal_capacity,
@@ -907,7 +939,10 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         loadCategoryAssets('user_licenses', 'seed_licenses', 'Licencia', ['license_id', 'id'])
       ]);
 
-      setInventoryAssets([...ships, ...tools, ...astrobots, ...consumables, ...licenses]);
+      const rawAssets = [...ships, ...tools, ...astrobots, ...consumables, ...licenses];
+      const deduplicatedAssets = Array.from(new Map(rawAssets.map(item => [item.id, item])).values());
+
+      setInventoryAssets(deduplicatedAssets);
 
       const { data: fleetData } = await supabase.from('fleets').select('*').eq('user_id', userId);
       if (fleetData) {
@@ -2253,6 +2288,42 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 )}
               </div>
             </div>
+
+            {selectedAssets && selectedAssets.length > 0 && (
+              <div className="bg-[#020509] border border-cyan-500/30 p-3 rounded-xl flex flex-wrap items-center justify-between gap-3 font-mono mt-3">
+                <div className="flex items-center gap-2 text-xs text-cyan-400 font-black uppercase tracking-widest">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                  <span>ATRIBUTOS COMBINADOS DE FLOTA ({selectedAssets.length})</span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-[9px] font-bold">
+                  <div className="bg-black/70 border border-red-500/40 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                    <span className="text-zinc-500 uppercase">⚔️ ATAQUE:</span>
+                    <span className="text-red-400 font-black">{fleetStats.attack.toLocaleString()}</span>
+                  </div>
+
+                  <div className="bg-black/70 border border-blue-500/40 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                    <span className="text-zinc-500 uppercase">🛡️ DEFENSA:</span>
+                    <span className="text-blue-400 font-black">{fleetStats.defense.toLocaleString()}</span>
+                  </div>
+
+                  <div className="bg-black/70 border border-amber-500/40 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                    <span className="text-zinc-500 uppercase">📦 CARGA:</span>
+                    <span className="text-amber-400 font-black">{fleetStats.cargo.toLocaleString()} KG</span>
+                  </div>
+
+                  <div className="bg-black/70 border border-emerald-500/40 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                    <span className="text-zinc-500 uppercase">⚡ VELOCIDAD:</span>
+                    <span className="text-emerald-400 font-black">{fleetStats.speed.toLocaleString()} KM/H</span>
+                  </div>
+
+                  <div className="bg-black/70 border border-purple-500/40 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                    <span className="text-zinc-500 uppercase">⛽ CONSUMO:</span>
+                    <span className="text-purple-400 font-black">{fleetStats.fuel.toLocaleString()} DEUT</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="p-2.5 bg-[#020508] border border-cyan-950 rounded-lg flex justify-between items-center text-[9.5px] shrink-0">
               <span className="text-zinc-400 font-bold uppercase">
