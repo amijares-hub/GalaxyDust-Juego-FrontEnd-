@@ -15,6 +15,7 @@ import {
 import { Button } from "./ui/joly-button";
 import { supabase } from "../lib/supabase";
 import { useAudioEngine } from "../hooks/useAudioEngine";
+import { GalaxyFrame } from "./CanView";
 
 interface Member {
   id: string;
@@ -180,7 +181,6 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
 
       if (error) throw error;
 
-      // 🎯 ACTUALIZACIÓN DE ESTADO ESTRICTAMENTE BASADA EN EL SERVIDOR
       if (data && typeof data.new_crystals === 'number') {
         setPlayerGems(data.new_crystals);
       }
@@ -235,185 +235,187 @@ export const AllianceView: React.FC<AllianceViewProps> = ({
   };
 
   return (
-    <div className="w-full flex flex-col items-center select-none py-1 relative">
-      <div className="absolute top-0 right-0 z-20">
-        <Button 
-          variant="secondary" 
-          size="sm" 
-          onClick={onBack}
-          className="text-[8.5px] font-mono tracking-widest border border-white/10 hover:border-[#E53E3E]/40 text-white/75 hover:text-[#E53E3E] px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-        >
-          <RotateCcw className="w-3 h-3 mr-1" />
-          REGRESAR A BASE
-        </Button>
-      </div>
+    <GalaxyFrame className="w-full max-w-6xl mx-auto my-2 text-white font-mono select-none" innerPadding="p-5 sm:p-7">
+      <div className="w-full flex flex-col items-center relative">
+        <div className="absolute top-0 right-0 z-20">
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            onClick={onBack}
+            className="text-[8.5px] font-mono tracking-widest border border-white/10 hover:border-[#E53E3E]/40 text-white/75 hover:text-[#E53E3E] px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+          >
+            <RotateCcw className="w-3 h-3 mr-1" />
+            REGRESAR A BASE
+          </Button>
+        </div>
 
-      <div className="text-center mb-4">
-        <h2 className="text-sm font-mono tracking-[0.25em] text-[#E53E3E] font-black uppercase flex items-center justify-center gap-2">
-          <ShieldAlert className="w-5 h-5" />
-          RED DE ALIANZA // VANGUARDIA
-        </h2>
-        <p className="text-[9.5px] font-mono tracking-widest text-[#A0A2A5]/70 uppercase mt-1">
-          Canal criptográfico seguro conectado al sector exterior
-        </p>
-      </div>
+        <div className="text-center mb-4">
+          <h2 className="text-sm font-mono tracking-[0.25em] text-[#E53E3E] font-black uppercase flex items-center justify-center gap-2">
+            <ShieldAlert className="w-5 h-5" />
+            RED DE ALIANZA // VANGUARDIA
+          </h2>
+          <p className="text-[9.5px] font-mono tracking-widest text-[#A0A2A5]/70 uppercase mt-1">
+            Canal criptográfico seguro conectado al sector exterior
+          </p>
+        </div>
 
-      <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 mt-2 max-w-6xl mx-auto">
-        <div className="lg:col-span-8 flex flex-col gap-4">
-          <div className="bg-[#0b0c10]/80 border border-indigo-500/20 p-5 rounded-2xl backdrop-blur-md relative overflow-hidden flex flex-col sm:flex-row items-center justify-between shadow-[0_0_30px_rgba(99,102,241,0.05)]">
-            <div className="absolute top-0 left-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[50px] pointer-events-none" />
-            
-            <div className="flex items-center gap-4 z-10 w-full sm:w-auto">
-              <div className="w-16 h-16 rounded-xl bg-black border border-indigo-500/40 p-1 flex items-center justify-center shadow-[0_0_15px_rgba(99,102,241,0.2)]">
-                <Shield className="w-8 h-8 text-indigo-400" />
-              </div>
-              <div>
-                <h3 className="text-lg font-black tracking-widest text-white uppercase font-sans">
-                  {allianceName}
-                </h3>
-                <div className="flex items-center gap-3 mt-1">
-                  <div className="flex items-center gap-1 text-[9px] font-mono text-indigo-300 bg-indigo-900/30 px-2 py-0.5 rounded border border-indigo-500/20">
-                    <Users className="w-3 h-3" />
-                    <span>MIEMBROS: {members.length}/50</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-[9px] font-mono text-emerald-400 bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-500/20">
-                    <Activity className="w-3 h-3" />
-                    <span>NIVEL DEL NÚCLEO: {allianceTechLevel}</span>
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 mt-2">
+          <div className="lg:col-span-8 flex flex-col gap-4">
+            <div className="bg-[#0b0c10]/80 border border-indigo-500/20 p-5 rounded-2xl backdrop-blur-md relative overflow-hidden flex flex-col sm:flex-row items-center justify-between shadow-[0_0_30px_rgba(99,102,241,0.05)]">
+              <div className="absolute top-0 left-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[50px] pointer-events-none" />
+              
+              <div className="flex items-center gap-4 z-10 w-full sm:w-auto">
+                <div className="w-16 h-16 rounded-xl bg-black border border-indigo-500/40 p-1 flex items-center justify-center shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+                  <Shield className="w-8 h-8 text-indigo-400" />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-lg font-black tracking-widest text-white uppercase font-sans">
+                    {allianceName}
+                  </h3>
+                  <div className="flex items-center gap-3 mt-1">
+                    <div className="flex items-center gap-1 text-[9px] font-mono text-indigo-300 bg-indigo-900/30 px-2 py-0.5 rounded border border-indigo-500/20">
+                      <Users className="w-3 h-3" />
+                      <span>MIEMBROS: {members.length}/50</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-[9px] font-mono text-emerald-400 bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-500/20">
+                      <Activity className="w-3 h-3" />
+                      <span>NIVEL DEL NÚCLEO: {allianceTechLevel}</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="mt-4 sm:mt-0 flex flex-col items-center sm:items-end w-full sm:w-auto z-10">
-              <span className="text-[8px] font-mono tracking-widest text-white/50 uppercase mb-1.5">
-                PROGRESO TECNOLÓGICO (+15%)
-              </span>
-              <div className="w-full sm:w-40 h-2 bg-black/60 border border-white/10 rounded-full overflow-hidden mb-2">
-                <div 
-                  className="h-full bg-gradient-to-r from-indigo-600 to-cyan-400 transition-all duration-500" 
-                  style={{ width: `${techProgress}%` }} 
-                />
-              </div>
-              <button 
-                onClick={handleDonateTech}
-                className="flex items-center gap-1.5 bg-[#E53E3E]/10 hover:bg-[#E53E3E]/20 border border-[#E53E3E]/40 text-[#E53E3E] hover:text-white px-3 py-1.5 rounded transition-all text-[9px] font-mono font-bold tracking-widest cursor-pointer active:scale-95"
-              >
-                <ArrowUpCircle className="w-3.5 h-3.5" />
-                DONAR (50💎)
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-[#08090b]/80 border border-white/5 p-4 rounded-2xl backdrop-blur-md flex-1 overflow-hidden flex flex-col min-h-[350px]">
-            <h4 className="text-[10px] font-mono tracking-[0.2em] text-white/50 uppercase border-b border-white/5 pb-2 mb-3 flex items-center gap-2">
-              <UserCheck className="w-3.5 h-3.5" />
-              REGISTRO DE PERSONAL ACTIVO
-            </h4>
-            
-            <div className="flex-1 overflow-y-auto scrollbar-none space-y-2 pr-1">
-              {members.map(member => (
-                <div 
-                  key={member.id} 
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.04] transition-colors rounded-xl"
+              <div className="mt-4 sm:mt-0 flex flex-col items-center sm:items-end w-full sm:w-auto z-10">
+                <span className="text-[8px] font-mono tracking-widest text-white/50 uppercase mb-1.5">
+                  PROGRESO TECNOLÓGICO (+15%)
+                </span>
+                <div className="w-full sm:w-40 h-2 bg-black/60 border border-white/10 rounded-full overflow-hidden mb-2">
+                  <div 
+                    className="h-full bg-gradient-to-r from-indigo-600 to-cyan-400 transition-all duration-500" 
+                    style={{ width: `${techProgress}%` }} 
+                  />
+                </div>
+                <button 
+                  onClick={handleDonateTech}
+                  className="flex items-center gap-1.5 bg-[#E53E3E]/10 hover:bg-[#E53E3E]/20 border border-[#E53E3E]/40 text-[#E53E3E] hover:text-white px-3 py-1.5 rounded transition-all text-[9px] font-mono font-bold tracking-widest cursor-pointer active:scale-95"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <img src={member.avatar} alt={member.name} className="w-10 h-10 rounded-full object-cover border border-white/10" />
-                      <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#08090b] ${member.status === 'online' ? 'bg-emerald-500' : 'bg-neutral-600'}`} />
-                    </div>
-                    <div className="flex flex-col text-left">
-                      <span className="text-[11px] font-bold text-white font-sans">{member.name}</span>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className={`text-[8.5px] font-mono px-1.5 py-0.5 rounded border ${
-                          member.role === 'Comandante' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                          member.role === 'Oficial' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
-                          'bg-white/5 text-white/40 border-white/10'
-                        }`}>
-                          {member.role.toUpperCase()}
-                        </span>
-                        <span className="text-[9px] font-mono text-white/30">NIVEL {member.level}</span>
+                  <ArrowUpCircle className="w-3.5 h-3.5" />
+                  DONAR (50💎)
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-[#08090b]/80 border border-white/5 p-4 rounded-2xl backdrop-blur-md flex-1 overflow-hidden flex flex-col min-h-[350px]">
+              <h4 className="text-[10px] font-mono tracking-[0.2em] text-white/50 uppercase border-b border-white/5 pb-2 mb-3 flex items-center gap-2 text-left">
+                <UserCheck className="w-3.5 h-3.5" />
+                REGISTRO DE PERSONAL ACTIVO
+              </h4>
+              
+              <div className="flex-1 overflow-y-auto scrollbar-none space-y-2 pr-1">
+                {members.map(member => (
+                  <div 
+                    key={member.id} 
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.04] transition-colors rounded-xl"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <img src={member.avatar} alt={member.name} className="w-10 h-10 rounded-full object-cover border border-white/10" />
+                        <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#08090b] ${member.status === 'online' ? 'bg-emerald-500' : 'bg-neutral-600'}`} />
+                      </div>
+                      <div className="flex flex-col text-left">
+                        <span className="text-[11px] font-bold text-white font-sans">{member.name}</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className={`text-[8.5px] font-mono px-1.5 py-0.5 rounded border ${
+                            member.role === 'Comandante' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                            member.role === 'Oficial' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
+                            'bg-white/5 text-white/40 border-white/10'
+                          }`}>
+                            {member.role.toUpperCase()}
+                          </span>
+                          <span className="text-[9px] font-mono text-white/30">NIVEL {member.level}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="mt-2 sm:mt-0 flex items-center gap-4 border-t sm:border-t-0 sm:border-l border-white/5 pt-2 sm:pt-0 sm:pl-4">
-                    <div className="flex flex-col sm:items-end">
-                      <span className="text-[7.5px] font-mono text-white/30 tracking-widest uppercase">Poder Táctico</span>
-                      <span className="text-[10px] font-mono text-cyan-400 font-bold">{member.power.toLocaleString()}</span>
+                    
+                    <div className="mt-2 sm:mt-0 flex items-center gap-4 border-t sm:border-t-0 sm:border-l border-white/5 pt-2 sm:pt-0 sm:pl-4">
+                      <div className="flex flex-col sm:items-end">
+                        <span className="text-[7.5px] font-mono text-white/30 tracking-widest uppercase">Poder Táctico</span>
+                        <span className="text-[10px] font-mono text-cyan-400 font-bold">{member.power.toLocaleString()}</span>
+                      </div>
+                      <button className="p-1.5 rounded bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-colors border border-white/5 cursor-pointer">
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
                     </div>
-                    <button className="p-1.5 rounded bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-colors border border-white/5 cursor-pointer">
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="lg:col-span-4 flex flex-col bg-[#050608]/90 border border-[#E53E3E]/20 rounded-2xl backdrop-blur-md overflow-hidden min-h-[400px] shadow-[0_0_20px_rgba(229,62,62,0.05)] relative">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-[#E53E3E]/5 rounded-full blur-[40px] pointer-events-none" />
-
-          <div className="px-4 py-3 border-b border-[#E53E3E]/20 bg-[#E53E3E]/5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Wifi className="w-4 h-4 text-[#E53E3E] animate-pulse" />
-              <span className="text-[10px] font-mono tracking-widest font-black text-white/80 uppercase">
-                COM-LINK CIFRADO
-              </span>
-            </div>
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-none flex flex-col font-mono text-[9.5px]">
-            {logs.length === 0 ? (
-              <span className="text-zinc-600 italic text-[9px] text-center my-auto">Sin transmisiones recientes.</span>
-            ) : (
-              logs.map((log) => (
-                <div 
-                  key={log.id} 
-                  className={`p-2 rounded-lg border ${
-                    log.type === 'system' ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-200' :
-                    log.type === 'combat' ? 'bg-amber-500/10 border-amber-500/20 text-amber-200' :
-                    'bg-white/5 border-white/10 text-neutral-300'
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-1 opacity-60 text-[7.5px] uppercase tracking-wider">
-                    <span className={`font-black ${log.author === 'SYSTEM' ? 'text-indigo-400' : 'text-cyan-400'}`}>
-                      {log.author}
-                    </span>
-                    <span>{log.time}</span>
-                  </div>
-                  <div className="leading-relaxed">
-                    {log.message}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="p-3 border-t border-[#E53E3E]/20 bg-black/40 relative z-10">
-            <form onSubmit={handleSendMessage} className="flex gap-2">
-              <div className="relative flex-1">
-                <MessageSquare className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
-                <input 
-                  type="text" 
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Transmitir mensaje..." 
-                  className="w-full bg-[#121315] border border-white/10 rounded-lg py-2 pl-8 pr-3 text-[10px] font-mono text-white placeholder-white/30 focus:outline-none focus:border-[#E53E3E]/50 transition-colors uppercase"
-                />
+                ))}
               </div>
-              <button 
-                type="submit"
-                disabled={!chatInput.trim()}
-                className="bg-[#E53E3E] hover:bg-red-500 disabled:opacity-50 disabled:bg-neutral-800 text-white p-2 rounded-lg transition-colors border border-transparent disabled:border-white/10 cursor-pointer"
-              >
-                <Send className="w-3.5 h-3.5" />
-              </button>
-            </form>
+            </div>
+          </div>
+
+          <div className="lg:col-span-4 flex flex-col bg-[#050608]/90 border border-[#E53E3E]/20 rounded-2xl backdrop-blur-md overflow-hidden min-h-[400px] shadow-[0_0_20px_rgba(229,62,62,0.05)] relative">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#E53E3E]/5 rounded-full blur-[40px] pointer-events-none" />
+
+            <div className="px-4 py-3 border-b border-[#E53E3E]/20 bg-[#E53E3E]/5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Wifi className="w-4 h-4 text-[#E53E3E] animate-pulse" />
+                <span className="text-[10px] font-mono tracking-widest font-black text-white/80 uppercase">
+                  COM-LINK CIFRADO
+                </span>
+              </div>
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-none flex flex-col font-mono text-[9.5px]">
+              {logs.length === 0 ? (
+                <span className="text-zinc-600 italic text-[9px] text-center my-auto">Sin transmisiones recientes.</span>
+              ) : (
+                logs.map((log) => (
+                  <div 
+                    key={log.id} 
+                    className={`p-2 rounded-lg border text-left ${
+                      log.type === 'system' ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-200' :
+                      log.type === 'combat' ? 'bg-amber-500/10 border-amber-500/20 text-amber-200' :
+                      'bg-white/5 border-white/10 text-neutral-300'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-1 opacity-60 text-[7.5px] uppercase tracking-wider">
+                      <span className={`font-black ${log.author === 'SYSTEM' ? 'text-indigo-400' : 'text-cyan-400'}`}>
+                        {log.author}
+                      </span>
+                      <span>{log.time}</span>
+                    </div>
+                    <div className="leading-relaxed">
+                      {log.message}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-3 border-t border-[#E53E3E]/20 bg-black/40 relative z-10">
+              <form onSubmit={handleSendMessage} className="flex gap-2">
+                <div className="relative flex-1">
+                  <MessageSquare className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
+                  <input 
+                    type="text" 
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Transmitir mensaje..." 
+                    className="w-full bg-[#121315] border border-white/10 rounded-lg py-2 pl-8 pr-3 text-[10px] font-mono text-white placeholder-white/30 focus:outline-none focus:border-[#E53E3E]/50 transition-colors uppercase"
+                  />
+                </div>
+                <button 
+                  type="submit"
+                  disabled={!chatInput.trim()}
+                  className="bg-[#E53E3E] hover:bg-red-500 disabled:opacity-50 disabled:bg-neutral-800 text-white p-2 rounded-lg transition-colors border border-transparent disabled:border-white/10 cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </GalaxyFrame>
   );
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, ShoppingBag, Clock, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAudioEngine } from '../hooks/useAudioEngine';
+import { GalaxyFrame } from './CanView';
 
 const PHANTOM_COIN_ASSET = "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/Phantom%20Coin.png";
 const GD_COIN_ASSET = "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Monedas%20y%20Recursos/GD%20Coin.png";
@@ -84,7 +85,6 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
     let loadedItems: PhantomBlueprint[] = [];
 
     try {
-      // 1. Lectura principal desde phantom_rotation_config
       const { data: allLists, error: listErr } = await supabase
         .from('phantom_rotation_config')
         .select('*');
@@ -117,7 +117,6 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
         }
       }
 
-      // 2. Lectura secundaria desde sasori_game_hud
       if (loadedItems.length === 0) {
         const { data: hudData } = await supabase
           .from('sasori_game_hud')
@@ -143,14 +142,12 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
         }
       }
 
-      // 3. Fallback de respaldo para evitar tienda vacía
       if (loadedItems.length === 0) {
         loadedItems = EMERGENCY_FALLBACK_ITEMS;
       }
 
       setBlueprints(loadedItems);
 
-      // Cargar frecuencia de rotación
       const { data: timerData } = await supabase
         .from('sasori_game_hud')
         .select('config')
@@ -235,7 +232,7 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto bg-[#080b0e] border border-cyan-500/30 p-3 rounded-2xl shadow-2xl relative overflow-hidden font-mono text-left select-none text-white">
+    <GalaxyFrame className="w-full max-w-7xl mx-auto my-2 font-mono text-left select-none text-white" innerPadding="p-4 sm:p-5">
       <div className="w-full flex flex-col lg:flex-row gap-3 items-stretch">
         
         {/* HERO POSTER */}
@@ -371,7 +368,7 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
         </div>
 
       </div>
-    </div>
+    </GalaxyFrame>
   );
 };
 

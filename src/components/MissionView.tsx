@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Target, CheckCircle2, Clock } from 'lucide-react';
+import { GalaxyFrame } from './CanView';
 
 export type MissionType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'EVENT' | 'LIMITED' | 'FLEET' | 'CLAN';
 
@@ -42,13 +43,7 @@ export const MissionView: React.FC<MissionViewProps> = ({
   };
 
   return (
-    <motion.div
-      key="sector-mission-page"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      className="w-full bg-[#080b0e] border border-cyan-500/30 p-6 sm:p-8 rounded-2xl font-mono text-left space-y-6 backdrop-blur-md shadow-2xl relative overflow-hidden text-white"
-    >
+    <GalaxyFrame className="w-full max-w-7xl mx-auto my-2 font-mono text-left space-y-6 backdrop-blur-md relative overflow-hidden text-white" innerPadding="p-6 sm:p-8">
       <div className="flex justify-between items-center border-b border-cyan-900/50 pb-4">
         <div className="flex items-center gap-3">
           <Target className="w-7 h-7 text-cyan-400 animate-pulse" />
@@ -66,7 +61,7 @@ export const MissionView: React.FC<MissionViewProps> = ({
         </span>
       </div>
 
-      <div className="flex items-center gap-2 overflow-x-auto scrollbar-none border-b border-cyan-950 pb-3 text-[9px] uppercase font-bold tracking-wider">
+      <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar border-b border-cyan-950 pb-3 text-[9px] uppercase font-bold tracking-wider">
         {(['DAILY', 'WEEKLY', 'MONTHLY', 'EVENT', 'LIMITED', 'FLEET', 'CLAN'] as MissionType[]).map((type) => (
           <button
             key={type}
@@ -84,7 +79,7 @@ export const MissionView: React.FC<MissionViewProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-1 custom-scrollbar">
         {missions.filter(m => m.type === activeMissionType).length === 0 ? (
-          <div className="col-span-2 p-12 text-center text-zinc-600 text-[10px] uppercase tracking-widest">
+          <div className="col-span-2 p-12 text-center text-zinc-600 text-[10px] uppercase tracking-widest bg-black/40 border border-cyan-950 rounded-xl">
             NO HAY MISIONES DISPONIBLES EN ESTA CATEGORÍA
           </div>
         ) : (
@@ -133,7 +128,7 @@ export const MissionView: React.FC<MissionViewProps> = ({
           })
         )}
       </div>
-    </motion.div>
+    </GalaxyFrame>
   );
 };
 

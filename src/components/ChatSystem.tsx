@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { chatService, ChatMessage } from '../services/chatService';
+import { GalaxyFrame } from './CanView';
 
 interface ChatSystemProps {
   userAllianceName?: string;
@@ -340,219 +341,223 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="w-[calc(100vw-2rem)] max-w-[360px] sm:max-w-[460px] h-[520px] max-h-[85dvh] bg-[#06080b]/95 border-2 border-cyan-500/40 rounded-2xl shadow-[0_0_40px_rgba(6,182,212,0.25)] backdrop-blur-xl flex flex-col overflow-hidden text-left"
+            className="w-[calc(100vw-2rem)] max-w-[360px] sm:max-w-[460px] h-[520px] max-h-[85dvh]"
           >
-            <div className="flex items-center justify-between px-3 py-2 bg-black/90 border-b border-cyan-900/50 font-mono text-[8.5px] uppercase font-bold shrink-0">
-              <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
-                {availableChannels.map((ch) => {
-                  const Icon = ch.icon;
-                  return (
-                    <button
-                      key={ch.id}
-                      onClick={() => setActiveChannel(ch.id as ChannelType)}
-                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer shrink-0 border ${
-                        activeChannel === ch.id
-                          ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black shadow-[0_0_10px_rgba(6,182,212,0.3)]'
-                          : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:bg-white/5'
-                      }`}
-                    >
-                      <Icon className="w-3.5 h-3.5" />
-                      <span>{ch.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1 text-zinc-400 hover:text-red-400 hover:bg-red-950/40 border border-transparent hover:border-red-500/30 rounded-lg transition-colors cursor-pointer shrink-0 ml-1"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {activeChannel === 'PRIVADO' && activeDmPartner ? (
-              <div className="px-3 py-1.5 bg-cyan-950/40 border-b border-cyan-500/30 flex items-center justify-between font-mono shrink-0">
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setActiveDmPartner(null)} className="p-1 text-cyan-400 hover:text-white bg-black/60 rounded border border-cyan-950 cursor-pointer">
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                  </button>
-                  <div className="w-5 h-5 rounded-full border border-cyan-400 overflow-hidden shrink-0">
-                    <img 
-                      src={resolveAvatarUrl(profilesMap[activeDmPartner.id]?.avatar_url || activeDmPartner.avatar)} 
-                      alt={activeDmPartner.name} 
-                      className="w-full h-full object-cover" 
-                    />
-                  </div>
-                  <div className="flex flex-col text-left">
-                    <span className="text-[9px] font-bold text-white uppercase">
-                      {profilesMap[activeDmPartner.id]?.username || activeDmPartner.name}
-                    </span>
-                    <span className="text-[7px] text-cyan-400 uppercase font-mono">CANAL PRIVADO SEGURO</span>
-                  </div>
-                </div>
-                <span className="text-[7.5px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 rounded uppercase font-bold">
-                  EN LÍNEA
-                </span>
-              </div>
-            ) : (
-              <div className="px-3 py-1.5 bg-black/40 border-b border-cyan-950/60 relative shrink-0">
-                <Search className="absolute left-5 top-2.5 w-3 h-3 text-cyan-600" />
-                <input
-                  type="text"
-                  placeholder={activeChannel === 'PRIVADO' ? "BUSCAR PILOTO PARA DM..." : "FILTRAR TRANSMISIONES O COMANDANTES..."}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-black/80 border border-cyan-950 rounded pl-7 pr-3 py-1 text-[8px] font-mono text-cyan-200 placeholder-zinc-600 outline-none uppercase"
-                />
-              </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto p-3 space-y-3 font-mono text-[9.5px] scrollbar-thin scrollbar-thumb-cyan-950">
-              {activeChannel === 'PRIVADO' && !activeDmPartner ? (
-                <div className="space-y-2">
-                  <span className="text-[8px] font-mono text-cyan-400 uppercase tracking-widest block font-bold border-b border-cyan-950 pb-1">
-                    CONVERSACIONES PRIVADAS RECIENTES
-                  </span>
-                  {recentDmPartners.length === 0 ? (
-                    <div className="text-center text-zinc-600 uppercase text-[8px] py-12 tracking-widest">NO TIENES CONVERSACIONES PRIVADAS ACTIVAS</div>
-                  ) : (
-                    recentDmPartners.map((partner) => {
-                      const partnerProf = profilesMap[partner.id];
-                      const realPartnerAvatar = resolveAvatarUrl(partnerProf?.avatar_url || partner.avatar);
-                      const realPartnerName = partnerProf?.username || partner.name;
-
+            <GalaxyFrame className="w-full h-full overflow-hidden text-left" innerPadding="p-0">
+              <div className="flex flex-col h-full w-full overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 bg-black/90 border-b border-cyan-900/50 font-mono text-[8.5px] uppercase font-bold shrink-0">
+                  <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
+                    {availableChannels.map((ch) => {
+                      const Icon = ch.icon;
                       return (
-                        <div key={partner.id} onClick={() => handleStartPrivateChat(partner)} className="p-2.5 bg-black/60 hover:bg-cyan-950/50 border border-cyan-950 hover:border-cyan-500/40 rounded-xl flex items-center justify-between cursor-pointer transition-colors group">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full border border-cyan-400/60 overflow-hidden shrink-0 bg-neutral-900">
-                              <img src={realPartnerAvatar} alt={realPartnerName} className="w-full h-full object-cover" />
-                            </div>
-                            <div className="flex flex-col text-left">
-                              <span className="text-white font-bold uppercase group-hover:text-cyan-300 text-[9.5px]">{realPartnerName}</span>
-                              <span className="text-zinc-500 text-[7.5px] uppercase">{partnerProf?.role || partner.role || 'COMANDANTE'}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <button onClick={() => handleStartPrivateChat(partner)} className="px-2.5 py-1 bg-cyan-950 group-hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 text-[7.5px] font-bold uppercase rounded cursor-pointer">
-                              ABRIR DM
-                            </button>
-                            <button onClick={(e) => handleDeleteDmConversation(partner.id, partner.name, e)} className="p-1 bg-red-950/40 hover:bg-red-600 border border-red-500/40 text-red-400 hover:text-white rounded cursor-pointer transition-colors">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
+                        <button
+                          key={ch.id}
+                          onClick={() => setActiveChannel(ch.id as ChannelType)}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer shrink-0 border ${
+                            activeChannel === ch.id
+                              ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black shadow-[0_0_10px_rgba(6,182,212,0.3)]'
+                              : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:bg-white/5'
+                          }`}
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                          <span>{ch.label}</span>
+                        </button>
                       );
-                    })
-                  )}
+                    })}
+                  </div>
+                  <button
+                    onClick={() => setIsOpen(false)}
+                    className="p-1 text-zinc-400 hover:text-red-400 hover:bg-red-950/40 border border-transparent hover:border-red-500/30 rounded-lg transition-colors cursor-pointer shrink-0 ml-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-              ) : (
-                filteredMessages.length === 0 ? (
-                  <div className="text-center text-zinc-600 uppercase text-[8px] py-12 tracking-widest">
-                    {activeChannel === 'PRIVADO' ? 'INICIA LA TRANSMISIÓN PRIVADA CON ESTE PILOTO' : 'SIN TRANSMISIONES ACTIVAS EN ESTE CANAL'}
+
+                {activeChannel === 'PRIVADO' && activeDmPartner ? (
+                  <div className="px-3 py-1.5 bg-cyan-950/40 border-b border-cyan-500/30 flex items-center justify-between font-mono shrink-0">
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setActiveDmPartner(null)} className="p-1 text-cyan-400 hover:text-white bg-black/60 rounded border border-cyan-950 cursor-pointer">
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="w-5 h-5 rounded-full border border-cyan-400 overflow-hidden shrink-0">
+                        <img 
+                          src={resolveAvatarUrl(profilesMap[activeDmPartner.id]?.avatar_url || activeDmPartner.avatar)} 
+                          alt={activeDmPartner.name} 
+                          className="w-full h-full object-cover" 
+                        />
+                      </div>
+                      <div className="flex flex-col text-left">
+                        <span className="text-[9px] font-bold text-white uppercase">
+                          {profilesMap[activeDmPartner.id]?.username || activeDmPartner.name}
+                        </span>
+                        <span className="text-[7px] text-cyan-400 uppercase font-mono">CANAL PRIVADO SEGURO</span>
+                      </div>
+                    </div>
+                    <span className="text-[7.5px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 rounded uppercase font-bold">
+                      EN LÍNEA
+                    </span>
                   </div>
                 ) : (
-                  filteredMessages.map((msg) => {
-                    const userProf = profilesMap[msg.user_id];
-                    const realAvatar = resolveAvatarUrl(userProf?.avatar_url || msg.user_avatar);
-                    const realName = userProf?.username || msg.user_name;
-                    const realRole = userProf?.role || msg.user_role;
+                  <div className="px-3 py-1.5 bg-black/40 border-b border-cyan-950/60 relative shrink-0">
+                    <Search className="absolute left-5 top-2.5 w-3 h-3 text-cyan-600" />
+                    <input
+                      type="text"
+                      placeholder={activeChannel === 'PRIVADO' ? "BUSCAR PILOTO PARA DM..." : "FILTRAR TRANSMISIONES O COMANDANTES..."}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-black/80 border border-cyan-950 rounded pl-7 pr-3 py-1 text-[8px] font-mono text-cyan-200 placeholder-zinc-600 outline-none uppercase"
+                    />
+                  </div>
+                )}
 
-                    return (
-                      <div key={msg.id} className="flex gap-2.5 items-start group text-left relative">
-                        <div className="w-7 h-7 rounded-full border border-cyan-500/40 bg-neutral-900 overflow-hidden shrink-0 mt-0.5 shadow">
-                          <img src={realAvatar} alt={realName} className="w-full h-full object-cover" />
-                        </div>
-                        <div className="flex-1 overflow-hidden">
-                          <div className="flex items-center justify-between gap-1 mb-0.5">
-                            <div className="flex items-center gap-1.5">
-                              <span onClick={() => setActiveUserMenu(activeUserMenu === msg.id ? null : msg.id)} className="font-bold text-white hover:text-cyan-300 cursor-pointer uppercase text-[9px] transition-colors">
-                                {realName}
-                              </span>
-                              <span className="text-[7px] bg-cyan-950 text-cyan-400 border border-cyan-800/40 px-1 rounded font-black uppercase">
-                                {realRole}
-                              </span>
-                            </div>
-                            <span className="text-[7.5px] text-zinc-600">
-                              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
+                <div className="flex-1 overflow-y-auto p-3 space-y-3 font-mono text-[9.5px] custom-scrollbar">
+                  {activeChannel === 'PRIVADO' && !activeDmPartner ? (
+                    <div className="space-y-2">
+                      <span className="text-[8px] font-mono text-cyan-400 uppercase tracking-widest block font-bold border-b border-cyan-950 pb-1">
+                        CONVERSACIONES PRIVADAS RECIENTES
+                      </span>
+                      {recentDmPartners.length === 0 ? (
+                        <div className="text-center text-zinc-600 uppercase text-[8px] py-12 tracking-widest">NO TIENES CONVERSACIONES PRIVADAS ACTIVAS</div>
+                      ) : (
+                        recentDmPartners.map((partner) => {
+                          const partnerProf = profilesMap[partner.id];
+                          const realPartnerAvatar = resolveAvatarUrl(partnerProf?.avatar_url || partner.avatar);
+                          const realPartnerName = partnerProf?.username || partner.name;
 
-                          {msg.message_type === 'SYSTEM' ? (
-                            <div className="p-2 bg-red-950/20 border border-red-500/30 text-red-300 rounded text-[8.5px] font-bold uppercase">
-                              📢 {msg.content}
-                            </div>
-                          ) : (
-                            <p className="text-zinc-300 leading-relaxed break-words">{msg.content}</p>
-                          )}
-                        </div>
-
-                        {activeUserMenu === msg.id && (
-                          <div className="absolute right-0 top-6 bg-[#0c1017] border border-cyan-500/50 rounded-xl shadow-2xl p-1.5 z-50 flex flex-col gap-1 text-[8.5px] font-mono uppercase backdrop-blur-md">
-                            <button onClick={() => handleMentionUser(realName)} className="px-2.5 py-1.5 hover:bg-cyan-950 text-cyan-300 rounded-lg flex items-center gap-2 text-left cursor-pointer transition-colors">
-                              <AtSign className="w-3.5 h-3.5 text-cyan-400" /> MENCIONAR
-                            </button>
-                            
-                            {msg.user_id !== currentUserId && (
-                              <button onClick={() => handleStartPrivateChat({ id: msg.user_id, name: realName, avatar: realAvatar, role: realRole })} className="px-2.5 py-1.5 hover:bg-cyan-950 text-emerald-400 rounded-lg flex items-center gap-2 text-left cursor-pointer font-bold transition-colors">
-                                <MessageCircle className="w-3.5 h-3.5 text-emerald-400" /> MENSAJE PRIVADO
-                              </button>
-                            )}
-
-                            <button onClick={() => handleDeleteMessage(msg.id)} className="px-2.5 py-1.5 hover:bg-red-950/80 text-red-400 rounded-lg flex items-center gap-2 text-left cursor-pointer font-bold transition-colors">
-                              <Trash2 className="w-3.5 h-3.5 text-red-400" /> BORRAR MENSAJE
-                            </button>
-
-                            {msg.user_id !== currentUserId && (
-                              <>
-                                <button onClick={() => handleBlockUser(msg.user_id, realName)} className="px-2.5 py-1.5 hover:bg-red-950/80 text-red-400 rounded-lg flex items-center gap-2 text-left cursor-pointer transition-colors">
-                                  <Ban className="w-3.5 h-3.5 text-red-400" /> BLOQUEAR
+                          return (
+                            <div key={partner.id} onClick={() => handleStartPrivateChat(partner)} className="p-2.5 bg-black/60 hover:bg-cyan-950/50 border border-cyan-950 hover:border-cyan-500/40 rounded-xl flex items-center justify-between cursor-pointer transition-colors group">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full border border-cyan-400/60 overflow-hidden shrink-0 bg-neutral-900">
+                                  <img src={realPartnerAvatar} alt={realPartnerName} className="w-full h-full object-cover" />
+                                </div>
+                                <div className="flex flex-col text-left">
+                                  <span className="text-white font-bold uppercase group-hover:text-cyan-300 text-[9.5px]">{realPartnerName}</span>
+                                  <span className="text-zinc-500 text-[7.5px] uppercase">{partnerProf?.role || partner.role || 'COMANDANTE'}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <button onClick={() => handleStartPrivateChat(partner)} className="px-2.5 py-1 bg-cyan-950 group-hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 text-[7.5px] font-bold uppercase rounded cursor-pointer">
+                                  ABRIR DM
                                 </button>
-                                <button onClick={() => handleReportUser(msg.user_id, realName)} className="px-2.5 py-1.5 hover:bg-amber-950/80 text-amber-400 rounded-lg flex items-center gap-2 text-left cursor-pointer transition-colors">
-                                  <Flag className="w-3.5 h-3.5 text-amber-400" /> REPORTAR USUARIO
+                                <button onClick={(e) => handleDeleteDmConversation(partner.id, partner.name, e)} className="p-1 bg-red-950/40 hover:bg-red-600 border border-red-500/40 text-red-400 hover:text-white rounded cursor-pointer transition-colors">
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 </button>
-                              </>
-                            )}
-                          </div>
-                        )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  ) : (
+                    filteredMessages.length === 0 ? (
+                      <div className="text-center text-zinc-600 uppercase text-[8px] py-12 tracking-widest">
+                        {activeChannel === 'PRIVADO' ? 'INICIA LA TRANSMISIÓN PRIVADA CON ESTE PILOTO' : 'SIN TRANSMISIONES ACTIVAS EN ESTE CANAL'}
                       </div>
-                    );
-                  })
-                )
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+                    ) : (
+                      filteredMessages.map((msg) => {
+                        const userProf = profilesMap[msg.user_id];
+                        const realAvatar = resolveAvatarUrl(userProf?.avatar_url || msg.user_avatar);
+                        const realName = userProf?.username || msg.user_name;
+                        const realRole = userProf?.role || msg.user_role;
 
-            <AnimatePresence>
-              {showEmojiPicker && (
-                <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }} className="p-2.5 bg-neutral-950/95 border-t border-cyan-500/40 grid grid-cols-8 gap-1.5 text-center text-sm font-mono backdrop-blur-md relative z-40 shrink-0">
-                  {QUICK_EMOJIS.map((emoji) => (
-                    <button key={emoji} type="button" onClick={() => handleAddEmoji(emoji)} className="p-1.5 hover:bg-cyan-950/80 rounded border border-transparent hover:border-cyan-500/40 cursor-pointer transition-all hover:scale-110">
-                      {emoji}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
+                        return (
+                          <div key={msg.id} className="flex gap-2.5 items-start group text-left relative">
+                            <div className="w-7 h-7 rounded-full border border-cyan-500/40 bg-neutral-900 overflow-hidden shrink-0 mt-0.5 shadow">
+                              <img src={realAvatar} alt={realName} className="w-full h-full object-cover" />
+                            </div>
+                            <div className="flex-1 overflow-hidden">
+                              <div className="flex items-center justify-between gap-1 mb-0.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span onClick={() => setActiveUserMenu(activeUserMenu === msg.id ? null : msg.id)} className="font-bold text-white hover:text-cyan-300 cursor-pointer uppercase text-[9px] transition-colors">
+                                    {realName}
+                                  </span>
+                                  <span className="text-[7px] bg-cyan-950 text-cyan-400 border border-cyan-800/40 px-1 rounded font-black uppercase">
+                                    {realRole}
+                                  </span>
+                                </div>
+                                <span className="text-[7.5px] text-zinc-600">
+                                  {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
 
-            <form onSubmit={handleSend} className="p-2.5 bg-black/90 border-t border-cyan-900/50 flex items-center gap-2 shrink-0">
-              <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={`p-2 rounded-lg border transition-colors cursor-pointer ${showEmojiPicker ? 'bg-cyan-950 text-cyan-300 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-neutral-900 hover:bg-cyan-950/80 border-cyan-900/60 hover:border-cyan-500/50 text-cyan-400'}`}>
-                <Smile className="w-4 h-4" />
-              </button>
+                              {msg.message_type === 'SYSTEM' ? (
+                                <div className="p-2 bg-red-950/20 border border-red-500/30 text-red-300 rounded text-[8.5px] font-bold uppercase">
+                                  📢 {msg.content}
+                                </div>
+                              ) : (
+                                <p className="text-zinc-300 leading-relaxed break-words">{msg.content}</p>
+                              )}
+                            </div>
 
-              <input
-                ref={inputRef}
-                type="text"
-                placeholder={activeChannel === 'PRIVADO' ? activeDmPartner ? `DM A @${profilesMap[activeDmPartner.id]?.username || activeDmPartner.name}...` : "SELECCIONA UN PILOTO..." : `TRANSMITIR A #${activeChannel.toLowerCase()}...`}
-                value={inputContent}
-                onChange={(e) => setInputContent(e.target.value)}
-                disabled={activeChannel === 'PRIVADO' && !activeDmPartner}
-                className="flex-1 bg-black border border-cyan-950 focus:border-cyan-500 disabled:opacity-50 rounded-lg px-3 py-2 text-[9px] font-mono text-cyan-200 placeholder-zinc-600 outline-none uppercase"
-              />
+                            {activeUserMenu === msg.id && (
+                              <div className="absolute right-0 top-6 bg-[#0c1017] border border-cyan-500/50 rounded-xl shadow-2xl p-1.5 z-50 flex flex-col gap-1 text-[8.5px] font-mono uppercase backdrop-blur-md">
+                                <button onClick={() => handleMentionUser(realName)} className="px-2.5 py-1.5 hover:bg-cyan-950 text-cyan-300 rounded-lg flex items-center gap-2 text-left cursor-pointer transition-colors">
+                                  <AtSign className="w-3.5 h-3.5 text-cyan-400" /> MENCIONAR
+                                </button>
+                                
+                                {msg.user_id !== currentUserId && (
+                                  <button onClick={() => handleStartPrivateChat({ id: msg.user_id, name: realName, avatar: realAvatar, role: realRole })} className="px-2.5 py-1.5 hover:bg-cyan-950 text-emerald-400 rounded-lg flex items-center gap-2 text-left cursor-pointer font-bold transition-colors">
+                                    <MessageCircle className="w-3.5 h-3.5 text-emerald-400" /> MENSAJE PRIVADO
+                                  </button>
+                                )}
 
-              <button type="submit" disabled={activeChannel === 'PRIVADO' && !activeDmPartner} className="p-2 bg-gradient-to-br from-cyan-600 to-teal-700 hover:brightness-110 disabled:opacity-50 text-white rounded-lg cursor-pointer transition-all shadow-[0_0_10px_rgba(6,182,212,0.4)]">
-                <Send className="w-4 h-4" />
-              </button>
-            </form>
+                                <button onClick={() => handleDeleteMessage(msg.id)} className="px-2.5 py-1.5 hover:bg-red-950/80 text-red-400 rounded-lg flex items-center gap-2 text-left cursor-pointer font-bold transition-colors">
+                                  <Trash2 className="w-3.5 h-3.5 text-red-400" /> BORRAR MENSAJE
+                                </button>
+
+                                {msg.user_id !== currentUserId && (
+                                  <>
+                                    <button onClick={() => handleBlockUser(msg.user_id, realName)} className="px-2.5 py-1.5 hover:bg-red-950/80 text-red-400 rounded-lg flex items-center gap-2 text-left cursor-pointer transition-colors">
+                                      <Ban className="w-3.5 h-3.5 text-red-400" /> BLOQUEAR
+                                    </button>
+                                    <button onClick={() => handleReportUser(msg.user_id, realName)} className="px-2.5 py-1.5 hover:bg-amber-950/80 text-amber-400 rounded-lg flex items-center gap-2 text-left cursor-pointer transition-colors">
+                                      <Flag className="w-3.5 h-3.5 text-amber-400" /> REPORTAR USUARIO
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                <AnimatePresence>
+                  {showEmojiPicker && (
+                    <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }} className="p-2.5 bg-neutral-950/95 border-t border-cyan-500/40 grid grid-cols-8 gap-1.5 text-center text-sm font-mono backdrop-blur-md relative z-40 shrink-0">
+                      {QUICK_EMOJIS.map((emoji) => (
+                        <button key={emoji} type="button" onClick={() => handleAddEmoji(emoji)} className="p-1.5 hover:bg-cyan-950/80 rounded border border-transparent hover:border-cyan-500/40 cursor-pointer transition-all hover:scale-110">
+                          {emoji}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <form onSubmit={handleSend} className="p-2.5 bg-black/90 border-t border-cyan-900/50 flex items-center gap-2 shrink-0">
+                  <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={`p-2 rounded-lg border transition-colors cursor-pointer ${showEmojiPicker ? 'bg-cyan-950 text-cyan-300 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-neutral-900 hover:bg-cyan-950/80 border-cyan-900/60 hover:border-cyan-500/50 text-cyan-400'}`}>
+                    <Smile className="w-4 h-4" />
+                  </button>
+
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    placeholder={activeChannel === 'PRIVADO' ? activeDmPartner ? `DM A @${profilesMap[activeDmPartner.id]?.username || activeDmPartner.name}...` : "SELECCIONA UN PILOTO..." : `TRANSMITIR A #${activeChannel.toLowerCase()}...`}
+                    value={inputContent}
+                    onChange={(e) => setInputContent(e.target.value)}
+                    disabled={activeChannel === 'PRIVADO' && !activeDmPartner}
+                    className="flex-1 bg-black border border-cyan-950 focus:border-cyan-500 disabled:opacity-50 rounded-lg px-3 py-2 text-[9px] font-mono text-cyan-200 placeholder-zinc-600 outline-none uppercase"
+                  />
+
+                  <button type="submit" disabled={activeChannel === 'PRIVADO' && !activeDmPartner} className="p-2 bg-gradient-to-br from-cyan-600 to-teal-700 hover:brightness-110 disabled:opacity-50 text-white rounded-lg cursor-pointer transition-all shadow-[0_0_10px_rgba(6,182,212,0.4)]">
+                    <Send className="w-4 h-4" />
+                  </button>
+                </form>
+              </div>
+            </GalaxyFrame>
           </motion.div>
         )}
       </AnimatePresence>

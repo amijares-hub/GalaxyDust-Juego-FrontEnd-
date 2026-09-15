@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { X, ShieldAlert, Sparkles, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { GalaxyFrame } from './CanView';
 
 export interface CanAssetItem {
   id: string;
@@ -97,7 +98,7 @@ export const CanAssetsModal: React.FC<CanAssetsModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[150] flex items-center justify-center p-2 sm:p-4 font-mono select-none text-white overflow-hidden">
-      <div className="w-full max-w-xl sm:max-w-2xl lg:max-w-3xl my-auto max-h-[88vh] bg-[#080b0e] border border-cyan-500/40 rounded-xl sm:rounded-2xl shadow-[0_0_40px_rgba(6,182,212,0.2)] flex flex-col overflow-hidden">
+      <GalaxyFrame className="w-full max-w-xl sm:max-w-2xl lg:max-w-3xl my-auto max-h-[88vh] flex flex-col overflow-hidden shadow-[0_0_40px_rgba(6,182,212,0.2)]" innerPadding="p-0">
         
         {/* CABECERA */}
         <div className="bg-[#05070a] border-b border-cyan-950 p-3 sm:p-4 flex justify-between items-center shrink-0">
@@ -187,7 +188,7 @@ export const CanAssetsModal: React.FC<CanAssetsModalProps> = ({
           </button>
         </div>
 
-      </div>
+      </GalaxyFrame>
     </div>
   );
 };

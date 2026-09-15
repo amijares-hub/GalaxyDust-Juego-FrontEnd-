@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, AlertCircle, RefreshCw, ShieldCheck, KeyRound, Calendar, CheckSquare, Square, MailCheck, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { GalaxyFrame } from './CanView';
 
 export const AuthView: React.FC = () => {
   const {
@@ -152,7 +153,6 @@ export const AuthView: React.FC = () => {
           name: cleanEmail.split('@')[0]
         } as any);
 
-        // Desplegar pop-up de confirmación si no hubo errores
         if (!errorMessage) {
           setIsRegisteredSuccess(true);
           setCountdown(10);
@@ -189,7 +189,7 @@ export const AuthView: React.FC = () => {
         <div className="absolute bottom-[-100px] right-[-100px] w-[500px] h-[500px] bg-[#111214] rounded-full blur-[140px]" />
       </div>
 
-      <div className="relative z-10 w-full max-w-sm px-6">
+      <div className="relative z-10 w-full max-w-sm px-4">
 
         {/* ─── LOGO Y TÍTULO ─── */}
         <div className="flex flex-col items-center mb-6">
@@ -201,8 +201,7 @@ export const AuthView: React.FC = () => {
           <h1 className="text-xl font-black uppercase tracking-[0.4em] text-white">GALAXYDUST</h1>
         </div>
 
-        <div className="bg-[#121315]/90 border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-2xl relative overflow-hidden">
-
+        <GalaxyFrame className="w-full rounded-2xl shadow-2xl overflow-hidden" innerPadding="p-6">
           <AnimatePresence mode="wait">
 
             {/* ─── FASE 0: POP-UP DE VERIFICACIÓN DE CORREO ─── */}
@@ -281,7 +280,7 @@ export const AuthView: React.FC = () => {
                   <div className="absolute bottom-0 w-full h-[1px] bg-white/10 -z-10" />
                 </div>
 
-                <form onSubmit={handleFormSubmit} className="flex flex-col gap-3.5">
+                <form onSubmit={handleFormSubmit} className="flex flex-col gap-3.5 text-left">
                   <div className="flex flex-col gap-1">
                     <label className="text-[9px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium ml-1">Correo Electrónico</label>
                     <div className="relative">
@@ -472,8 +471,8 @@ export const AuthView: React.FC = () => {
             )}
 
           </AnimatePresence>
+        </GalaxyFrame>
 
-        </div>
       </div>
     </div>
   );

@@ -38,6 +38,34 @@ interface DiscoveredStar {
   discovered_at: string;
 }
 
+const GALAXY_FRAME_PNG = "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Bordes,%20Frames/galaxy_dust_frame_clean.png";
+
+// 🖼️ MARCO SCI-FI NÍTIDO: 12px DE GROSOR, SIN DESENFOQUE Y CON MARGEN INTERNO DE SEGURIDAD
+export const GalaxyFrame: React.FC<{ children: React.ReactNode; className?: string; innerPadding?: string }> = ({
+  children,
+  className = "",
+  innerPadding = "p-4"
+}) => {
+  return (
+    <div className={`relative bg-[#05080d]/95 ${className}`}>
+      <div
+        className="absolute inset-0 pointer-events-none z-30"
+        style={{
+          borderStyle: 'solid',
+          borderWidth: '12px',
+          borderImageSource: `url("${GALAXY_FRAME_PNG}")`,
+          borderImageSlice: '120',
+          borderImageRepeat: 'stretch',
+          mixBlendMode: 'screen'
+        }}
+      />
+      <div className={`relative z-20 h-full w-full ${innerPadding}`}>
+        {children}
+      </div>
+    </div>
+  );
+};
+
 const SKILLS_PER_PAGE = 5;
 
 export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
@@ -57,25 +85,13 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
   const [skillsModalFilter, setSkillsModalFilter] = useState<'ALL' | 'CAN' | 'STRUCTURE' | 'TECH' | 'BADGE'>('ALL');
   const [skillsPage, setSkillsPage] = useState<number>(1);
 
-  // Estado Ticker HUD
   const [hoveredSkill, setHoveredSkill] = useState<ActiveSkillItem | null>(null);
-
-  // Vuelos activos
   const [activeFlightsCount, setActiveFlightsCount] = useState<number>(0);
-
-  // Lista unificada de activos C.A.N.
   const [canAssetsList, setCanAssetsList] = useState<CanAssetItem[]>([]);
-
-  // Conteo de estrellas mapeadas
   const [totalDiscoveredStars, setTotalDiscoveredStars] = useState<number>(0);
-
-  // Habilidades activas
   const [activeSkills, setActiveSkills] = useState<ActiveSkillItem[]>([]);
-
-  // Historial cartográfico A.M.I.
   const [discoveredStars, setDiscoveredStars] = useState<DiscoveredStar[]>([]);
 
-  // Producción real calculada dinámicamente
   const [dailyProduction, setDailyProduction] = useState({
     metal: 0,
     crystal: 0,
@@ -530,14 +546,14 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
               key={sk.id}
               onMouseEnter={() => setHoveredSkill(sk)}
               onClick={() => setHoveredSkill(sk)}
-              className={`relative cursor-pointer w-6 h-6 sm:w-7 sm:h-7 rounded-lg border flex items-center justify-center transition-all duration-200 shrink-0 ${
+              className={`relative cursor-pointer w-6 h-6 sm:w-7 sm:h-7 rounded-md border flex items-center justify-center transition-all duration-200 shrink-0 ${
                 isCanon
-                  ? 'bg-cyan-950/80 border-cyan-400/80 shadow-[0_0_8px_rgba(6,182,212,0.3)]'
+                  ? 'bg-cyan-950/80 border-cyan-400/80 shadow-[0_0_6px_rgba(6,182,212,0.3)]'
                   : isStruct
-                  ? 'bg-amber-950/40 border-amber-500/60 shadow-[0_0_8px_rgba(245,158,11,0.2)]'
+                  ? 'bg-amber-950/40 border-amber-500/60 shadow-[0_0_6px_rgba(245,158,11,0.2)]'
                   : isTech
-                  ? 'bg-purple-950/40 border-purple-500/60 shadow-[0_0_8px_rgba(168,85,247,0.2)]'
-                  : 'bg-emerald-950/40 border-emerald-500/60 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
+                  ? 'bg-purple-950/40 border-purple-500/60 shadow-[0_0_6px_rgba(168,85,247,0.2)]'
+                  : 'bg-emerald-950/40 border-emerald-500/60 shadow-[0_0_6px_rgba(16,185,129,0.2)]'
               } hover:scale-110 active:scale-95`}
             >
               {icon}
@@ -573,510 +589,510 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto bg-[#080b0e] border border-cyan-500/30 p-3 sm:p-5 rounded-xl sm:rounded-2xl shadow-2xl font-mono text-left select-none space-y-3.5 backdrop-blur-md relative overflow-x-hidden text-white">
-      
-      {/* HEADER DE C.A.N. STATION */}
-      <div className="flex justify-between items-center border-b border-cyan-900/50 pb-2.5 gap-2">
-        <div className="flex items-center gap-2">
-          <div>
-            <span className="text-[8px] sm:text-[8.5px] font-mono text-cyan-400 tracking-widest block font-bold uppercase">
-              COMMAND ACTION NODE
-            </span>
-            <h2 className="text-sm sm:text-base font-black tracking-widest text-white uppercase">
-              C.A.N. STATION
-            </h2>
-          </div>
-        </div>
-      </div>
-
-      {/* BANNER DE RESTRICCIÓN DE VUELO */}
-      {activeFlightsCount > 0 && (
-        <div className="p-2 bg-red-950/40 border border-red-500/60 rounded-xl flex items-center justify-between gap-2 text-red-300 text-[8px] sm:text-[8.5px]">
-          <div className="flex items-center gap-1.5 overflow-hidden">
-            <AlertTriangle className="w-3.5 h-3.5 text-red-400 animate-pulse shrink-0" />
-            <span className="font-bold uppercase tracking-wider truncate">
-              RESTRICCIÓN ACTIVA: {activeFlightsCount} FLOTA(S) EN VUELO. BLOQUEO TÁCTICO EN RED.
-            </span>
-          </div>
-          <span className="text-[7px] bg-red-900/80 px-2 py-0.5 rounded font-black border border-red-600 uppercase shrink-0">
-            BLOQUEADO
-          </span>
-        </div>
-      )}
-
-      {/* ESTRUCTURA PRINCIPAL */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch min-h-[340px]">
+    <GalaxyFrame className="w-full max-w-7xl mx-auto font-mono text-left select-none backdrop-blur-md relative overflow-x-hidden text-white" innerPadding="p-5">
+      <div className="space-y-3.5">
         
-        {/* COLUMNA 1: NIVEL CAN & GALACTIC POWER */}
-        <div className="lg:col-span-3 bg-black/60 border border-cyan-950 rounded-xl p-3.5 flex flex-col items-center justify-between text-center relative gap-2">
-          <span className="text-[9.5px] text-cyan-400 font-bold uppercase tracking-wider">
-            NIVEL DE C.A.N.
-          </span>
-
-          <div className="my-2 relative flex items-center justify-center">
-            <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-full border-2 border-dashed border-cyan-500/40 animate-spin-slow absolute inset-0" />
-            <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full border-2 border-cyan-400 bg-cyan-950/40 flex items-center justify-center text-2xl sm:text-3xl font-black text-white shadow-[0_0_20px_rgba(6,182,212,0.4)] relative z-10">
-              {canLevel}
+        {/* HEADER DE C.A.N. STATION */}
+        <div className="flex justify-between items-center border-b border-cyan-900/50 pb-2.5 gap-2 relative z-20">
+          <div className="flex items-center gap-2">
+            <div>
+              <span className="text-[8px] sm:text-[8.5px] font-mono text-cyan-400 tracking-widest block font-bold uppercase">
+                COMMAND ACTION NODE
+              </span>
+              <h2 className="text-sm sm:text-base font-black tracking-widest text-white uppercase">
+                C.A.N. STATION
+              </h2>
             </div>
           </div>
-
-          <div className="p-2 bg-purple-950/40 border border-purple-800 text-purple-200 text-center w-full rounded-lg mb-1">
-            <div className="text-[7px] text-zinc-400 uppercase">PODER GALÁCTICO</div>
-            <div className="text-sm sm:text-base font-black text-white">{galacticPower.toLocaleString()} <span className="text-[10px] font-bold text-purple-300">POW</span></div>
-          </div>
-
-          <button
-            onClick={handleUpgradeCan}
-            disabled={isUpgrading}
-            className="w-full py-2 bg-gradient-to-r from-cyan-600 to-teal-600 hover:brightness-110 border border-cyan-400 text-white text-[8.5px] font-black uppercase tracking-widest rounded-lg shadow-lg cursor-pointer transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
-          >
-            {isUpgrading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : 'UPGRADE NODE'}
-          </button>
         </div>
 
-        {/* COLUMNA 2: ASSETS ACTIVADOS & ACTIVE SKILLS */}
-        <div className="lg:col-span-5 flex flex-col gap-3">
-          
-          <div className="bg-black/60 border border-cyan-950 rounded-xl p-2.5 flex flex-col justify-between">
-            <span className="text-[9.5px] text-cyan-400 font-bold uppercase tracking-wider block text-center mb-2 border-b border-cyan-950 pb-1">
-              ASSETS ACTIVADOS
+        {/* BANNER DE RESTRICCIÓN DE VUELO */}
+        {activeFlightsCount > 0 && (
+          <div className="p-2 bg-red-950/40 border border-red-500/60 rounded-xl flex items-center justify-between gap-2 text-red-300 text-[8px] sm:text-[8.5px] relative z-20">
+            <div className="flex items-center gap-1.5 overflow-hidden">
+              <AlertTriangle className="w-3.5 h-3.5 text-red-400 animate-pulse shrink-0" />
+              <span className="font-bold uppercase tracking-wider truncate">
+                RESTRICCIÓN ACTIVA: {activeFlightsCount} FLOTA(S) EN VUELO. BLOQUEO TÁCTICO EN RED.
+              </span>
+            </div>
+            <span className="text-[7px] bg-red-900/80 px-2 py-0.5 rounded font-black border border-red-600 uppercase shrink-0">
+              BLOQUEADO
             </span>
-
-            {/* TRES BOTONES INTERACTIVOS */}
-            <div className="grid grid-cols-3 gap-2 items-center">
-              
-              {/* BOTÓN 1: ESTRUCTURAS */}
-              <button
-                onClick={() => { playSfx(660); setActiveModalCategory('Estructuras'); }}
-                className="bg-[#050910] border border-cyan-900 hover:border-cyan-400 transition-all rounded-lg p-2 text-center flex flex-col items-center justify-center cursor-pointer hover:scale-[1.02] active:scale-95 group shadow-md"
-              >
-                <span className="text-xs sm:text-sm font-black text-white group-hover:text-cyan-300 transition-colors">
-                  {equippedStructuresCount}
-                </span>
-                <span className="text-[7.5px] font-bold text-zinc-300 group-hover:text-cyan-400 uppercase mt-0.5">
-                  STRUCTURES
-                </span>
-              </button>
-
-              {/* BOTÓN 2: TECNOLOGÍAS */}
-              <button
-                onClick={() => { playSfx(660); setActiveModalCategory('Tecnologias'); }}
-                className="bg-[#050910] border border-cyan-900 hover:border-cyan-400 transition-all rounded-lg p-2 text-center flex flex-col items-center justify-center cursor-pointer hover:scale-[1.02] active:scale-95 group shadow-md"
-              >
-                <span className="text-xs sm:text-sm font-black text-white group-hover:text-cyan-300 transition-colors">
-                  {equippedTechCount}
-                </span>
-                <span className="text-[7.5px] font-bold text-zinc-300 group-hover:text-cyan-400 uppercase mt-0.5">
-                  TECH
-                </span>
-              </button>
-
-              {/* BOTÓN 3: INSIGNIAS */}
-              <button
-                onClick={() => { playSfx(660); setActiveModalCategory('Insignias'); }}
-                className="bg-[#050910] border border-cyan-900 hover:border-cyan-400 transition-all rounded-lg p-2 text-center flex flex-col items-center justify-center cursor-pointer hover:scale-[1.02] active:scale-95 group shadow-md"
-              >
-                <span className="text-xs sm:text-sm font-black text-cyan-300 group-hover:text-white transition-colors">
-                  {equippedBadgesCount} / 5
-                </span>
-                <span className="text-[7.5px] font-bold text-zinc-300 group-hover:text-cyan-400 uppercase mt-0.5">
-                  BADGES
-                </span>
-              </button>
-
-            </div>
           </div>
+        )}
 
-          {/* DASHBOARD DE ACTIVE SKILLS DIVIDIDO EN 3 COLUMNAS REORDENADO CON BARRA HUD INFERIOR */}
-          <div className="flex-1 bg-black/60 border border-cyan-950 rounded-xl p-2.5 flex flex-col justify-between min-h-[190px] overflow-hidden">
-            <div className="flex justify-between items-center mb-1.5 pb-1 border-b border-cyan-950">
-              <span className="text-[9.5px] text-cyan-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400" /> DASHBOARD DE ACTIVE SKILLS ({activeSkills.length})
-              </span>
-              <span className="text-[7px] bg-cyan-950 border border-cyan-800 text-cyan-300 px-1.5 py-0.5 rounded font-bold uppercase">
-                TOUCH
-              </span>
-            </div>
-
-            {/* SECCIÓN TRIPARTITA: ESTRUCTURAS | TECNOLOGÍAS | INSIGNIAS */}
-            <div className="grid grid-cols-3 gap-1.5 flex-1 min-h-[110px] overflow-hidden">
-              
-              {/* COLUMNA 1: ESTRUCTURAS */}
-              <div className="bg-[#03060a] border border-amber-500/30 rounded-lg p-1 flex flex-col justify-start overflow-hidden">
-                <div className="text-[7px] font-black text-amber-400 uppercase tracking-wider border-b border-amber-950/60 pb-0.5 mb-0.5 flex items-center justify-between shrink-0">
-                  <span>ESTRUCTURAS</span>
-                  <span className="text-zinc-500 font-bold">({structSkills.length})</span>
-                </div>
-                {renderSkillChipsSection(structSkills, "SIN ESTRUCTURAS")}
-              </div>
-
-              {/* COLUMNA 2: TECNOLOGÍAS */}
-              <div className="bg-[#03060a] border border-purple-500/30 rounded-lg p-1 flex flex-col justify-start overflow-hidden">
-                <div className="text-[7px] font-black text-purple-400 uppercase tracking-wider border-b border-purple-950/60 pb-0.5 mb-0.5 flex items-center justify-between shrink-0">
-                  <span>TECNOLOGÍAS</span>
-                  <span className="text-zinc-500 font-bold">({techSkills.length})</span>
-                </div>
-                {renderSkillChipsSection(techSkills, "SIN TECH")}
-              </div>
-
-              {/* COLUMNA 3: INSIGNIAS */}
-              <div className="bg-[#03060a] border border-emerald-500/30 rounded-lg p-1 flex flex-col justify-start overflow-hidden">
-                <div className="text-[7px] font-black text-emerald-400 uppercase tracking-wider border-b border-emerald-950/60 pb-0.5 mb-0.5 flex items-center justify-between shrink-0">
-                  <span>INSIGNIAS</span>
-                  <span className="text-zinc-500 font-bold">({badgeSkills.length})</span>
-                </div>
-                {renderSkillChipsSection(badgeSkills, "SIN INSIGNIAS")}
-              </div>
-
-            </div>
-
-            {/* BARRA TICKER HUD MUESTRA HABILIDAD EN TIEMPO REAL */}
-            <div className="mt-1.5 bg-[#020408] border border-cyan-950 p-1.5 rounded-lg flex items-center gap-1.5 text-[7.5px] font-mono shrink-0">
-              <Info className="w-3 h-3 text-cyan-400 shrink-0" />
-              {hoveredSkill ? (
-                <span className="text-cyan-200 font-bold uppercase truncate">
-                  <strong className="text-white">{hoveredSkill.assetName}:</strong> {hoveredSkill.effectDescription}
-                </span>
-              ) : (
-                <span className="text-zinc-500 uppercase truncate">
-                  TOCA UN ICONO PARA DESPLEGAR SU EFECTO TÁCTICO
-                </span>
-              )}
-            </div>
-
-            <button
-              onClick={() => { playSfx(660); setSkillsPage(1); setShowSkillsModal(true); }}
-              className="mt-1.5 w-full py-1.5 bg-gradient-to-r from-cyan-950 to-cyan-900 hover:from-cyan-900 border border-cyan-500/60 text-cyan-200 text-[8px] font-black uppercase tracking-widest rounded-lg cursor-pointer transition-colors shadow-inner flex items-center justify-center gap-1 shrink-0"
-            >
-              VER DETALLES COMPLETOS DE SKILLS
-            </button>
-          </div>
-
-        </div>
-
-        {/* COLUMNA 3: A.M.I. & STATS */}
-        <div className="lg:col-span-4 flex flex-col justify-between gap-3">
+        {/* ESTRUCTURA PRINCIPAL */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch min-h-[340px] relative z-20">
           
-          <div
-            onClick={() => { playSfx(660); setShowAmiModal(true); }}
-            className="flex-1 bg-black/80 border-2 border-cyan-500 hover:border-cyan-300 p-3.5 rounded-xl flex flex-col items-center justify-center text-center gap-1 cursor-pointer transition-all shadow-[0_0_15px_rgba(6,182,212,0.25)] hover:scale-[1.02] active:scale-95 group min-h-[100px]"
-          >
-            <Globe className="w-6 h-6 text-cyan-400 animate-pulse group-hover:scale-110 transition-transform" />
-            <div className="text-xs font-black text-white uppercase tracking-widest">A.M.I.</div>
-            <div className="text-xs font-bold text-cyan-300 mt-0.5">
-              {totalDiscoveredStars.toLocaleString()} <span className="text-[7.5px] text-cyan-500 uppercase">ESTRELLAS MAPEADAS</span>
-            </div>
-          </div>
-
-          <div
-            onClick={() => { playSfx(660); setShowStatsModal(true); }}
-            className="flex-1 bg-black/80 border-2 border-purple-500 hover:border-purple-300 p-3.5 rounded-xl flex flex-col items-center justify-center text-center gap-1 cursor-pointer transition-all shadow-[0_0_15px_rgba(168,85,247,0.25)] hover:scale-[1.02] active:scale-95 group min-h-[100px]"
-          >
-            <BarChart2 className="w-6 h-6 text-purple-400 animate-pulse group-hover:scale-110 transition-transform" />
-            <div className="text-[10.5px] font-black text-white uppercase tracking-wider">STATS & PRODUCCIÓN DIARIA</div>
-          </div>
-
-        </div>
-
-      </div>
-
-      {/* MODAL DESPLEGABLE DE ASSETS (ESTRUCTURAS, TECH, BADGES) */}
-      <CanAssetsModal
-        isOpen={activeModalCategory !== null}
-        onClose={() => setActiveModalCategory(null)}
-        category={activeModalCategory}
-        assets={canAssetsList}
-        userId={currentUserId}
-        onRefresh={fetchCanData}
-        triggerNotification={triggerNotification}
-      />
-
-      {/* MODAL 1: A.M.I. */}
-      {showAmiModal && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 font-mono text-white overflow-hidden">
-          <div className="w-full max-w-xl sm:max-w-2xl h-auto max-h-[85vh] bg-[#080b0e] border border-cyan-500/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 text-left flex flex-col gap-2.5 shadow-2xl mx-auto my-auto overflow-hidden">
-            
-            {/* CABECERA (shrink-0) */}
-            <div className="flex justify-between items-center border-b border-cyan-950 pb-2 shrink-0">
-              <div className="flex items-center gap-2 overflow-hidden">
-                <Globe className="w-4 h-4 text-cyan-400 animate-pulse shrink-0" />
-                <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-widest truncate">
-                  A.M.I. - CATÁLOGO CARTOGRÁFICO
-                </h3>
-              </div>
-              <button onClick={() => { playSfx(440); setShowAmiModal(false); }} className="p-1 text-zinc-400 hover:text-white cursor-pointer shrink-0">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-[7.5px] sm:text-[8px] text-zinc-400 uppercase shrink-0">
-              Catálogo oficial de Sistemas Solares (SS) mapeados en el registro.
-            </p>
-
-            {/* CUADRÍCULA COMPACTA DE 2 COLUMNAS (flex-1 min-h-0 overflow-y-auto) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
-              {discoveredStars.length === 0 ? (
-                <div className="col-span-full my-auto text-center text-zinc-600 text-[9px] py-10 uppercase font-bold bg-black/40 rounded-xl border border-cyan-950">
-                  SIN SISTEMAS SOLARES MAPEADOS EN EL REGISTRO
-                </div>
-              ) : (
-                discoveredStars.map((star) => {
-                  const rank = star.discovery_order;
-                  const reward = star.reward_details || {};
-                  const coinReward = Number(reward.gd_coin || 0);
-                  const dynamicTitle = reward.title || `REGISTRO NATIVO (${rank}º+)`;
-
-                  let badgeColor = "bg-cyan-950/80 text-cyan-300 border-cyan-800";
-                  let badgeIcon = "📡";
-
-                  if (rank === 1) {
-                    badgeColor = "bg-amber-950/80 text-amber-300 border-amber-500/80 shadow-[0_0_8px_rgba(245,158,11,0.2)]";
-                    badgeIcon = "🥇";
-                  } else if (rank === 2) {
-                    badgeColor = "bg-slate-900/80 text-slate-200 border-slate-400/80";
-                    badgeIcon = "🥈";
-                  } else if (rank === 3) {
-                    badgeColor = "bg-amber-950/50 text-amber-500 border-amber-700/80";
-                    badgeIcon = "🥉";
-                  }
-
-                  return (
-                    <div 
-                      key={star.id} 
-                      className="bg-[#050910] border border-cyan-500/30 rounded-lg p-2.5 flex flex-col justify-between gap-1.5 shadow-md relative overflow-hidden"
-                    >
-                      <div className="flex justify-between items-start gap-1">
-                        <div className="flex flex-col text-left overflow-hidden">
-                          <span className="text-[9px] font-black text-white uppercase truncate" title={star.star_name}>
-                            {star.star_name}
-                          </span>
-                          <span className="text-[7px] text-cyan-400 font-bold uppercase truncate">
-                            CLÚSTER: {star.cluster}
-                          </span>
-                        </div>
-                        <span className="text-[6.5px] text-zinc-500 font-mono shrink-0">
-                          {star.discovered_at}
-                        </span>
-                      </div>
-
-                      <div className={`px-2 py-1 rounded border flex items-center justify-between text-[7.5px] font-bold ${badgeColor}`}>
-                        <span className="flex items-center gap-1 uppercase truncate">
-                          <span>{badgeIcon}</span>
-                          <span className="truncate">{dynamicTitle}</span>
-                        </span>
-                      </div>
-
-                      <div className="bg-black/60 px-2 py-1 rounded border border-cyan-950 text-[7px] font-mono flex justify-between items-center">
-                        <span className="text-zinc-400 uppercase">BOTÍN REGISTRADO:</span>
-                        {coinReward > 0 ? (
-                          <span className="text-amber-400 font-bold">
-                            +{coinReward.toLocaleString()} GD
-                          </span>
-                        ) : (
-                          <span className="text-zinc-600 uppercase font-bold">SIN PREMIO EXTRA</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* PIE (shrink-0) */}
-            <div className="pt-2 border-t border-cyan-950 flex justify-end shrink-0">
-              <button onClick={() => { playSfx(440); setShowAmiModal(false); }} className="px-4 py-1.5 bg-black border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 hover:text-white text-[8.5px] font-bold uppercase rounded-lg cursor-pointer transition-colors">
-                ACEPTAR
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: ESTADÍSTICAS Y PRODUCCIÓN DIARIA REAL */}
-      {showStatsModal && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 font-mono text-white overflow-hidden">
-          <div className="w-full max-w-lg h-auto max-h-[85vh] bg-[#080b0e] border border-purple-500/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 text-left flex flex-col justify-between gap-2.5 shadow-2xl mx-auto my-auto overflow-hidden">
-            <div className="flex justify-between items-center border-b border-purple-950 pb-2 shrink-0">
-              <div className="flex items-center gap-2">
-                <BarChart2 className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400 animate-pulse shrink-0" />
-                <h3 className="text-xs font-black text-white uppercase tracking-widest truncate">
-                  ESTADÍSTICAS Y PRODUCCIÓN DIARIA
-                </h3>
-              </div>
-              <button onClick={() => { playSfx(440); setShowStatsModal(false); }} className="p-1 text-zinc-400 hover:text-white cursor-pointer shrink-0">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-2 text-[8.5px] sm:text-[9px] flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
-              <span className="text-cyan-400 font-bold uppercase block border-b border-purple-950 pb-1">
-                PRODUCCIÓN REAL CALCULADA (24 HORAS)
+          {/* COLUMNA 1: NIVEL CAN & GALACTIC POWER */}
+          <GalaxyFrame className="lg:col-span-3 flex flex-col justify-between" innerPadding="p-4">
+            <div className="flex flex-col items-center justify-between text-center gap-2 h-full">
+              <span className="text-[9.5px] text-cyan-400 font-bold uppercase tracking-wider">
+                NIVEL DE C.A.N.
               </span>
 
-              <div className="grid grid-cols-2 gap-2 font-mono">
-                <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                  <span className="text-zinc-400 uppercase">METAL:</span>
-                  <span className="text-cyan-200 font-bold text-[9.5px]">+{dailyProduction.metal.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
-                </div>
-                <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                  <span className="text-zinc-400 uppercase">CRISTAL:</span>
-                  <span className="text-purple-300 font-bold text-[9.5px]">+{dailyProduction.crystal.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
-                </div>
-                <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                  <span className="text-zinc-400 uppercase">DEUTERIO:</span>
-                  <span className="text-blue-300 font-bold text-[9.5px]">+{dailyProduction.deuterium.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
-                </div>
-                <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                  <span className="text-zinc-400 uppercase">MATERIA OSCURA:</span>
-                  <span className="text-indigo-300 font-bold text-[9.5px]">+{dailyProduction.darkMatter.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
+              <div className="my-2 relative flex items-center justify-center">
+                <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-full border-2 border-dashed border-cyan-500/40 animate-spin-slow absolute inset-0" />
+                <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full border-2 border-cyan-400 bg-cyan-950/40 flex items-center justify-center text-2xl sm:text-3xl font-black text-white shadow-[0_0_20px_rgba(6,182,212,0.4)] relative z-10">
+                  {canLevel}
                 </div>
               </div>
 
-              <span className="text-purple-400 font-bold uppercase block border-b border-purple-950 pb-1 pt-1.5">
-                MODIFICADORES TÁCTICOS GLOBALES
+              <div className="p-2 bg-purple-950/40 border border-purple-800 text-purple-200 text-center w-full rounded-lg mb-1">
+                <div className="text-[7px] text-zinc-400 uppercase">PODER GALÁCTICO</div>
+                <div className="text-sm sm:text-base font-black text-white">{galacticPower.toLocaleString()} <span className="text-[10px] font-bold text-purple-300">POW</span></div>
+              </div>
+
+              <button
+                onClick={handleUpgradeCan}
+                disabled={isUpgrading}
+                className="w-full py-2 bg-gradient-to-r from-cyan-600 to-teal-600 hover:brightness-110 border border-cyan-400 text-white text-[8.5px] font-black uppercase tracking-widest rounded-lg shadow-lg cursor-pointer transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {isUpgrading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : 'UPGRADE NODE'}
+              </button>
+            </div>
+          </GalaxyFrame>
+
+          {/* COLUMNA 2: ASSETS ACTIVADOS & ACTIVE SKILLS */}
+          <div className="lg:col-span-5 flex flex-col gap-3">
+            
+            <GalaxyFrame className="w-full" innerPadding="p-4">
+              <span className="text-[9.5px] text-cyan-400 font-bold uppercase tracking-wider block text-center mb-2 border-b border-cyan-950 pb-1">
+                ASSETS ACTIVADOS
               </span>
 
-              <div className="grid grid-cols-2 gap-2 font-mono">
-                <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                  <span className="text-zinc-400 uppercase">PODER DE FLOTA:</span>
-                  <span className="text-emerald-400 font-bold text-[9.5px]">+{dailyProduction.fleetPowerMod}%</span>
-                </div>
-                <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                  <span className="text-zinc-400 uppercase">ESCUDOS DE DEFENSA:</span>
-                  <span className="text-cyan-400 font-bold text-[9.5px]">+{dailyProduction.defenseShieldMod}%</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-purple-950 flex justify-end shrink-0">
-              <button onClick={() => { playSfx(440); setShowStatsModal(false); }} className="px-4 py-1.5 bg-black border border-zinc-800 text-zinc-300 hover:text-white text-[8.5px] font-bold uppercase rounded-lg cursor-pointer">
-                ACEPTAR
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: ACTIVE SKILLS DETALLADAS (SIN BRECHA INFERIOR NI BOTÓN SOBRANTE) */}
-      {showSkillsModal && (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 font-mono text-white overflow-hidden">
-          <div className="w-full max-w-2xl sm:max-w-3xl h-auto max-h-[90vh] bg-[#080b0e] border border-cyan-500/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 text-left flex flex-col gap-2 shadow-2xl mx-auto my-auto overflow-hidden">
-            
-            {/* CABECERA (shrink-0) */}
-            <div className="flex justify-between items-center border-b border-cyan-950 pb-2 shrink-0">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400 animate-pulse shrink-0" />
-                <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-widest truncate">
-                  LISTA DETALLADA DE ACTIVE SKILLS TÁCTICAS ({filteredSkillsForModal.length})
-                </h3>
-              </div>
-              <button onClick={() => { playSfx(440); setShowSkillsModal(false); }} className="p-1 text-zinc-400 hover:text-white cursor-pointer shrink-0">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* PESTAÑAS DE FILTRADO POR ORIGEN (shrink-0) */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 custom-scrollbar shrink-0">
-              {[
-                { id: 'ALL', label: `TODAS (${activeSkills.length})` },
-                { id: 'CAN', label: `NODO C.A.N. (${activeSkills.filter(s => s.source === 'CAN').length})` },
-                { id: 'STRUCTURE', label: `ESTRUCTURAS (${activeSkills.filter(s => s.source === 'STRUCTURE').length})` },
-                { id: 'TECH', label: `TECNOLOGÍAS (${activeSkills.filter(s => s.source === 'TECH').length})` },
-                { id: 'BADGE', label: `INSIGNIAS (${activeSkills.filter(s => s.source === 'BADGE').length})` }
-              ].map((tab) => (
+              {/* TRES BOTONES INTERACTIVOS */}
+              <div className="grid grid-cols-3 gap-2 items-center">
+                
                 <button
-                  key={tab.id}
-                  onClick={() => handleFilterChange(tab.id as any)}
-                  className={`px-2.5 py-1 rounded-lg text-[7.5px] sm:text-[8px] font-black uppercase transition-all border whitespace-nowrap cursor-pointer shrink-0 ${
-                    skillsModalFilter === tab.id
-                      ? 'bg-cyan-950 text-cyan-300 border-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.3)]'
-                      : 'bg-black/60 text-zinc-400 border-cyan-950 hover:text-white hover:border-cyan-800'
-                  }`}
+                  onClick={() => { playSfx(660); setActiveModalCategory('Estructuras'); }}
+                  className="bg-[#050910] border border-cyan-900 hover:border-cyan-400 transition-all rounded-lg p-2 text-center flex flex-col items-center justify-center cursor-pointer hover:scale-[1.02] active:scale-95 group shadow-md"
                 >
-                  {tab.label}
+                  <span className="text-xs sm:text-sm font-black text-white group-hover:text-cyan-300 transition-colors">
+                    {equippedStructuresCount}
+                  </span>
+                  <span className="text-[7.5px] font-bold text-zinc-300 group-hover:text-cyan-400 uppercase mt-0.5">
+                    STRUCTURES
+                  </span>
                 </button>
-              ))}
-            </div>
 
-            {/* TARJETAS PAGINADAS AJUSTADAS AL TAMAÑO REAL DE CONTENIDO */}
-            <div className="flex flex-col gap-1.5 flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1 justify-start">
-              {paginatedSkillsForModal.length === 0 ? (
-                <div className="w-full my-auto text-center py-8 text-zinc-600 text-[8.5px] uppercase tracking-widest font-bold bg-black/40 rounded-xl border border-cyan-950">
-                  NO HAY HABILIDADES ACTIVAS EN ESTA CATEGORÍA
+                <button
+                  onClick={() => { playSfx(660); setActiveModalCategory('Tecnologias'); }}
+                  className="bg-[#050910] border border-cyan-900 hover:border-cyan-400 transition-all rounded-lg p-2 text-center flex flex-col items-center justify-center cursor-pointer hover:scale-[1.02] active:scale-95 group shadow-md"
+                >
+                  <span className="text-xs sm:text-sm font-black text-white group-hover:text-cyan-300 transition-colors">
+                    {equippedTechCount}
+                  </span>
+                  <span className="text-[7.5px] font-bold text-zinc-300 group-hover:text-cyan-400 uppercase mt-0.5">
+                    TECH
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => { playSfx(660); setActiveModalCategory('Insignias'); }}
+                  className="bg-[#050910] border border-cyan-900 hover:border-cyan-400 transition-all rounded-lg p-2 text-center flex flex-col items-center justify-center cursor-pointer hover:scale-[1.02] active:scale-95 group shadow-md"
+                >
+                  <span className="text-xs sm:text-sm font-black text-cyan-300 group-hover:text-white transition-colors">
+                    {equippedBadgesCount} / 5
+                  </span>
+                  <span className="text-[7.5px] font-bold text-zinc-300 group-hover:text-cyan-400 uppercase mt-0.5">
+                    BADGES
+                  </span>
+                </button>
+
+              </div>
+            </GalaxyFrame>
+
+            {/* DASHBOARD DE ACTIVE SKILLS DIVIDIDO EN 3 COLUMNAS */}
+            <GalaxyFrame className="flex-1 min-h-[190px] overflow-hidden" innerPadding="p-4">
+              <div className="flex flex-col justify-between h-full">
+                <div className="flex justify-between items-center mb-1.5 pb-1 border-b border-cyan-950">
+                  <span className="text-[9.5px] text-cyan-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" /> DASHBOARD DE ACTIVE SKILLS ({activeSkills.length})
+                  </span>
+                  <span className="text-[7px] bg-cyan-950 border border-cyan-800 text-cyan-300 px-1.5 py-0.5 rounded font-bold uppercase">
+                    TOUCH
+                  </span>
                 </div>
-              ) : (
-                paginatedSkillsForModal.map((sk) => {
-                  const isCanon = sk.source === 'CAN';
-                  const isStruct = sk.source === 'STRUCTURE';
-                  const isTech = sk.source === 'TECH';
 
-                  return (
-                    <div
-                      key={sk.id}
-                      className={`p-2 rounded-lg border flex items-center gap-2 transition-all shrink-0 ${
-                        isCanon
-                          ? 'bg-cyan-950/30 border-cyan-500/60 text-cyan-200'
-                          : isStruct
-                          ? 'bg-amber-950/20 border-amber-500/40 text-amber-200'
-                          : isTech
-                          ? 'bg-purple-950/20 border-purple-500/40 text-purple-200'
-                          : 'bg-emerald-950/20 border-emerald-500/40 text-emerald-200'
+                {/* SECCIÓN TRIPARTITA: ESTRUCTURAS | TECNOLOGÍAS | INSIGNIAS */}
+                <div className="grid grid-cols-3 gap-1.5 flex-1 min-h-[110px] overflow-hidden">
+                  
+                  <div className="bg-[#03060a] border border-amber-500/30 rounded-lg p-1 flex flex-col justify-start overflow-hidden">
+                    <div className="text-[7px] font-black text-amber-400 uppercase tracking-wider border-b border-amber-950/60 pb-0.5 mb-0.5 flex items-center justify-between shrink-0">
+                      <span>ESTRUCTURAS</span>
+                      <span className="text-zinc-500 font-bold">({structSkills.length})</span>
+                    </div>
+                    {renderSkillChipsSection(structSkills, "SIN ESTRUCTURAS")}
+                  </div>
+
+                  <div className="bg-[#03060a] border border-purple-500/30 rounded-lg p-1 flex flex-col justify-start overflow-hidden">
+                    <div className="text-[7px] font-black text-purple-400 uppercase tracking-wider border-b border-purple-950/60 pb-0.5 mb-0.5 flex items-center justify-between shrink-0">
+                      <span>TECNOLOGÍAS</span>
+                      <span className="text-zinc-500 font-bold">({techSkills.length})</span>
+                    </div>
+                    {renderSkillChipsSection(techSkills, "SIN TECH")}
+                  </div>
+
+                  <div className="bg-[#03060a] border border-emerald-500/30 rounded-lg p-1 flex flex-col justify-start overflow-hidden">
+                    <div className="text-[7px] font-black text-emerald-400 uppercase tracking-wider border-b border-emerald-950/60 pb-0.5 mb-0.5 flex items-center justify-between shrink-0">
+                      <span>INSIGNIAS</span>
+                      <span className="text-zinc-500 font-bold">({badgeSkills.length})</span>
+                    </div>
+                    {renderSkillChipsSection(badgeSkills, "SIN INSIGNIAS")}
+                  </div>
+
+                </div>
+
+                {/* BARRA TICKER HUD MUESTRA HABILIDAD EN TIEMPO REAL */}
+                <div className="mt-1.5 bg-[#020408] border border-cyan-950 p-1.5 rounded-lg flex items-center gap-1.5 text-[7.5px] font-mono shrink-0">
+                  <Info className="w-3 h-3 text-cyan-400 shrink-0" />
+                  {hoveredSkill ? (
+                    <span className="text-cyan-200 font-bold uppercase truncate">
+                      <strong className="text-white">{hoveredSkill.assetName}:</strong> {hoveredSkill.effectDescription}
+                    </span>
+                  ) : (
+                    <span className="text-zinc-500 uppercase truncate">
+                      TOCA UN ICONO PARA DESPLEGAR SU EFECTO TÁCTICO
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => { playSfx(660); setSkillsPage(1); setShowSkillsModal(true); }}
+                  className="mt-1.5 w-full py-1.5 bg-gradient-to-r from-cyan-950 to-cyan-900 hover:from-cyan-900 border border-cyan-500/60 text-cyan-200 text-[8px] font-black uppercase tracking-widest rounded-lg cursor-pointer transition-colors shadow-inner flex items-center justify-center gap-1 shrink-0"
+                >
+                  VER DETALLES COMPLETOS DE SKILLS
+                </button>
+              </div>
+            </GalaxyFrame>
+
+          </div>
+
+          {/* COLUMNA 3: A.M.I. & STATS */}
+          <div className="lg:col-span-4 flex flex-col justify-between gap-3">
+            
+            <GalaxyFrame className="flex-1 min-h-[100px] hover:scale-[1.02] active:scale-95 transition-all cursor-pointer group" innerPadding="p-4">
+              <div onClick={() => { playSfx(660); setShowAmiModal(true); }} className="w-full h-full flex flex-col items-center justify-center text-center gap-1">
+                <Globe className="w-6 h-6 text-cyan-400 animate-pulse group-hover:scale-110 transition-transform" />
+                <div className="text-xs font-black text-white uppercase tracking-widest">A.M.I.</div>
+                <div className="text-xs font-bold text-cyan-300 mt-0.5">
+                  {totalDiscoveredStars.toLocaleString()} <span className="text-[7.5px] text-cyan-500 uppercase">ESTRELLAS MAPEADAS</span>
+                </div>
+              </div>
+            </GalaxyFrame>
+
+            <GalaxyFrame className="flex-1 min-h-[100px] hover:scale-[1.02] active:scale-95 transition-all cursor-pointer group" innerPadding="p-4">
+              <div onClick={() => { playSfx(660); setShowStatsModal(true); }} className="w-full h-full flex flex-col items-center justify-center text-center gap-1">
+                <BarChart2 className="w-6 h-6 text-purple-400 animate-pulse group-hover:scale-110 transition-transform" />
+                <div className="text-[10.5px] font-black text-white uppercase tracking-wider">STATS & PRODUCCIÓN DIARIA</div>
+              </div>
+            </GalaxyFrame>
+
+          </div>
+
+        </div>
+
+        {/* MODAL DESPLEGABLE DE ASSETS (ESTRUCTURAS, TECH, BADGES) */}
+        <CanAssetsModal
+          isOpen={activeModalCategory !== null}
+          onClose={() => setActiveModalCategory(null)}
+          category={activeModalCategory}
+          assets={canAssetsList}
+          userId={currentUserId}
+          onRefresh={fetchCanData}
+          triggerNotification={triggerNotification}
+        />
+
+        {/* MODAL 1: A.M.I. */}
+        {showAmiModal && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 font-mono text-white overflow-hidden">
+            <GalaxyFrame className="w-full max-w-xl sm:max-w-2xl h-auto max-h-[85vh] mx-auto my-auto overflow-hidden" innerPadding="p-4 sm:p-5">
+              <div className="flex flex-col gap-2.5 h-full">
+                <div className="flex justify-between items-center border-b border-cyan-950 pb-2 shrink-0">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <Globe className="w-4 h-4 text-cyan-400 animate-pulse shrink-0" />
+                    <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-widest truncate">
+                      A.M.I. - CATÁLOGO CARTOGRÁFICO
+                    </h3>
+                  </div>
+                  <button onClick={() => { playSfx(440); setShowAmiModal(false); }} className="p-1 text-zinc-400 hover:text-white cursor-pointer shrink-0">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <p className="text-[7.5px] sm:text-[8px] text-zinc-400 uppercase shrink-0">
+                  Catálogo oficial de Sistemas Solares (SS) mapeados en el registro.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                  {discoveredStars.length === 0 ? (
+                    <div className="col-span-full my-auto text-center text-zinc-600 text-[9px] py-10 uppercase font-bold bg-black/40 rounded-xl border border-cyan-950">
+                      SIN SISTEMAS SOLARES MAPEADOS EN EL REGISTRO
+                    </div>
+                  ) : (
+                    discoveredStars.map((star) => {
+                      const rank = star.discovery_order;
+                      const reward = star.reward_details || {};
+                      const coinReward = Number(reward.gd_coin || 0);
+                      const dynamicTitle = reward.title || `REGISTRO NATIVO (${rank}º+)`;
+
+                      let badgeColor = "bg-cyan-950/80 text-cyan-300 border-cyan-800";
+                      let badgeIcon = "📡";
+
+                      if (rank === 1) {
+                        badgeColor = "bg-amber-950/80 text-amber-300 border-amber-500/80 shadow-[0_0_8px_rgba(245,158,11,0.2)]";
+                        badgeIcon = "🥇";
+                      } else if (rank === 2) {
+                        badgeColor = "bg-slate-900/80 text-slate-200 border-slate-400/80";
+                        badgeIcon = "🥈";
+                      } else if (rank === 3) {
+                        badgeColor = "bg-amber-950/50 text-amber-500 border-amber-700/80";
+                        badgeIcon = "🥉";
+                      }
+
+                      return (
+                        <div 
+                          key={star.id} 
+                          className="bg-[#050910] border border-cyan-500/30 rounded-lg p-2.5 flex flex-col justify-between gap-1.5 shadow-md relative overflow-hidden"
+                        >
+                          <div className="flex justify-between items-start gap-1">
+                            <div className="flex flex-col text-left overflow-hidden">
+                              <span className="text-[9px] font-black text-white uppercase truncate" title={star.star_name}>
+                                {star.star_name}
+                              </span>
+                              <span className="text-[7px] text-cyan-400 font-bold uppercase truncate">
+                                CLÚSTER: {star.cluster}
+                              </span>
+                            </div>
+                            <span className="text-[6.5px] text-zinc-500 font-mono shrink-0">
+                              {star.discovered_at}
+                            </span>
+                          </div>
+
+                          <div className={`px-2 py-1 rounded border flex items-center justify-between text-[7.5px] font-bold ${badgeColor}`}>
+                            <span className="flex items-center gap-1 uppercase truncate">
+                              <span>{badgeIcon}</span>
+                              <span className="truncate">{dynamicTitle}</span>
+                            </span>
+                          </div>
+
+                          <div className="bg-black/60 px-2 py-1 rounded border border-cyan-950 text-[7px] font-mono flex justify-between items-center">
+                            <span className="text-zinc-400 uppercase">BOTÍN REGISTRADO:</span>
+                            {coinReward > 0 ? (
+                              <span className="text-amber-400 font-bold">
+                                +{coinReward.toLocaleString()} GD
+                              </span>
+                            ) : (
+                              <span className="text-zinc-600 uppercase font-bold">SIN PREMIO EXTRA</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="pt-2 border-t border-cyan-950 flex justify-end shrink-0">
+                  <button onClick={() => { playSfx(440); setShowAmiModal(false); }} className="px-4 py-1.5 bg-black border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 hover:text-white text-[8.5px] font-bold uppercase rounded-lg cursor-pointer transition-colors">
+                    ACEPTAR
+                  </button>
+                </div>
+              </div>
+            </GalaxyFrame>
+          </div>
+        )}
+
+        {/* MODAL 2: ESTADÍSTICAS Y PRODUCCIÓN DIARIA REAL */}
+        {showStatsModal && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 font-mono text-white overflow-hidden">
+            <GalaxyFrame className="w-full max-w-lg h-auto max-h-[85vh] mx-auto my-auto overflow-hidden" innerPadding="p-4 sm:p-5">
+              <div className="flex flex-col justify-between gap-2.5 h-full">
+                <div className="flex justify-between items-center border-b border-purple-950 pb-2 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <BarChart2 className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400 animate-pulse shrink-0" />
+                    <h3 className="text-xs font-black text-white uppercase tracking-widest truncate">
+                      ESTADÍSTICAS Y PRODUCCIÓN DIARIA
+                    </h3>
+                  </div>
+                  <button onClick={() => { playSfx(440); setShowStatsModal(false); }} className="p-1 text-zinc-400 hover:text-white cursor-pointer shrink-0">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-2 text-[8.5px] sm:text-[9px] flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                  <span className="text-cyan-400 font-bold uppercase block border-b border-purple-950 pb-1">
+                    PRODUCCIÓN REAL CALCULADA (24 HORAS)
+                  </span>
+
+                  <div className="grid grid-cols-2 gap-2 font-mono">
+                    <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
+                      <span className="text-zinc-400 uppercase">METAL:</span>
+                      <span className="text-cyan-200 font-bold text-[9.5px]">+{dailyProduction.metal.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
+                    </div>
+                    <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
+                      <span className="text-zinc-400 uppercase">CRISTAL:</span>
+                      <span className="text-purple-300 font-bold text-[9.5px]">+{dailyProduction.crystal.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
+                    </div>
+                    <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
+                      <span className="text-zinc-400 uppercase">DEUTERIO:</span>
+                      <span className="text-blue-300 font-bold text-[9.5px]">+{dailyProduction.deuterium.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
+                    </div>
+                    <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
+                      <span className="text-zinc-400 uppercase">MATERIA OSCURA:</span>
+                      <span className="text-indigo-300 font-bold text-[9.5px]">+{dailyProduction.darkMatter.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
+                    </div>
+                  </div>
+
+                  <span className="text-purple-400 font-bold uppercase block border-b border-purple-950 pb-1 pt-1.5">
+                    MODIFICADORES TÁCTICOS GLOBALES
+                  </span>
+
+                  <div className="grid grid-cols-2 gap-2 font-mono">
+                    <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
+                      <span className="text-zinc-400 uppercase">PODER DE FLOTA:</span>
+                      <span className="text-emerald-400 font-bold text-[9.5px]">+{dailyProduction.fleetPowerMod}%</span>
+                    </div>
+                    <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
+                      <span className="text-zinc-400 uppercase">ESCUDOS DE DEFENSA:</span>
+                      <span className="text-cyan-400 font-bold text-[9.5px]">+{dailyProduction.defenseShieldMod}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-purple-950 flex justify-end shrink-0">
+                  <button onClick={() => { playSfx(440); setShowStatsModal(false); }} className="px-4 py-1.5 bg-black border border-zinc-800 text-zinc-300 hover:text-white text-[8.5px] font-bold uppercase rounded-lg cursor-pointer">
+                    ACEPTAR
+                  </button>
+                </div>
+              </div>
+            </GalaxyFrame>
+          </div>
+        )}
+
+        {/* MODAL 3: ACTIVE SKILLS DETALLADAS */}
+        {showSkillsModal && (
+          <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 font-mono text-white overflow-hidden">
+            <GalaxyFrame className="w-full max-w-2xl sm:max-w-3xl h-auto max-h-[90vh] mx-auto my-auto overflow-hidden" innerPadding="p-4 sm:p-5">
+              <div className="flex flex-col gap-2 h-full">
+                
+                {/* CABECERA */}
+                <div className="flex justify-between items-center border-b border-cyan-950 pb-2 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400 animate-pulse shrink-0" />
+                    <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-widest truncate">
+                      LISTA DETALLADA DE ACTIVE SKILLS TÁCTICAS ({filteredSkillsForModal.length})
+                    </h3>
+                  </div>
+                  <button onClick={() => { playSfx(440); setShowSkillsModal(false); }} className="p-1 text-zinc-400 hover:text-white cursor-pointer shrink-0">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* PESTAÑAS DE FILTRADO POR ORIGEN */}
+                <div className="flex items-center gap-1 overflow-x-auto pb-0.5 custom-scrollbar shrink-0">
+                  {[
+                    { id: 'ALL', label: `TODAS (${activeSkills.length})` },
+                    { id: 'CAN', label: `NODO C.A.N. (${activeSkills.filter(s => s.source === 'CAN').length})` },
+                    { id: 'STRUCTURE', label: `ESTRUCTURAS (${activeSkills.filter(s => s.source === 'STRUCTURE').length})` },
+                    { id: 'TECH', label: `TECNOLOGÍAS (${activeSkills.filter(s => s.source === 'TECH').length})` },
+                    { id: 'BADGE', label: `INSIGNIAS (${activeSkills.filter(s => s.source === 'BADGE').length})` }
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => handleFilterChange(tab.id as any)}
+                      className={`px-2.5 py-1 rounded-lg text-[7.5px] sm:text-[8px] font-black uppercase transition-all border whitespace-nowrap cursor-pointer shrink-0 ${
+                        skillsModalFilter === tab.id
+                          ? 'bg-cyan-950 text-cyan-300 border-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.3)]'
+                          : 'bg-black/60 text-zinc-400 border-cyan-950 hover:text-white hover:border-cyan-800'
                       }`}
                     >
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-md bg-black border border-cyan-950 overflow-hidden shrink-0 flex items-center justify-center p-0.5 relative">
-                        {sk.assetImageUrl ? (
-                          <img src={sk.assetImageUrl} alt={sk.assetName} className="w-full h-full object-contain" />
-                        ) : (
-                          getSkillIcon(sk.source, sk.effectDescription)
-                        )}
-                      </div>
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
 
-                      <div className="flex-1 flex flex-col gap-0.5 text-left overflow-hidden">
-                        <div className="flex justify-between items-center border-b border-cyan-950/80 pb-0.5">
-                          <span className="font-black text-white text-[8.5px] sm:text-[9px] uppercase truncate">{sk.assetName}</span>
-                          <span className="text-[6.5px] font-black uppercase px-1.5 py-0.2 rounded border bg-black/60 border-cyan-900 text-cyan-400 shrink-0">
-                            {sk.source} {sk.level ? `• LVL ${sk.level}` : ''}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1 pt-0.5">
-                          <ChevronRight className="w-3 h-3 text-cyan-400 shrink-0" />
-                          <span className="text-[7.5px] sm:text-[8px] font-bold text-zinc-200 leading-tight truncate">{sk.effectDescription}</span>
-                        </div>
-                      </div>
+                {/* TARJETAS PAGINADAS */}
+                <div className="flex flex-col gap-1.5 flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1 justify-start">
+                  {paginatedSkillsForModal.length === 0 ? (
+                    <div className="w-full my-auto text-center py-8 text-zinc-600 text-[8.5px] uppercase tracking-widest font-bold bg-black/40 rounded-xl border border-cyan-950">
+                      NO HAY HABILIDADES ACTIVAS EN ESTA CATEGORÍA
                     </div>
-                  );
-                })
-              )}
-            </div>
+                  ) : (
+                    paginatedSkillsForModal.map((sk) => {
+                      const isCanon = sk.source === 'CAN';
+                      const isStruct = sk.source === 'STRUCTURE';
+                      const isTech = sk.source === 'TECH';
 
-            {/* CONTROLES DE PAGINACIÓN ADICIONADOS DIRECTAMENTE AL FINAL DE LA MÁSCARA DEL MODAL */}
-            <div className="flex items-center justify-between bg-black/80 border border-cyan-950 p-1 sm:p-1.5 rounded-lg text-[8px] sm:text-[8.5px] shrink-0">
-              <button
-                disabled={currentSkillsPage === 1}
-                onClick={() => { playSfx(660); setSkillsPage(p => Math.max(1, p - 1)); }}
-                className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950 border border-cyan-500/50 hover:border-cyan-400 disabled:opacity-30 disabled:pointer-events-none text-cyan-300 font-bold uppercase rounded-md cursor-pointer transition-all shrink-0"
-              >
-                <ChevronLeft className="w-3 h-3" /> ANTERIOR
-              </button>
+                      return (
+                        <div
+                          key={sk.id}
+                          className={`p-2 rounded-lg border flex items-center gap-2 transition-all shrink-0 ${
+                            isCanon
+                              ? 'bg-cyan-950/30 border-cyan-500/60 text-cyan-200'
+                              : isStruct
+                              ? 'bg-amber-950/20 border-amber-500/40 text-amber-200'
+                              : isTech
+                              ? 'bg-purple-950/20 border-purple-500/40 text-purple-200'
+                              : 'bg-emerald-950/20 border-emerald-500/40 text-emerald-200'
+                          }`}
+                        >
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-md bg-black border border-cyan-950 overflow-hidden shrink-0 flex items-center justify-center p-0.5 relative">
+                            {sk.assetImageUrl ? (
+                              <img src={sk.assetImageUrl} alt={sk.assetName} className="w-full h-full object-contain" />
+                            ) : (
+                              getSkillIcon(sk.source, sk.effectDescription)
+                            )}
+                          </div>
 
-              <span className="font-mono font-black text-cyan-400 uppercase tracking-widest text-[8px]">
-                PÁGINA <span className="text-white">{currentSkillsPage}</span> DE <span className="text-white">{totalSkillsPages}</span>
-              </span>
+                          <div className="flex-1 flex flex-col gap-0.5 text-left overflow-hidden">
+                            <div className="flex justify-between items-center border-b border-cyan-950/80 pb-0.5">
+                              <span className="font-black text-white text-[8.5px] sm:text-[9px] uppercase truncate">{sk.assetName}</span>
+                              <span className="text-[6.5px] font-black uppercase px-1.5 py-0.2 rounded border bg-black/60 border-cyan-900 text-cyan-400 shrink-0">
+                                {sk.source} {sk.level ? `• LVL ${sk.level}` : ''}
+                              </span>
+                            </div>
 
-              <button
-                disabled={currentSkillsPage >= totalSkillsPages}
-                onClick={() => { playSfx(660); setSkillsPage(p => Math.min(totalSkillsPages, p + 1)); }}
-                className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950 border border-cyan-500/50 hover:border-cyan-400 disabled:opacity-30 disabled:pointer-events-none text-cyan-300 font-bold uppercase rounded-md cursor-pointer transition-all shrink-0"
-              >
-                SIGUIENTE <ChevronRight className="w-3 h-3" />
-              </button>
-            </div>
+                            <div className="flex items-center gap-1 pt-0.5">
+                              <ChevronRight className="w-3 h-3 text-cyan-400 shrink-0" />
+                              <span className="text-[7.5px] sm:text-[8px] font-bold text-zinc-200 leading-tight truncate">{sk.effectDescription}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* CONTROLES DE PAGINACIÓN */}
+                <div className="flex items-center justify-between bg-black/80 border border-cyan-950 p-1 sm:p-1.5 rounded-lg text-[8px] sm:text-[8.5px] shrink-0">
+                  <button
+                    disabled={currentSkillsPage === 1}
+                    onClick={() => { playSfx(660); setSkillsPage(p => Math.max(1, p - 1)); }}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950 border border-cyan-500/50 hover:border-cyan-400 disabled:opacity-30 disabled:pointer-events-none text-cyan-300 font-bold uppercase rounded-md cursor-pointer transition-all shrink-0"
+                  >
+                    <ChevronLeft className="w-3 h-3" /> ANTERIOR
+                  </button>
+
+                  <span className="font-mono font-black text-cyan-400 uppercase tracking-widest text-[8px]">
+                    PÁGINA <span className="text-white">{currentSkillsPage}</span> DE <span className="text-white">{totalSkillsPages}</span>
+                  </span>
+
+                  <button
+                    disabled={currentSkillsPage >= totalSkillsPages}
+                    onClick={() => { playSfx(660); setSkillsPage(p => Math.min(totalSkillsPages, p + 1)); }}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950 border border-cyan-500/50 hover:border-cyan-400 disabled:opacity-30 disabled:pointer-events-none text-cyan-300 font-bold uppercase rounded-md cursor-pointer transition-all shrink-0"
+                  >
+                    SIGUIENTE <ChevronRight className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            </GalaxyFrame>
           </div>
-        </div>
-      )}
+        )}
 
-    </div>
+      </div>
+    </GalaxyFrame>
   );
 };
 

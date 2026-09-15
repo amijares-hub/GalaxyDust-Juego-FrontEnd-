@@ -4,6 +4,7 @@ import { Plus, Search, ChevronRight, Check, Zap, ArrowLeft, RefreshCw, Layers } 
 import { supabase } from "../lib/supabase";
 import { InventoryItem } from "../lib/inventoryService";
 import { useAudioEngine } from "../hooks/useAudioEngine";
+import { GalaxyFrame } from "./CanView";
 
 export interface SasoriFleet {
   id: string;
@@ -21,7 +22,6 @@ interface FleetManagerProps {
 }
 
 export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerNotification }) => {
-  // UserProfile del AuthContext no expone `id` — obtenemos el UUID directamente de Supabase Auth
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -56,7 +56,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
     if (!userId) return;
     setLoadingFleets(true);
     
-    // Consulta unificada a la tabla de flotas
     const { data, error } = await supabase
       .from("fleets")
       .select("*")
@@ -132,7 +131,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
     }
   };
 
-  // 🛡️ SUBMISIÓN DE FLOTA ZERO-TRUST VIA RPC
   const handleSubmitFleet = async (e: React.MouseEvent) => {
     if (!userId) return;
     setIsSubmitting(true);
@@ -144,7 +142,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
       const toolIds = selectedTools.map(t => t.id);
       const consumableIds = selectedConsumables.map(c => c.id);
 
-      // 🛡️ LLAMADA AL SERVIDOR PASANDO ÚNICAMENTE ARREGLOS DE ARRAYS
       const { data, error } = await supabase.rpc("create_custom_fleet_secure", {
         p_fleet_name: fleetName.trim(),
         p_ship_ids: shipIds,
@@ -171,12 +168,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
   };
 
   const getPhaseItems = () => {
-    let category = "";
-    if (wizardStep === 1) category = "Spaceships";
-    else if (wizardStep === 2) category = "Astrobots";
-    else if (wizardStep === 3) category = "Tools";
-    else if (wizardStep === 4) category = "Consumibles";
-
     let filtered = characters.filter(c => {
       const catLower = (c.category || '').toLowerCase();
       if (wizardStep === 1) return catLower.includes('ship') || catLower.includes('nave') || catLower.includes('spaceships');
@@ -202,7 +193,7 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
 
   const renderSelectionGrid = (step: WizardStep) => {
     return (
-      <div className="flex flex-col h-full gap-4">
+      <div className="flex flex-col h-full gap-4 font-mono">
         <div className="flex flex-wrap items-center gap-3 bg-cyan-950/20 border border-cyan-900/40 p-3 rounded-xl">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-2 w-4 h-4 text-cyan-500" />
@@ -217,7 +208,7 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
           <select
             value={rarityFilter}
             onChange={(e) => setRarityFilter(e.target.value)}
-            className="bg-black/60 border border-cyan-800 text-cyan-400 text-[10px] font-mono tracking-widest px-3 py-2 rounded-lg outline-none focus:border-cyan-400 appearance-none uppercase"
+            className="bg-black/60 border border-cyan-800 text-cyan-400 text-[10px] font-mono tracking-widest px-3 py-2 rounded-lg outline-none focus:border-cyan-400 appearance-none uppercase cursor-pointer"
           >
             <option value="ALL">TODAS LAS RAREZAS</option>
             <option value="COMMON">COMMON (Gris)</option>
@@ -228,7 +219,7 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
           </select>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 overflow-y-auto max-h-[400px] scrollbar-thin scrollbar-thumb-cyan-900 p-1">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 overflow-y-auto max-h-[400px] custom-scrollbar p-1">
           {phaseItems.length === 0 ? (
             <div className="col-span-full text-center py-10 font-mono text-xs text-cyan-800/60 uppercase">No hay activos disponibles con estos filtros.</div>
           ) : (
@@ -243,7 +234,7 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
                 <div 
                   key={item.id} 
                   onClick={() => toggleItemSelection(item, step)}
-                  className={`relative flex flex-col items-center bg-black border rounded-xl p-3 cursor-pointer transition-all ${
+                  className={`relative flex flex-col items-center bg-black/70 border rounded-xl p-3 cursor-pointer transition-all ${
                     isSelected 
                       ? "border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)] bg-cyan-950/30" 
                       : "border-cyan-900/40 hover:border-cyan-700 hover:bg-cyan-950/10"
@@ -268,7 +259,7 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
         <div className="mt-auto flex justify-between items-center border-t border-cyan-900/40 pt-4">
           <button 
             onClick={() => setWizardStep(prev => (prev - 1) as WizardStep)}
-            className="px-4 py-2 text-[10px] font-mono text-zinc-400 hover:text-white uppercase tracking-widest"
+            className="px-4 py-2 text-[10px] font-mono text-zinc-400 hover:text-white uppercase tracking-widest cursor-pointer"
           >
             Atrás
           </button>
@@ -301,116 +292,119 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#030608]/90 border border-cyan-900/25 p-5 sm:p-7 rounded-2xl shadow-inner min-h-[420px] text-white">
-      
-      {viewMode === "LIST" && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full">
-          <div className="flex items-center justify-between mb-6 border-b border-cyan-900/40 pb-3">
-            <div>
-              <h3 className="text-sm font-sans font-black tracking-widest text-white uppercase">Hangar de Flotas Activas</h3>
-              <p className="text-[10px] font-mono text-cyan-600 uppercase mt-1">Sistemas de combate preconfigurados</p>
+    <GalaxyFrame className="w-full max-w-5xl mx-auto my-2 min-h-[420px] text-white font-mono select-none" innerPadding="p-5 sm:p-7">
+      <div className="flex flex-col h-full">
+        {viewMode === "LIST" && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full">
+            <div className="flex items-center justify-between mb-6 border-b border-cyan-900/40 pb-3">
+              <div className="text-left">
+                <h3 className="text-sm font-sans font-black tracking-widest text-white uppercase">Hangar de Flotas Activas</h3>
+                <p className="text-[10px] font-mono text-cyan-600 uppercase mt-1">Sistemas de combate preconfigurados</p>
+              </div>
+              {fleets.length > 0 && (
+                <button 
+                  onClick={handleStartWizard}
+                  className="flex items-center gap-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-lg transition-all shadow-[0_0_15px_rgba(34,211,238,0.3)] cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" /> CREAR FLOTA
+                </button>
+              )}
             </div>
-            {fleets.length > 0 && (
-              <button 
-                onClick={handleStartWizard}
-                className="flex items-center gap-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-lg transition-all shadow-[0_0_15px_rgba(34,211,238,0.3)] cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" /> CREAR FLOTA
-              </button>
-            )}
-          </div>
 
-          {loadingFleets ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3">
-              <RefreshCw className="w-6 h-6 text-cyan-500 animate-spin" />
-              <span className="text-[10px] font-mono tracking-widest uppercase text-cyan-500 animate-pulse">Consultando Registros...</span>
-            </div>
-          ) : fleets.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center py-10 text-center">
-              <div className="w-16 h-16 rounded-full border border-white/10 bg-white/[0.02] flex items-center justify-center mb-5">
-                <Layers className="w-7 h-7 text-white/20" />
+            {loadingFleets ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
+                <RefreshCw className="w-6 h-6 text-cyan-500 animate-spin" />
+                <span className="text-[10px] font-mono tracking-widest uppercase text-cyan-500 animate-pulse">Consultando Registros...</span>
               </div>
-              <div className="text-[10px] font-mono uppercase tracking-[0.4em] text-red-400/80 mb-3 animate-pulse">
-                ⚠ NO SE DETECTAN FLOTAS ACTIVAS
+            ) : fleets.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center py-10 text-center">
+                <div className="w-16 h-16 rounded-full border border-white/10 bg-white/[0.02] flex items-center justify-center mb-5">
+                  <Layers className="w-7 h-7 text-white/20" />
+                </div>
+                <div className="text-[10px] font-mono uppercase tracking-[0.4em] text-red-400/80 mb-3 animate-pulse">
+                  ⚠ NO SE DETECTAN FLOTAS ACTIVAS
+                </div>
+                <p className="text-white/30 text-[11px] font-mono max-w-sm mb-6 leading-relaxed">
+                  Necesitas crear un Deck antes de lanzar expediciones o participar en combates tácticos.
+                </p>
+                <button 
+                  onClick={handleStartWizard}
+                  className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white font-black text-[11px] uppercase tracking-[0.2em] px-6 py-3.5 rounded-xl transition-all cursor-pointer shadow-[0_0_25px_rgba(6,182,212,0.4)]"
+                >
+                  <Plus className="w-4 h-4" />
+                  + REGISTRAR NUEVA FLOTA DE COMBATE
+                </button>
               </div>
-              <p className="text-white/30 text-[11px] font-mono max-w-sm mb-6 leading-relaxed">
-                Necesitas crear un Deck antes de lanzar expediciones o participar en combates tácticos.
-              </p>
-              <button 
-                onClick={handleStartWizard}
-                className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white font-black text-[11px] uppercase tracking-[0.2em] px-6 py-3.5 rounded-xl transition-all cursor-pointer shadow-[0_0_25px_rgba(6,182,212,0.4)]"
-              >
-                <Plus className="w-4 h-4" />
-                + REGISTRAR NUEVA FLOTA DE COMBATE
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {fleets.map(fleet => (
-                <div key={fleet.id} className="bg-black/60 border border-cyan-900/40 rounded-xl p-4 flex flex-col gap-3 hover:border-cyan-700 transition-colors text-left">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="text-xs font-black text-white uppercase tracking-wider">{fleet.name}</h4>
-                      <div className="text-[9px] font-mono text-cyan-500 mt-1">POWER: {fleet.total_power_score?.toLocaleString()} POW</div>
-                    </div>
-                    <div className="bg-cyan-950/50 px-2 py-1 rounded text-[8px] font-mono text-cyan-300 border border-cyan-800/50">
-                      FLOTA ACTIVA
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {fleets.map(fleet => (
+                  <div key={fleet.id} className="bg-black/60 border border-cyan-900/40 rounded-xl p-4 flex flex-col gap-3 hover:border-cyan-700 transition-colors text-left">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="text-xs font-black text-white uppercase tracking-wider">{fleet.name}</h4>
+                        <div className="text-[9px] font-mono text-cyan-500 mt-1">POWER: {fleet.total_power_score?.toLocaleString()} POW</div>
+                      </div>
+                      <div className="bg-cyan-950/50 px-2 py-1 rounded text-[8px] font-mono text-cyan-300 border border-cyan-800/50">
+                        FLOTA ACTIVA
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </motion.div>
-      )}
-
-      {viewMode === "CREATE_WIZARD" && (
-        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col h-full">
-          <div className="flex items-center gap-3 mb-6 border-b border-cyan-900/40 pb-3">
-            <button onClick={() => setViewMode("LIST")} className="p-1.5 text-zinc-500 hover:text-white bg-black rounded-lg border border-cyan-900/50 cursor-pointer">
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-            <div className="text-left">
-              <h3 className="text-sm font-sans font-black tracking-widest text-white uppercase">Asistente de Ensamblaje</h3>
-              <p className="text-[10px] font-mono text-cyan-600 uppercase mt-1">
-                {wizardStep === 0 && "PASO 0: IDENTIFICADOR"}
-                {wizardStep === 1 && "FASE 1: ACOPLAMIENTO DE NAVES"}
-                {wizardStep === 2 && "FASE 2: ASIGNACIÓN DE ASTROBOTS"}
-                {wizardStep === 3 && "FASE 3: CARGA DE TOOLS"}
-                {wizardStep === 4 && "FASE 4: CONSUMIBLES DE EMERGENCIA"}
-              </p>
-            </div>
-          </div>
-
-          <AnimatePresence mode="wait">
-            {wizardStep === 0 && (
-              <motion.div key="step0" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col items-center justify-center flex-1">
-                <Layers className="w-12 h-12 text-cyan-500/50 mb-6" />
-                <h4 className="text-sm font-black text-white uppercase tracking-widest mb-2">Designa tu Flota</h4>
-                <p className="text-[10px] font-mono text-zinc-400 mb-6 text-center max-w-sm">Establece un código de identificación táctico para agrupar tus activos.</p>
-                <input 
-                  type="text" 
-                  value={fleetName}
-                  onChange={(e) => setFleetName(e.target.value)}
-                  placeholder="Ej: FLOTA DE ASALTO SASORI"
-                  className="bg-black border-2 border-cyan-900 rounded-xl px-5 py-3 text-sm font-mono tracking-widest text-center text-white placeholder-cyan-900/50 focus:outline-none focus:border-cyan-400 w-full max-w-md uppercase mb-8 shadow-[inset_0_0_20px_rgba(34,211,238,0.1)]"
-                />
-                <button 
-                  onClick={handleNextStep}
-                  className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white font-black text-[10px] uppercase tracking-[0.2em] px-8 py-3 rounded-xl transition-all shadow-[0_0_20px_rgba(34,211,238,0.3)] cursor-pointer"
-                >
-                  INICIAR ENSAMBLAJE <ChevronRight className="w-4 h-4" />
-                </button>
-              </motion.div>
+                ))}
+              </div>
             )}
+          </motion.div>
+        )}
 
-            {wizardStep === 1 && <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1">{renderSelectionGrid(1)}</motion.div>}
-            {wizardStep === 2 && <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1">{renderSelectionGrid(2)}</motion.div>}
-            {wizardStep === 3 && <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1">{renderSelectionGrid(3)}</motion.div>}
-            {wizardStep === 4 && <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1">{renderSelectionGrid(4)}</motion.div>}
-          </AnimatePresence>
-        </motion.div>
-      )}
-    </div>
+        {viewMode === "CREATE_WIZARD" && (
+          <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col h-full">
+            <div className="flex items-center gap-3 mb-6 border-b border-cyan-900/40 pb-3">
+              <button onClick={() => setViewMode("LIST")} className="p-1.5 text-zinc-500 hover:text-white bg-black rounded-lg border border-cyan-900/50 cursor-pointer">
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <div className="text-left">
+                <h3 className="text-sm font-sans font-black tracking-widest text-white uppercase">Asistente de Ensamblaje</h3>
+                <p className="text-[10px] font-mono text-cyan-600 uppercase mt-1">
+                  {wizardStep === 0 && "PASO 0: IDENTIFICADOR"}
+                  {wizardStep === 1 && "FASE 1: ACOPLAMIENTO DE NAVES"}
+                  {wizardStep === 2 && "FASE 2: ASIGNACIÓN DE ASTROBOTS"}
+                  {wizardStep === 3 && "FASE 3: CARGA DE TOOLS"}
+                  {wizardStep === 4 && "FASE 4: CONSUMIBLES DE EMERGENCIA"}
+                </p>
+              </div>
+            </div>
+
+            <AnimatePresence mode="wait">
+              {wizardStep === 0 && (
+                <motion.div key="step0" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col items-center justify-center flex-1 py-8">
+                  <Layers className="w-12 h-12 text-cyan-500/50 mb-6" />
+                  <h4 className="text-sm font-black text-white uppercase tracking-widest mb-2">Designa tu Flota</h4>
+                  <p className="text-[10px] font-mono text-zinc-400 mb-6 text-center max-w-sm">Establece un código de identificación táctico para agrupar tus activos.</p>
+                  <input 
+                    type="text" 
+                    value={fleetName}
+                    onChange={(e) => setFleetName(e.target.value)}
+                    placeholder="Ej: FLOTA DE ASALTO SASORI"
+                    className="bg-black border-2 border-cyan-900 rounded-xl px-5 py-3 text-sm font-mono tracking-widest text-center text-white placeholder-cyan-900/50 focus:outline-none focus:border-cyan-400 w-full max-w-md uppercase mb-8 shadow-[inset_0_0_20px_rgba(34,211,238,0.1)]"
+                  />
+                  <button 
+                    onClick={handleNextStep}
+                    className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white font-black text-[10px] uppercase tracking-[0.2em] px-8 py-3 rounded-xl transition-all shadow-[0_0_20px_rgba(34,211,238,0.3)] cursor-pointer"
+                  >
+                    INICIAR ENSAMBLAJE <ChevronRight className="w-4 h-4" />
+                  </button>
+                </motion.div>
+              )}
+
+              {wizardStep === 1 && <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1">{renderSelectionGrid(1)}</motion.div>}
+              {wizardStep === 2 && <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1">{renderSelectionGrid(2)}</motion.div>}
+              {wizardStep === 3 && <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1">{renderSelectionGrid(3)}</motion.div>}
+              {wizardStep === 4 && <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1">{renderSelectionGrid(4)}</motion.div>}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </div>
+    </GalaxyFrame>
   );
 };
+
+export default FleetManager;

@@ -7,7 +7,7 @@ import { MarketplaceView } from '../components/MarketplaceView';
 import { PhantomStationView } from '../components/PhantomStationView';
 import { InventoryView } from '../components/InventoryView';
 import { AllianceView } from '../components/AllianceView';
-import { CanView } from '../components/CanView';
+import { CanView, GalaxyFrame } from '../components/CanView';
 import { ProfileView } from '../components/ProfileView';
 import { NotificationsView } from '../components/NotificationsView';
 import { MissionView } from '../components/MissionView';
@@ -70,17 +70,41 @@ const resolveAvatarUrl = (rawUrl?: string): string => {
 };
 
 const cards: SectorCard[] = [
-  { id: "expedition", title: "EXPEDITION", description: "Venture into the unknown, explore, farm, and dominate the galaxy.", imageSrc: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop", targetWindow: "expeditions" },
-  { id: "alliance", title: "ALLIANCE", description: "Coordinate your power. Expand your dominion.", imageSrc: "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=800&auto=format&fit=crop", targetWindow: "alliance" },
-  { id: "market", title: "MARKET", description: "Acquire cargo bundles, speedups, and imperial fleet supplies.", imageSrc: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=800&auto=format&fit=crop", targetTab: "marketplace" },
-  { id: "phantom", title: "PHANTOM STATION", description: "Exchange void crystals, blueprints, and rare synaptic upgrades.", imageSrc: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800&auto=format&fit=crop", targetTab: "phantom" }
+  { 
+    id: "expedition", 
+    title: "EXPEDITION", 
+    description: "Venture into the unknown, explore, farm, and dominate the galaxy.", 
+    imageSrc: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20(Ambientes%20)/13.jpg", 
+    targetWindow: "expeditions" 
+  },
+  { 
+    id: "alliance", 
+    title: "ALLIANCE", 
+    description: "Coordinate your power. Expand your dominion.", 
+    imageSrc: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20(Ambientes%20)/Alliance%20depot.jpg", 
+    targetWindow: "alliance" 
+  },
+  { 
+    id: "market", 
+    title: "MARKET", 
+    description: "Acquire cargo bundles, speedups, and imperial fleet supplies.", 
+    imageSrc: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20(Ambientes%20)/17.jpg", 
+    targetTab: "marketplace" 
+  },
+  { 
+    id: "phantom", 
+    title: "PHANTOM STATION", 
+    description: "Exchange void crystals, blueprints, and rare synaptic upgrades.", 
+    imageSrc: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800&auto=format&fit=crop", 
+    targetTab: "phantom" 
+  }
 ];
 
 export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<"home" | "marketplace" | "phantom" | "can" | "inventory" | "mission">("home");
   const [activeWindow, setActiveWindow] = useState<"home" | "expeditions" | "alliance" | "profile" | "settings">("home");
 
-  // 🎯 POPUPS OVERLAY INDEPENDIENTES (MANTIENEN LA NAVEGACIÓN Y PESTAÑA DEL HEADER)
+  // POPUPS OVERLAY INDEPENDIENTES
   const [showFlightsModal, setShowFlightsModal] = useState<boolean>(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState<boolean>(false);
 
@@ -405,7 +429,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         </div>
       </div>
 
-      {/* BOTONES ACCESO RÁPIDO Y POPUPS (OJITO Y CAMPANA NO CAMBIAN PESTAÑA EN HEADER) */}
+      {/* BOTONES ACCESO RÁPIDO Y POPUPS */}
       <div className="fixed right-6 top-24 flex flex-col items-center gap-3 z-30 font-mono">
         <button 
           onClick={() => setShowFlightsModal(true)} 
@@ -453,40 +477,45 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
               <motion.div key="sector-home-screen" className="w-full my-auto">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
                   {cards.map((card) => (
-                    <div
+                    <GalaxyFrame
                       key={card.id}
-                      onClick={() => {
-                        if (card.targetWindow) {
-                          setActiveTab("home");
-                          setActiveWindow(card.targetWindow);
-                        } else if (card.targetTab) {
-                          setActiveTab(card.targetTab);
-                          setActiveWindow("home");
-                        }
-                      }}
-                      className="relative h-[440px] w-full rounded-xl overflow-hidden cursor-pointer border border-neutral-800 hover:border-red-500/60 transition-all duration-300 group flex flex-col justify-between p-6 bg-black/85 backdrop-blur-sm shadow-2xl"
+                      className="h-[440px] w-full cursor-pointer hover:scale-[1.02] transition-all duration-300 group shadow-2xl bg-transparent"
+                      innerPadding="p-3.5"
                     >
-                      <div className="absolute inset-0 z-0">
-                        <img
-                          src={card.imageSrc}
-                          alt={card.title}
-                          className="w-full h-full object-cover brightness-50 group-hover:scale-105 group-hover:brightness-75 transition-all duration-500"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-                      </div>
+                      <div
+                        onClick={() => {
+                          if (card.targetWindow) {
+                            setActiveTab("home");
+                            setActiveWindow(card.targetWindow);
+                          } else if (card.targetTab) {
+                            setActiveTab(card.targetTab);
+                            setActiveWindow("home");
+                          }
+                        }}
+                        className="relative h-full w-full flex flex-col justify-between overflow-hidden rounded-lg bg-black/80 border border-cyan-950/60"
+                      >
+                        <div className="absolute inset-0 z-0">
+                          <img
+                            src={card.imageSrc}
+                            alt={card.title}
+                            className="w-full h-full object-cover brightness-60 group-hover:scale-105 group-hover:brightness-80 transition-all duration-500"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+                        </div>
 
-                      <div className="relative z-10">
-                        <h2 className="text-xl font-black text-white uppercase tracking-widest group-hover:text-red-400 transition-colors">
-                          {card.title}
-                        </h2>
-                      </div>
+                        <div className="relative z-10 text-left p-4">
+                          <h2 className="text-lg font-black text-white uppercase tracking-widest group-hover:text-cyan-400 transition-colors">
+                            {card.title}
+                          </h2>
+                        </div>
 
-                      <div className="relative z-10 mt-auto">
-                        <p className="text-[11px] font-mono text-zinc-400 leading-relaxed uppercase">
-                          {card.description}
-                        </p>
+                        <div className="relative z-10 mt-auto text-left p-4">
+                          <p className="text-[10px] font-mono text-zinc-200 leading-relaxed uppercase drop-shadow-md">
+                            {card.description}
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    </GalaxyFrame>
                   ))}
                 </div>
               </motion.div>
@@ -521,7 +550,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         </AnimatePresence>
       </div>
 
-      {/* 🎯 VENTANA POPUP 1: EXPEDITIONS IN FLIGHT (OVERLAY FLOTANTE SOBRE CUALQUIER PANTALLA) */}
+      {/* VENTANA POPUP 1: EXPEDITIONS IN FLIGHT */}
       <AnimatePresence>
         {showFlightsModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
@@ -541,7 +570,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         )}
       </AnimatePresence>
 
-      {/* 🎯 VENTANA POPUP 2: NOTIFICACIONES (OVERLAY FLOTANTE SOBRE CUALQUIER PANTALLA) */}
+      {/* VENTANA POPUP 2: NOTIFICACIONES (ENMARCADA CON GALAXYFRAME) */}
       <AnimatePresence>
         {showNotificationsModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
@@ -549,9 +578,11 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-3xl relative bg-[#080b0e] border border-cyan-500/40 rounded-2xl p-4 shadow-[0_0_50px_rgba(6,182,212,0.2)]"
+              className="w-full max-w-3xl relative"
             >
-              <NotificationsView onBack={() => setShowNotificationsModal(false)} triggerNotification={handleTriggerNotification} />
+              <GalaxyFrame className="w-full h-full overflow-hidden text-left" innerPadding="p-4 sm:p-6">
+                <NotificationsView onBack={() => setShowNotificationsModal(false)} triggerNotification={handleTriggerNotification} />
+              </GalaxyFrame>
             </motion.div>
           </div>
         )}
