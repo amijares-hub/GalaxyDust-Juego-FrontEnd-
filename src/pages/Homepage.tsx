@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, Settings, X, Bell } from 'lucide-react';
+import { Eye, Settings, X, Bell, Lock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ExpeditionsView } from '../components/ExpeditionsView';
 import { MarketplaceView } from '../components/MarketplaceView';
@@ -9,11 +9,12 @@ import { InventoryView } from '../components/InventoryView';
 import { AllianceView } from '../components/AllianceView';
 import { CanView, GalaxyFrame } from '../components/CanView';
 import { ProfileView } from '../components/ProfileView';
-import { NotificationsView } from '../components/NotificationsView';
+import { NotificationsView, isOfficialComunicado } from '../components/NotificationsView';
 import { MissionView } from '../components/MissionView';
 import { ChatSystem } from '../components/ChatSystem';
 import { Header } from '../components/Header';
 import { miningService } from '../services/miningService';
+import { useNotifications } from '../hooks/useNotifications';
 
 const GAME_ASSETS = {
   background: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20(Ambientes%20)/22.jpg",
@@ -69,6 +70,26 @@ const resolveAvatarUrl = (rawUrl?: string): string => {
   return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/galaxy-assets/${clean.replace(/^\//, '')}`;
 };
 
+// Helpers para almacenamiento persistente anti-bucle
+const getNotifiedExpeditionIds = (userId: string): Set<string> => {
+  try {
+    const stored = localStorage.getItem(`notified_expeditions_${userId}`);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch {
+    return new Set();
+  }
+};
+
+const addNotifiedExpeditionId = (userId: string, expId: string) => {
+  try {
+    const stored = getNotifiedExpeditionIds(userId);
+    stored.add(expId);
+    localStorage.setItem(`notified_expeditions_${userId}`, JSON.stringify(Array.from(stored)));
+  } catch (e) {
+    console.error(e);
+  }
+};
+
 const cards: SectorCard[] = [
   { 
     id: "expedition", 
@@ -95,7 +116,7 @@ const cards: SectorCard[] = [
     id: "phantom", 
     title: "PHANTOM STATION", 
     description: "Exchange void crystals, blueprints, and rare synaptic upgrades.", 
-    imageSrc: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800&auto=format&fit=crop", 
+    imageSrc: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Phatom%20Station/Skin%20Original/image%20(18).png", 
     targetTab: "phantom" 
   }
 ];
@@ -104,17 +125,17 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<"home" | "marketplace" | "phantom" | "can" | "inventory" | "mission">("home");
   const [activeWindow, setActiveWindow] = useState<"home" | "expeditions" | "alliance" | "profile" | "settings">("home");
 
-  // POPUPS OVERLAY INDEPENDIENTES
   const [showFlightsModal, setShowFlightsModal] = useState<boolean>(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState<boolean>(false);
 
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string>(user.avatarUrl || '');
-  const [unreadNotifCount, setUnreadNotifCount] = useState<number>(0);
   const [utcTime, setUtcTime] = useState<string>(miningService.getFormattedUtcTime());
+
+  // Hook maestro de notificaciones / comunicados oficiales
+  const { unreadCount, refresh: refreshNotifications } = useNotifications();
 
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const [activeFlights, setActiveFlights] = useState<any[]>([]);
-  const [notifiedFlightIds, setNotifiedFlightIds] = useState<Set<string>>(new Set());
 
   const [power, setPower] = useState(0);
   const [currencies, setCurrencies] = useState({ gd_coin: 0, quantum_credit: 0, phantom_coin: 0, halloween_coin: 0, xmas_coin: 0, valentine_coin: 0 });
@@ -128,6 +149,8 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     return activeFlights.filter(exp => new Date(exp.estimated_return_time).getTime() <= nowMs).length;
   }, [activeFlights, utcTime]);
 
+  // 🎯 Muestra SIEMPRE el aviso flotante Toast en pantalla, pero NUNCA suma +1 directo a la campana
+  // Solo se persiste en DB si es uno de los 5 Comunicados Oficiales permitidos
   const handleTriggerNotification = async (text: string, payloadOrExpId?: any) => {
     const id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
     const newToast: ToastNotification = {
@@ -136,43 +159,66 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       timestamp: new Date().toLocaleTimeString()
     };
 
+    // 1. Mostrar Toast flotante para feedback inmediato
     setToasts(prev => [newToast, ...prev].slice(0, 4));
-
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser) {
-        let validExpId: string | null = null;
-        let rewardsPayload: any = {};
-
-        if (typeof payloadOrExpId === 'string' && isValidUUID(payloadOrExpId)) {
-          validExpId = payloadOrExpId;
-        } else if (payloadOrExpId && typeof payloadOrExpId === 'object') {
-          if (isValidUUID(payloadOrExpId.expId)) validExpId = payloadOrExpId.expId;
-          if (payloadOrExpId.rewards) rewardsPayload = payloadOrExpId.rewards;
-        }
-
-        if (validExpId) {
-          await supabase.from('expedition_logs').insert([{
-            user_id: authUser.id,
-            expedition_id: validExpId,
-            event_type: 'discovery',
-            title: 'EXPEDICIÓN FINALIZADA',
-            message: text,
-            rewards_looted: rewardsPayload,
-            damage_sustained: 0
-          }]);
-        }
-
-        setUnreadNotifCount(prev => prev + 1);
-      }
-    } catch (err) {
-      console.error("Error al persistir notificación:", err);
-      setUnreadNotifCount(prev => prev + 1);
-    }
 
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 5500);
+
+    // 2. Evaluar filtro de Comunicados Oficiales
+    const mockRecord: any = {
+      title: typeof payloadOrExpId === 'object' && payloadOrExpId?.title ? payloadOrExpId.title : 'COMUNICADO OFICIAL',
+      message: text,
+      category: typeof payloadOrExpId === 'object' && payloadOrExpId?.category ? payloadOrExpId.category : 'EXPEDITION',
+      box_type: typeof payloadOrExpId === 'object' && payloadOrExpId?.box_type ? payloadOrExpId.box_type : ''
+    };
+
+    // Si no cumple el filtro estricto de Comunicados Oficiales, termina aquí (sin persistir en BD ni alterar campana)
+    if (!isOfficialComunicado(mockRecord)) {
+      return;
+    }
+
+    // 3. Persistir en Supabase únicamente si es un Comunicado Oficial
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) return;
+
+      let validExpId: string | null = null;
+      let rewardsPayload: any = {};
+
+      if (typeof payloadOrExpId === 'string' && isValidUUID(payloadOrExpId)) {
+        validExpId = payloadOrExpId;
+      } else if (payloadOrExpId && typeof payloadOrExpId === 'object') {
+        if (isValidUUID(payloadOrExpId.expId)) validExpId = payloadOrExpId.expId;
+        if (payloadOrExpId.rewards) rewardsPayload = payloadOrExpId.rewards;
+      }
+
+      if (validExpId) {
+        const { data: existingLog } = await supabase
+          .from('expedition_logs')
+          .select('id')
+          .eq('user_id', authUser.id)
+          .eq('expedition_id', validExpId)
+          .maybeSingle();
+
+        if (existingLog) return;
+      }
+
+      await supabase.from('expedition_logs').insert([{
+        user_id: authUser.id,
+        expedition_id: validExpId,
+        event_type: mockRecord.category,
+        title: mockRecord.title,
+        message: text,
+        rewards_looted: rewardsPayload,
+        is_read: false
+      }]);
+
+      refreshNotifications();
+    } catch (err) {
+      console.error("Error al persistir comunicado oficial:", err);
+    }
   };
 
   const removeToast = (id: string) => {
@@ -186,20 +232,39 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     return () => clearInterval(timer);
   }, []);
 
+  // Control estricto anti-duplicados al verificar vuelos terminados
   useEffect(() => {
     if (!activeFlights.length) return;
     const nowMs = Date.now();
-    activeFlights.forEach((exp) => {
-      const returnMs = new Date(exp.estimated_return_time).getTime();
-      if (nowMs >= returnMs && !notifiedFlightIds.has(exp.id)) {
-        setNotifiedFlightIds(prev => new Set(prev).add(exp.id));
-        handleTriggerNotification(
-          `🎉 ¡EXPEDICIÓN FINALIZADA! La flota ${exp.fleet_name || 'de expedición'} ha llegado a su destino (${exp.sector_name || 'SC'}). Reclama tus recompensas en Expeditions In Flight.`,
-          { expId: exp.id }
-        );
-      }
+
+    supabase.auth.getUser().then(({ data: { user: authUser } }) => {
+      if (!authUser) return;
+
+      const notifiedSet = getNotifiedExpeditionIds(authUser.id);
+
+      activeFlights.forEach(async (exp) => {
+        const returnMs = new Date(exp.estimated_return_time).getTime();
+        if (nowMs >= returnMs && !notifiedSet.has(exp.id)) {
+          // Registrar en almacenamiento persistente
+          addNotifiedExpeditionId(authUser.id, exp.id);
+
+          const { data: existingLog } = await supabase
+            .from('expedition_logs')
+            .select('id')
+            .eq('user_id', authUser.id)
+            .eq('expedition_id', exp.id)
+            .maybeSingle();
+
+          if (!existingLog) {
+            handleTriggerNotification(
+              `🎉 ¡EXPEDICIÓN FINALIZADA! La flota ${exp.fleet_name || 'de expedición'} ha llegado a su destino (${exp.sector_name || 'SC'}). Reclama tus recompensas en Expeditions In Flight.`,
+              { expId: exp.id, category: 'EXPEDITION', title: 'EXPEDICIÓN FINALIZADA' }
+            );
+          }
+        }
+      });
     });
-  }, [utcTime, activeFlights, notifiedFlightIds]);
+  }, [utcTime, activeFlights]);
 
   useEffect(() => {
     let profileChannel: any;
@@ -302,10 +367,9 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           schema: 'public', 
           table: 'expedition_logs',
           filter: `user_id=eq.${authUser.id}`
-        }, (payload: any) => {
-          const newLog = payload.new;
-          if (newLog && isMounted) {
-            setUnreadNotifCount(prev => prev + 1);
+        }, () => {
+          if (isMounted) {
+            refreshNotifications();
           }
         })
         .subscribe();
@@ -327,7 +391,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       if (logsChannel) supabase.removeChannel(logsChannel);
       if (expeditionsChannel) supabase.removeChannel(expeditionsChannel);
     };
-  }, []);
+  }, [refreshNotifications]);
 
   return (
     <main 
@@ -417,8 +481,11 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           else if (tab === 'INVENTORY') { setActiveTab('inventory'); setActiveWindow('home'); }
           else if (tab === 'MISSION') { setActiveTab('mission'); setActiveWindow('home'); }
         }}
-        unreadNotificationsCount={unreadNotifCount}
-        onOpenNotifications={() => setShowNotificationsModal(true)}
+        unreadNotificationsCount={unreadCount}
+        onOpenNotifications={() => {
+          setShowNotificationsModal(true);
+          refreshNotifications();
+        }}
         onOpenSettings={() => { setActiveTab('home'); setActiveWindow('settings'); }}
         onOpenProfile={() => { setActiveTab('home'); setActiveWindow('profile'); }}
       />
@@ -448,15 +515,19 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           ) : null}
         </button>
 
+        {/* BOTÓN CAMPANA DE NOTIFICACIONES */}
         <button 
-          onClick={() => setShowNotificationsModal(true)} 
+          onClick={() => {
+            setShowNotificationsModal(true);
+            refreshNotifications();
+          }} 
           className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer relative hover:border-cyan-400 transition-all shadow-md"
-          title="Notificaciones"
+          title="Comunicados Oficiales"
         >
           <Bell className="w-5 h-5 text-cyan-400" />
-          {unreadNotifCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full border border-red-400 shadow-[0_0_10px_#ef4444] animate-pulse">
-              {unreadNotifCount}
+          {unreadCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white font-mono text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-[0_0_8px_rgba(239,68,68,0.8)] border border-black animate-pulse">
+              {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
         </button>
@@ -479,11 +550,12 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                   {cards.map((card) => (
                     <GalaxyFrame
                       key={card.id}
-                      className="h-[440px] w-full cursor-pointer hover:scale-[1.02] transition-all duration-300 group shadow-2xl bg-transparent"
+                      className={`h-[440px] w-full ${card.id === 'alliance' ? 'pointer-events-none' : 'cursor-pointer hover:scale-[1.02]'} transition-all duration-300 group shadow-2xl bg-transparent`}
                       innerPadding="p-3.5"
                     >
                       <div
                         onClick={() => {
+                          if (card.id === 'alliance') return;
                           if (card.targetWindow) {
                             setActiveTab("home");
                             setActiveWindow(card.targetWindow);
@@ -492,7 +564,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                             setActiveWindow("home");
                           }
                         }}
-                        className="relative h-full w-full flex flex-col justify-between overflow-hidden rounded-lg bg-black/80 border border-cyan-950/60"
+                        className={`relative h-full w-full flex flex-col justify-between overflow-hidden rounded-lg bg-black/80 border border-cyan-950/60 ${card.id === 'alliance' ? 'opacity-40 grayscale' : ''}`}
                       >
                         <div className="absolute inset-0 z-0">
                           <img
@@ -514,6 +586,18 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                             {card.description}
                           </p>
                         </div>
+                        {card.id === 'alliance' && (
+                          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none bg-black/40">
+                            <motion.div 
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="bg-black/90 border border-cyan-500/50 rounded-lg px-4 py-3 flex flex-col items-center gap-2 shadow-[0_0_15px_rgba(6,182,212,0.3)] backdrop-blur-md"
+                            >
+                              <Lock className="w-6 h-6 text-cyan-400" />
+                              <span className="text-[10px] font-black text-cyan-300 tracking-widest uppercase">COMING SOON</span>
+                            </motion.div>
+                          </div>
+                        )}
                       </div>
                     </GalaxyFrame>
                   ))}
@@ -570,7 +654,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         )}
       </AnimatePresence>
 
-      {/* VENTANA POPUP 2: NOTIFICACIONES (ENMARCADA CON GALAXYFRAME) */}
+      {/* VENTANA POPUP 2: NOTIFICACIONES / COMUNICADOS */}
       <AnimatePresence>
         {showNotificationsModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
@@ -592,3 +676,5 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     </main>
   );
 };
+
+export default Homepage;

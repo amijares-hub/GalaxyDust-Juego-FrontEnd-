@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CornerUpLeft, X, Search, Lock, MapPin, Wrench, Bot, FileText, Package, Clock, 
-  Pickaxe, Radio, Box, Check, Trash2, Rocket, Sparkles, RotateCcw, ShieldAlert, ChevronDown, ChevronUp, Layers
+  Pickaxe, Radio, Box, Check, Trash2, Rocket, Sparkles, ChevronDown, ChevronUp, Layers
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAudioEngine } from '../hooks/useAudioEngine';
@@ -160,12 +160,18 @@ const isValidUUID = (str?: string | null): boolean => {
 };
 
 const resolveImageUrl = (rawUrl?: string, fallbackId?: string) => {
-  if (rawUrl && typeof rawUrl === 'string' && rawUrl.trim() !== '') {
-    const clean = rawUrl.trim();
-    if (clean.startsWith('http://') || clean.startsWith('https://')) return clean;
-    if (clean.includes('.') || clean.includes('/')) {
-      return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/galaxy-assets/${clean.replace(/^\//, '')}`;
-    }
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
+  }
+  const clean = rawUrl.trim();
+  if (clean === '' || clean.includes('global_hud_config') || clean.includes('undefined') || clean.includes('[object Object]')) {
+    return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
+  }
+  if (clean.startsWith('http://') || clean.startsWith('https://')) {
+    return clean;
+  }
+  if (clean.includes('.') || clean.includes('/')) {
+    return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/galaxy-assets/${clean.replace(/^\//, '')}`;
   }
   return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
 };
@@ -315,7 +321,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   const totalExpeditionProbability = useMemo(() => {
     const baseClusterRate = activeGcObject?.ss_discovery_rate !== undefined 
       ? Number(activeGcObject.ss_discovery_rate) 
-      : 5;
+      : 0.5;
 
     let modifierSum = baseClusterRate + globalPassiveBonus;
 
@@ -658,7 +664,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
           max_metal: g.max_metal ?? 1200,
           min_crystal: g.min_crystal ?? 150,
           max_crystal: g.max_crystal ?? 600,
-          ss_discovery_rate: g.ss_discovery_rate ?? 5
+          ss_discovery_rate: g.ss_discovery_rate ?? 0.5
         }));
         setGcList(gcObjects);
         setSelectedGC(prev => prev ?? gcObjects[0].id);
@@ -977,7 +983,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
       }
     } catch (err) {
       if (triggerNotification) triggerNotification("⚠️ FALLO AL SINCRONIZAR INVENTARIO REAL");
-    } finally {
+    } fontally: {
       setLoading(false);
     }
   };
@@ -1189,6 +1195,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     }
   };
 
+  // 🛡️ RECLAMO STRICT ZERO-TRUST (LLAMADA RPC CON VALIDACIÓN EN BD)
   const handleClaimExpeditionRewards = async (exp: Expedition) => {
     const returnMs = new Date(exp.estimated_return_time).getTime();
     if (now < returnMs) {
@@ -1197,55 +1204,56 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
       return;
     }
 
+    if (!isValidUUID(exp.id)) {
+      playSfx(300);
+      if (triggerNotification) triggerNotification("⛔ IDENTIFICADOR DE EXPEDICIÓN INVÁLIDO");
+      return;
+    }
+
     setClaimingExpeditionId(exp.id);
     playSfx(880);
 
     try {
-      if (isValidUUID(exp.id)) {
-        const { data, error } = await supabase.rpc('claim_expedition_secure', {
-          p_expedition_id: exp.id
-        });
+      const { data, error } = await supabase.rpc('claim_expedition_secure', {
+        p_expedition_id: exp.id
+      });
 
-        if (error) throw error;
-
-        if (data && data.success) {
-          playSfx(1200);
-
-          const metalMined = Number(data.metal_mined || 0);
-          const crystalMined = Number(data.crystal_mined || 0);
-          const darkMatterMined = Number(data.dark_matter_mined || 0);
-
-          const dropText = `METAL: +${metalMined.toLocaleString()} | CRISTAL: +${crystalMined.toLocaleString()}${darkMatterMined > 0 ? ` | M.O.: +${darkMatterMined.toLocaleString()}` : ''}`;
-
-          const drop: MiningDrop = {
-            name: dropText,
-            amount: 1,
-            rarity: "EPIC",
-            icon: "💎"
-          };
-          setCurrentRewardDrop(drop);
-          setIsRewardSummaryOpen(true);
-
-          const notificationMsg = `🎉 BOTÍN EXTRAÍDO EN ${exp.sector_name.toUpperCase()}: +${metalMined.toLocaleString()} Metal, +${crystalMined.toLocaleString()} Cristal${darkMatterMined > 0 ? `, +${darkMatterMined.toLocaleString()} Materia Oscura` : ''}`;
-
-          if (triggerNotification) {
-            triggerNotification(notificationMsg, {
-              expId: exp.id,
-              rewards: {
-                metal: metalMined,
-                crystal: crystalMined,
-                dark_matter: darkMatterMined
-              }
-            });
-          }
-        } else {
-          throw new Error(data?.error || 'Falló el reclamo');
-        }
+      if (error) {
+        console.error("Detalle de error RPC Supabase:", error);
+        throw new Error(error.message || 'Error en respuesta RPC del servidor.');
       }
 
-      await syncDatabaseData();
+      if (data && data.success) {
+        playSfx(1200);
+
+        const metalMined = Number(data.metal_mined || 0);
+        const crystalMined = Number(data.crystal_mined || 0);
+        const darkMatterMined = Number(data.dark_matter_mined || 0);
+
+        const dropText = `METAL: +${metalMined.toLocaleString()} | CRISTAL: +${crystalMined.toLocaleString()}${darkMatterMined > 0 ? ` | M.O.: +${darkMatterMined.toLocaleString()}` : ''}`;
+
+        setCurrentRewardDrop({
+          name: dropText,
+          amount: 1,
+          rarity: "EPIC",
+          icon: "💎"
+        });
+        setIsRewardSummaryOpen(true);
+
+        if (triggerNotification) {
+          triggerNotification(`🎉 BOTÍN EXTRAÍDO EN ${exp.sector_name.toUpperCase()}: ${dropText}`, {
+            expId: exp.id,
+            rewards: { metal: metalMined, crystal: crystalMined, dark_matter: darkMatterMined }
+          });
+        }
+
+        await syncDatabaseData();
+      } else {
+        throw new Error(data?.error || 'Reclamo rechazado por el servidor.');
+      }
     } catch (err: any) {
-      console.error("Error al reclamar recompensas:", err);
+      console.error("Error al reclamar recompensas Zero-Trust:", err);
+      playSfx(300);
       if (triggerNotification) triggerNotification(`⛔ ERROR AL RECLAMAR: ${err.message}`);
     } finally {
       setClaimingExpeditionId(null);
@@ -1359,17 +1367,38 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar py-0.5 max-w-full">
-              {['ALL', 'EXPLORATION', 'MINING', 'DOMINATION', 'HISTORIAL'].map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => { playSfx(660); setActiveFlightCategory(cat); }}
-                  className={`px-3 py-1.5 rounded-lg text-[8px] font-mono font-bold uppercase transition-all cursor-pointer border whitespace-nowrap ${
-                    activeFlightCategory === cat ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black shadow-[0_0_8px_rgba(6,182,212,0.3)]' : 'bg-[#0a0f14] text-zinc-400 border-transparent hover:text-white'
-                  }`}
-                >
-                  {cat === 'HISTORIAL' ? 'HISTORIAL (ÚLTIMAS 10)' : cat}
-                </button>
-              ))}
+              {['ALL', 'EXPLORATION', 'MINING', 'DOMINATION', 'HISTORIAL'].map((cat) => {
+                const isDomination = cat === 'DOMINATION';
+                return (
+                  <button
+                    key={cat}
+                    disabled={isDomination}
+                    onClick={() => {
+                      if (!isDomination) {
+                        playSfx(660);
+                        setActiveFlightCategory(cat);
+                      }
+                    }}
+                    className={`relative px-3 py-1.5 rounded-lg text-[8px] font-mono font-bold uppercase transition-all border whitespace-nowrap overflow-hidden ${
+                      isDomination
+                        ? 'bg-[#05080c] text-zinc-600 border-zinc-800 opacity-30 grayscale cursor-not-allowed pointer-events-none'
+                        : activeFlightCategory === cat
+                        ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black shadow-[0_0_8px_rgba(6,182,212,0.3)] cursor-pointer'
+                        : 'bg-[#0a0f14] text-zinc-400 border-transparent hover:text-white cursor-pointer'
+                    }`}
+                  >
+                    {cat === 'HISTORIAL' ? 'HISTORIAL (ÚLTIMAS 10)' : cat}
+                    {isDomination && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
+                        <span className="text-[6px] font-black text-red-500 bg-red-950/80 px-1 py-0.5 rounded border border-red-800 shadow-sm flex items-center gap-0.5">
+                          <Lock className="w-2 h-2" />
+                          [ LOCKED ]
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -1723,7 +1752,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                   {currentRewardDrop.name}
                 </div>
                 <button
-                  onClick={() => setIsRewardSummaryOpen(false)}
+                  onClick={handleAcceptRewardsClose}
                   className="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-[9px] uppercase rounded-lg cursor-pointer"
                 >
                   ENTENDIDO
@@ -1736,7 +1765,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     );
   }
 
-  // 🎯 VISTA 2: MAPA ORIGINAL DE SELECCIÓN Y CONFIGURACIÓN
+  // 🎯 VISTA 2: MAPA ORIGINAL DE SELECCIÓN Y CONFIGURACIÓN DE EXPEDICIONES
   return (
     <GalaxyFrame className="w-full max-w-7xl mx-auto my-1 font-mono text-left select-none text-white" innerPadding="p-4">
       <div className="flex flex-col gap-2">
@@ -1787,7 +1816,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                     { id: 'GC', label: 'GC', isUnlocked: true, isSelected: selectedGC !== null },
                     { id: 'GAL', label: 'GAL', isUnlocked: selectedGC !== null, isSelected: selectedGAL !== null },
                     { id: 'SC', label: 'SC', isUnlocked: selectedGAL !== null, isSelected: selectedSC !== null },
-                    { id: 'SS', label: 'SS', isUnlocked: selectedSC !== null && dbStarSystems.length > 0, isSelected: selectedSS !== null },
+                    { id: 'SS', label: 'SS', isUnlocked: selectedSC !== null, isSelected: selectedSS !== null },
                     { id: 'PLANETA', label: 'PLANETA', isUnlocked: selectedSS !== null && dbPlanets.length > 0, isSelected: selectedPlanet !== null }
                   ] as const).map((tab) => {
                     const isCurrent = currentStep === tab.id;
@@ -1908,6 +1937,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                     )
                   )}
 
+                  {/* 🎯 SELECCIONAR SC AVANZA AUTOMÁTICAMENTE A LA PESTAÑA SS */}
                   {currentStep === 'SC' && (
                     dbStarClusters.length === 0 ? (
                       <div className="p-4 text-center text-zinc-600 text-[9px] uppercase italic">No hay Star Clusters en esta galaxia.</div>
@@ -1920,6 +1950,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                             onClick={() => {
                               playSfx(880);
                               setSelectedSC(sc.id);
+                              setCurrentStep('SS'); // Avanza a la pestaña SS automáticamente
                             }} 
                             className={`w-full p-2.5 rounded-lg border text-[9.5px] font-bold uppercase cursor-pointer text-left transition-all ${
                               isSelected ? 'bg-cyan-950 text-cyan-300 border-cyan-500 shadow-md' : 'bg-[#0a0f14] border-cyan-950 text-zinc-300 hover:border-cyan-800'
@@ -1932,15 +1963,18 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                     )
                   )}
 
+                  {/* 🎯 PESTAÑA SS: SI NO HAY SS DESCUBIERTOS, MUESTRA MENSAJE Y BOTÓN "ARMAR FLOTA" */}
                   {currentStep === 'SS' && (
                     dbStarSystems.length === 0 ? (
-                      <div className="p-4 text-center text-zinc-600 text-[9px] uppercase italic space-y-2">
-                        <p>No se han descubierto sistemas solares en este SC.</p>
+                      <div className="p-3.5 bg-cyan-950/20 border border-cyan-900/50 rounded-xl text-center space-y-3 my-2">
+                        <p className="text-[8.5px] text-zinc-300 font-bold uppercase leading-relaxed">
+                          No has descubierto ningún Star System en este Star Cluster
+                        </p>
                         <button
-                          onClick={() => { playSfx(660); setCurrentStep('SC'); }}
-                          className="px-3 py-1 bg-cyan-950 border border-cyan-800 text-cyan-300 text-[8px] font-bold rounded cursor-pointer"
+                          onClick={() => { playSfx(880); setIsDispatchPanelActive(true); }}
+                          className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-teal-600 border border-cyan-400 text-white font-black text-[9px] uppercase rounded-lg shadow-lg cursor-pointer hover:brightness-110 active:scale-95 transition-all"
                         >
-                          ← Volver a SC y Enviar Misión de Reconocimiento
+                          ARMAR FLOTA
                         </button>
                       </div>
                     ) : (
@@ -2023,13 +2057,14 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 )}
               </div>
 
+              {/* 🎯 BOTÓN DE ACCIÓN EN PANEL LATERAL RENOMBRADO A "ARMAR FLOTA" */}
               <div className="h-[30%] w-full border-t border-cyan-500/30 flex items-center justify-center p-4 bg-[#020508]/80">
                 {selectedSC && (
                   <button
                     onClick={() => { playSfx(880); setIsDispatchPanelActive(true); }}
                     className="px-8 py-3.5 bg-gradient-to-r from-cyan-600 to-teal-600 border border-cyan-400 text-white text-[11px] font-black uppercase rounded-lg shadow-lg cursor-pointer hover:brightness-110 active:scale-95 transition-all"
                   >
-                    EQUIPAR Y DESPLEGAR MISIÓN
+                    ARMAR FLOTA
                   </button>
                 )}
               </div>

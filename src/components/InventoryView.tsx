@@ -39,83 +39,95 @@ const resolveImageUrl = (rawUrl?: string): string => {
   return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/galaxy-assets/${clean.replace(/^\//, '')}`;
 };
 
+// 🎯 DETERMINA DE MANERA STRICTA LA CATEGORÍA BASÁNDOSE EN CAMPOS DE BD Y NO EN PALABRAS DEL NOMBRE
 const getItemCategory = (item: InventoryItem): string => {
   const cat = String(item.category || "").toLowerCase().trim();
   const type = String((item as any).type || "").toLowerCase().trim();
-  const name = String(item.name || (item as any).fullname || "").toLowerCase().trim();
 
-  if (cat === "fleets" || (item as any).is_fleet) return "Fleets";
+  if (cat === "fleets" || cat === "fleet" || (item as any).is_fleet) return "Fleets";
+
+  if (
+    ["spaceships", "spaceship", "ships", "ship", "naves", "nave"].includes(cat) ||
+    ["spaceships", "spaceship", "ships", "ship", "naves", "nave"].includes(type)
+  ) {
+    return "Spaceships";
+  }
 
   if (
     ["structures", "structure", "estructura", "estructuras"].includes(cat) ||
-    ["structures", "structure", "estructura"].includes(type) ||
-    /mine|deposit|factory|hq|extractor|plant|refinery|storage|building|estructura|structure|layer|agency/.test(name)
+    ["structures", "structure", "estructura", "estructuras"].includes(type)
   ) {
     return "Structures";
   }
 
   if (
     ["defense", "defenses", "defensa", "defensas"].includes(cat) ||
-    ["defense", "defensa"].includes(type) ||
-    /cannon|launcher|turret|torpedo|barrier|battery|defensa|defense/.test(name)
+    ["defense", "defenses", "defensa", "defensas"].includes(type)
   ) {
     return "Defense";
   }
 
   if (
     ["astrobots", "astrobot", "robot", "robots"].includes(cat) ||
-    ["astrobot", "robot"].includes(type) ||
-    /astrobot|robot|drone|android/.test(name)
+    ["astrobots", "astrobot", "robot", "robots"].includes(type)
   ) {
     return "Astrobots";
   }
 
   if (
     ["tecnology", "technology", "technologies", "tech", "tecnologia", "tecnología"].includes(cat) ||
-    ["technology", "tech", "tecnologia"].includes(type) ||
-    /technology|tecnologia|tech|research/.test(name)
+    ["tecnology", "technology", "technologies", "tech", "tecnologia", "tecnología"].includes(type)
   ) {
     return "Tecnology";
   }
 
   if (
     ["blueprints", "blueprint", "plano", "planos"].includes(cat) ||
-    ["blueprint", "plano"].includes(type) ||
-    /blueprint|plano|schematic/.test(name)
+    ["blueprints", "blueprint", "plano", "planos"].includes(type)
   ) {
     return "Blueprints";
   }
 
   if (
     ["badges", "badge", "insignia", "insignias"].includes(cat) ||
-    ["badge", "insignia"].includes(type) ||
-    /badge|insignia|medal/.test(name)
+    ["badges", "badge", "insignia", "insignias"].includes(type)
   ) {
     return "Badges";
   }
 
   if (
     ["licencia", "license", "licenses", "licencias"].includes(cat) ||
-    ["license", "licencia"].includes(type) ||
-    /license|licencia|permit/.test(name)
+    ["licencia", "license", "licenses", "licencias"].includes(type)
   ) {
     return "Licencia";
   }
 
   if (
     ["tools", "tool", "herramientas", "herramienta"].includes(cat) ||
-    ["tool", "herramienta"].includes(type) ||
-    /tool|herramienta|drill|probe|scanner|sensor/.test(name)
+    ["tools", "tool", "herramientas", "herramienta"].includes(type)
   ) {
     return "Tools";
   }
 
   if (
     ["consumibles", "consumables", "consumable"].includes(cat) ||
-    ["consumable", "consumible"].includes(type) ||
-    /consumable|consumible|capsule|ration|resupply/.test(name)
+    ["consumibles", "consumables", "consumable"].includes(type)
   ) {
     return "Consumibles";
+  }
+
+  // Fallback por cadena de categoría aislada
+  if (cat) {
+    if (cat.includes("ship") || cat.includes("nave")) return "Spaceships";
+    if (cat.includes("struct") || cat.includes("estruct")) return "Structures";
+    if (cat.includes("defen")) return "Defense";
+    if (cat.includes("bot") || cat.includes("robot")) return "Astrobots";
+    if (cat.includes("tech") || cat.includes("tecno")) return "Tecnology";
+    if (cat.includes("print") || cat.includes("plano")) return "Blueprints";
+    if (cat.includes("badge") || cat.includes("insign")) return "Badges";
+    if (cat.includes("licen")) return "Licencia";
+    if (cat.includes("tool") || cat.includes("herram")) return "Tools";
+    if (cat.includes("consum")) return "Consumibles";
   }
 
   return "Spaceships";
@@ -189,6 +201,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   const getFilteredCharacters = useMemo(() => {
     let list = [...characters];
+
+    // 🎯 FILTRO ANTI-MOCKDATA: Elimina licencias sintéticas o no enlazadas con UUID en el nombre
+    list = list.filter((c) => {
+      const cat = getItemCategory(c);
+      if (cat === "Licencia") {
+        const nameUpper = String(c.name || "").trim().toUpperCase();
+        if (/^LICENCIA\s*#[0-9A-F-]{10,}$/i.test(nameUpper) && !(c as any).has_real_seed) {
+          return false;
+        }
+      }
+      return true;
+    });
 
     if (modsEnabled) {
       list = list.filter((c) => c.is_in_flight);
@@ -669,7 +693,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       className="px-3.5 py-1.5 bg-purple-950/60 hover:bg-purple-900 border border-purple-500/50 text-purple-300 rounded-xl text-[8.5px] font-mono font-black uppercase tracking-wider transition-all cursor-pointer shadow-[0_0_10px_rgba(168,85,247,0.3)] flex items-center gap-1.5"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                      [SKILLS]
+                      [SKILLS COMING SOON]
                     </button>
 
                     {getItemCategory(selectedChar) === 'Spaceships' && showSubModal === null && !selectedChar.is_in_flight && (
@@ -726,54 +750,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
 
                 <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1 custom-scrollbar">
-                  <div className="p-2 bg-black/60 border border-purple-950 rounded-xl flex items-center justify-between">
+                  <div className="p-2 bg-black/60 border border-purple-950 rounded-xl flex items-center justify-between opacity-50 grayscale pointer-events-none">
                     <span className="text-[9.5px] text-white font-bold uppercase">{selectedChar.name}</span>
                     <span className="text-[7.5px] bg-purple-950 text-purple-300 px-2 py-0.5 rounded font-bold uppercase border border-purple-800">
                       {selectedChar.category}
                     </span>
                   </div>
 
-                  <div className="bg-amber-950/20 border border-amber-900/40 rounded-xl p-2.5">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                      <span className="text-[8.5px] text-amber-400 font-bold tracking-widest uppercase">Set Skills & Sinergias</span>
-                    </div>
-                    <p className="text-[8.5px] text-zinc-300 uppercase leading-relaxed">
-                      {selectedChar.set_skills || "Sin habilidad de set asociada."}
-                    </p>
-                  </div>
-
-                  <div className="bg-purple-950/20 border border-purple-900/40 rounded-xl p-2.5">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Zap className="w-3.5 h-3.5 text-purple-400" />
-                      <span className="text-[8.5px] text-purple-400 font-bold tracking-widest uppercase">Habilidades Registradas</span>
-                    </div>
-                    {selectedChar.skills ? (
-                      <div className="space-y-1.5 text-[8.5px] text-zinc-300 uppercase">
-                        {Array.isArray(selectedChar.skills) ? (
-                          selectedChar.skills.map((s: any, idx: number) => (
-                            <div key={idx} className="p-1.5 bg-black/40 border border-purple-950 rounded">
-                              {typeof s === 'string' ? s : JSON.stringify(s)}
-                            </div>
-                          ))
-                        ) : (
-                          <pre className="text-[7.5px] bg-black/60 p-2 rounded text-purple-300 whitespace-pre-wrap font-mono">
-                            {JSON.stringify(selectedChar.skills, null, 2)}
-                          </pre>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-[8.5px] text-zinc-500 uppercase">Sin habilidades activas en esta matriz.</p>
-                    )}
-                  </div>
-
-                  <div className="bg-cyan-950/20 border border-cyan-900/40 rounded-xl p-2.5">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Shield className="w-3.5 h-3.5 text-cyan-400" />
-                      <span className="text-[8.5px] text-cyan-400 font-bold tracking-widest uppercase">Efecto Especial</span>
-                    </div>
-                    <p className="text-[8.5px] text-zinc-300 uppercase leading-relaxed">
-                      {selectedChar.effect || "Sin efecto pasivo registrado."}
+                  <div className="flex flex-col items-center justify-center p-8 bg-black/80 rounded-xl border border-purple-900/50 relative overflow-hidden">
+                    <Lock className="w-8 h-8 text-purple-400 mb-2 opacity-80" />
+                    <span className="text-[12px] font-black text-purple-300 tracking-widest uppercase">
+                      [ SKILLS COMING SOON ]
+                    </span>
+                    <p className="text-[8px] text-zinc-500 mt-2 text-center uppercase">
+                      El módulo de habilidades avanzadas de combate y recolección está en desarrollo activo.
                     </p>
                   </div>
                 </div>

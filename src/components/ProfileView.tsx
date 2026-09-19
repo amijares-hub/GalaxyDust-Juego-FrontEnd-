@@ -404,30 +404,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
         {/* PESTAÑA PVP - PVE */}
         {activeTab === 'PVP-PVE' && (
           <div className="space-y-3">
-            <div className="bg-[#05070a] border border-cyan-950 p-3 rounded-xl text-[9px] uppercase font-bold text-cyan-400 flex justify-between items-center">
-              <span>REGISTRO DE OPERACIONES Y MISIONES RECIENTES</span>
-              <Swords className="w-4 h-4 text-cyan-400" />
-            </div>
-
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
-              {battleLogs.length === 0 ? (
-                <div className="p-8 text-center text-zinc-600 text-[9px] uppercase tracking-widest bg-black/40 border border-cyan-950 rounded-xl">
-                  NO HAY REGISTROS DE BATALLA O INCIDENTES REPORTADOS
-                </div>
-              ) : (
-                battleLogs.map((log) => (
-                  <div key={log.id} className="p-3 bg-[#050910] border border-cyan-950 rounded-lg flex justify-between items-center text-[8.5px] font-mono">
-                    <div className="flex flex-col text-left">
-                      <span className="font-bold text-white uppercase">{log.title || 'MISION COMPLETADA'}</span>
-                      <span className="text-zinc-400 text-[7.5px]">{log.message}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-amber-400 font-bold block">{log.damage_sustained ? `-${log.damage_sustained} HP` : 'OK'}</span>
-                      <span className="text-zinc-600 text-[7px]">{new Date(log.created_at).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                ))
-              )}
+            <div className="flex flex-col items-center justify-center p-12 bg-[#05080c] rounded-xl border border-red-900/50 shadow-[inset_0_0_50px_rgba(220,38,38,0.05)] relative overflow-hidden">
+              {/* Sello Top Secret background */}
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -rotate-12 opacity-5 pointer-events-none">
+                <span className="text-[100px] font-black text-red-500 uppercase tracking-tighter whitespace-nowrap">CLASSIFIED</span>
+              </div>
+              
+              <Lock className="w-10 h-10 text-red-500 mb-3 opacity-80" />
+              <span className="text-[14px] font-black text-red-400 tracking-widest uppercase drop-shadow-md z-10 text-center">
+                MÓDULO DE COMBATE EN DESARROLLO
+              </span>
+              <p className="text-[9px] text-zinc-500 mt-3 text-center uppercase max-w-md z-10 leading-relaxed font-bold">
+                El registro de operaciones PvP y simulaciones PvE (Combate Táctico) se encuentra bajo restricciones de nivel Beta. Acceso denegado temporalmente por alto mando.
+              </p>
             </div>
           </div>
         )}

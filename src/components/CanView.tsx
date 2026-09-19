@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  BarChart2, Globe, AlertTriangle, RefreshCw, X, Sparkles, ChevronRight, ChevronLeft, Shield, Info
+  BarChart2, Globe, AlertTriangle, RefreshCw, X, Sparkles, ChevronRight, ChevronLeft, Shield, Info, Lock
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAudioEngine } from '../hooks/useAudioEngine';
@@ -907,63 +907,77 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
         {showStatsModal && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 font-mono text-white overflow-hidden">
             <GalaxyFrame className="w-full max-w-lg h-auto max-h-[85vh] mx-auto my-auto overflow-hidden" innerPadding="p-4 sm:p-5">
-              <div className="flex flex-col justify-between gap-2.5 h-full">
-                <div className="flex justify-between items-center border-b border-purple-950 pb-2 shrink-0">
-                  <div className="flex items-center gap-2">
-                    <BarChart2 className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400 animate-pulse shrink-0" />
-                    <h3 className="text-xs font-black text-white uppercase tracking-widest truncate">
-                      ESTADÍSTICAS Y PRODUCCIÓN DIARIA
-                    </h3>
-                  </div>
-                  <button onClick={() => { playSfx(440); setShowStatsModal(false); }} className="p-1 text-zinc-400 hover:text-white cursor-pointer shrink-0">
-                    <X className="w-4 h-4" />
+              <div className="relative flex flex-col justify-between gap-2.5 h-full">
+                {/* OVERLAY DE COMING SOON */}
+                <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-xl p-6 text-center border border-cyan-900/50 shadow-[0_0_30px_rgba(6,182,212,0.2)]">
+                  <Lock className="w-8 h-8 sm:w-10 sm:h-10 text-cyan-400 mb-3 opacity-90" />
+                  <span className="text-xs sm:text-sm font-black text-cyan-300 tracking-widest uppercase drop-shadow-md">
+                    MÓDULO EN DESARROLLO / PRODUCCIÓN PASIVA C.A.N.
+                  </span>
+                  <button onClick={() => { playSfx(440); setShowStatsModal(false); }} className="mt-6 px-6 py-2 bg-cyan-950 border border-cyan-500/50 text-cyan-200 hover:text-white hover:bg-cyan-900 text-[9px] font-bold uppercase rounded-lg cursor-pointer transition-all shadow-md">
+                    CERRAR
                   </button>
                 </div>
 
-                <div className="space-y-2 text-[8.5px] sm:text-[9px] flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
-                  <span className="text-cyan-400 font-bold uppercase block border-b border-purple-950 pb-1">
-                    PRODUCCIÓN REAL CALCULADA (24 HORAS)
-                  </span>
+                {/* CONTENIDO ORIGINAL OPACO */}
+                <div className="opacity-20 pointer-events-none flex flex-col justify-between gap-2.5 h-full grayscale">
+                  <div className="flex justify-between items-center border-b border-purple-950 pb-2 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <BarChart2 className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400 animate-pulse shrink-0" />
+                      <h3 className="text-xs font-black text-white uppercase tracking-widest truncate">
+                        ESTADÍSTICAS Y PRODUCCIÓN DIARIA
+                      </h3>
+                    </div>
+                    <button className="p-1 text-zinc-400 shrink-0">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
 
-                  <div className="grid grid-cols-2 gap-2 font-mono">
-                    <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                      <span className="text-zinc-400 uppercase">METAL:</span>
-                      <span className="text-cyan-200 font-bold text-[9.5px]">+{dailyProduction.metal.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
+                  <div className="space-y-2 text-[8.5px] sm:text-[9px] flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                    <span className="text-cyan-400 font-bold uppercase block border-b border-purple-950 pb-1">
+                      PRODUCCIÓN REAL CALCULADA (24 HORAS)
+                    </span>
+
+                    <div className="grid grid-cols-2 gap-2 font-mono">
+                      <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
+                        <span className="text-zinc-400 uppercase">METAL:</span>
+                        <span className="text-cyan-200 font-bold text-[9.5px]">+{dailyProduction.metal.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
+                      </div>
+                      <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
+                        <span className="text-zinc-400 uppercase">CRISTAL:</span>
+                        <span className="text-purple-300 font-bold text-[9.5px]">+{dailyProduction.crystal.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
+                      </div>
+                      <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
+                        <span className="text-zinc-400 uppercase">DEUTERIO:</span>
+                        <span className="text-blue-300 font-bold text-[9.5px]">+{dailyProduction.deuterium.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
+                      </div>
+                      <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
+                        <span className="text-zinc-400 uppercase">MATERIA OSCURA:</span>
+                        <span className="text-indigo-300 font-bold text-[9.5px]">+{dailyProduction.darkMatter.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
+                      </div>
                     </div>
-                    <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                      <span className="text-zinc-400 uppercase">CRISTAL:</span>
-                      <span className="text-purple-300 font-bold text-[9.5px]">+{dailyProduction.crystal.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
-                    </div>
-                    <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                      <span className="text-zinc-400 uppercase">DEUTERIO:</span>
-                      <span className="text-blue-300 font-bold text-[9.5px]">+{dailyProduction.deuterium.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
-                    </div>
-                    <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                      <span className="text-zinc-400 uppercase">MATERIA OSCURA:</span>
-                      <span className="text-indigo-300 font-bold text-[9.5px]">+{dailyProduction.darkMatter.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
+
+                    <span className="text-purple-400 font-bold uppercase block border-b border-purple-950 pb-1 pt-1.5">
+                      MODIFICADORES TÁCTICOS GLOBALES
+                    </span>
+
+                    <div className="grid grid-cols-2 gap-2 font-mono">
+                      <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
+                        <span className="text-zinc-400 uppercase">PODER DE FLOTA:</span>
+                        <span className="text-emerald-400 font-bold text-[9.5px]">+{dailyProduction.fleetPowerMod}%</span>
+                      </div>
+                      <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
+                        <span className="text-zinc-400 uppercase">ESCUDOS DE DEFENSA:</span>
+                        <span className="text-cyan-400 font-bold text-[9.5px]">+{dailyProduction.defenseShieldMod}%</span>
+                      </div>
                     </div>
                   </div>
 
-                  <span className="text-purple-400 font-bold uppercase block border-b border-purple-950 pb-1 pt-1.5">
-                    MODIFICADORES TÁCTICOS GLOBALES
-                  </span>
-
-                  <div className="grid grid-cols-2 gap-2 font-mono">
-                    <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                      <span className="text-zinc-400 uppercase">PODER DE FLOTA:</span>
-                      <span className="text-emerald-400 font-bold text-[9.5px]">+{dailyProduction.fleetPowerMod}%</span>
-                    </div>
-                    <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                      <span className="text-zinc-400 uppercase">ESCUDOS DE DEFENSA:</span>
-                      <span className="text-cyan-400 font-bold text-[9.5px]">+{dailyProduction.defenseShieldMod}%</span>
-                    </div>
+                  <div className="pt-2 border-t border-purple-950 flex justify-end shrink-0">
+                    <button className="px-4 py-1.5 bg-black border border-zinc-800 text-zinc-300 text-[8.5px] font-bold uppercase rounded-lg">
+                      ACEPTAR
+                    </button>
                   </div>
-                </div>
-
-                <div className="pt-2 border-t border-purple-950 flex justify-end shrink-0">
-                  <button onClick={() => { playSfx(440); setShowStatsModal(false); }} className="px-4 py-1.5 bg-black border border-zinc-800 text-zinc-300 hover:text-white text-[8.5px] font-bold uppercase rounded-lg cursor-pointer">
-                    ACEPTAR
-                  </button>
                 </div>
               </div>
             </GalaxyFrame>

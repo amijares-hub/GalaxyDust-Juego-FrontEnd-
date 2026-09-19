@@ -42,7 +42,7 @@ export interface UseSasoriAuthReturn {
   isInitializing: boolean;
   setScreen: (screen: ScreenState) => void;
   submitLogin: (email: string, password: string, rememberMe: boolean) => Promise<boolean>;
-  submitRegister: (email: string, password: string) => Promise<boolean>;
+  submitRegister: (email: string, password: string, metadata?: any) => Promise<boolean>;
   submitResetPassword: (email: string) => Promise<boolean>;
   triggerSocialLogin: (provider: 'google' | 'github' | 'facebook') => Promise<boolean>;
   verifyEmailCode: (code: string) => Promise<boolean>;
@@ -205,13 +205,17 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
   }, []);
 
   // 2. REGISTRO DE NUEVOS PILOTOS
-  const submitRegister = useCallback(async (email: string, password: string) => {
+  const submitRegister = useCallback(async (email: string, password: string, metadata?: any) => {
     setState('registering');
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: metadata ? { data: metadata } : undefined
+      });
       if (error) throw error;
 
       if (data.user && data.user.identities?.length === 0) {
