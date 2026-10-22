@@ -128,7 +128,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header
-      className="w-full bg-[#05080c]/98 border-b border-cyan-500/40 py-1 flex items-center justify-between gap-1 shrink-0 select-none z-50 font-mono backdrop-blur-md sticky top-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)]"
+      className="w-full h-8 sm:h-9 bg-[#05080c]/98 border-b border-cyan-500/40 flex items-center justify-between gap-1 shrink-0 select-none z-50 font-mono backdrop-blur-md sticky top-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)]"
       style={{
         paddingLeft: 'max(8px, env(safe-area-inset-left))',
         paddingRight: 'max(8px, env(safe-area-inset-right))',
@@ -141,7 +141,7 @@ export const Header: React.FC<HeaderProps> = ({
         onClick={() => onOpenProfile && onOpenProfile()}
         title="Ver Perfil"
       >
-        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-black border border-cyan-400/80 group-hover:border-cyan-300 flex items-center justify-center text-cyan-300 font-bold shadow-[0_0_8px_rgba(34,211,238,0.3)] transition-all overflow-hidden">
+        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-black border border-cyan-400/80 group-hover:border-cyan-300 flex items-center justify-center text-cyan-300 font-bold shadow-[0_0_8px_rgba(34,211,238,0.3)] transition-all overflow-hidden">
           <img
             src={resolveAvatarUrl(userProfile?.avatar_url)}
             alt="Piloto Avatar"
@@ -154,18 +154,18 @@ export const Header: React.FC<HeaderProps> = ({
             }}
           />
         </div>
-        <div className="flex flex-col text-left">
-          <span className="text-[8.5px] sm:text-[10px] font-black text-white group-hover:text-cyan-200 uppercase tracking-wider truncate max-w-[70px] sm:max-w-[120px]">
+        <div className="flex flex-col text-left leading-tight">
+          <span className="text-[8px] sm:text-[9.5px] font-black text-white group-hover:text-cyan-200 uppercase tracking-wider truncate max-w-[65px] sm:max-w-[110px]">
             {userProfile?.username || 'COMANDANTE'}
           </span>
-          <span className="text-[7px] sm:text-[8px] font-mono font-bold text-cyan-400 uppercase">
+          <span className="text-[6.5px] sm:text-[7.5px] font-mono font-bold text-cyan-400 uppercase">
             LVL {userProfile?.level || 1}
           </span>
         </div>
       </div>
 
       {/* 2. PESTAÑAS NAVEGACIÓN */}
-      <div className="flex-1 flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none px-1 py-0.5 min-w-0">
+      <div className="flex-1 flex items-center overflow-x-auto no-scrollbar whitespace-nowrap gap-1 px-1 min-w-0 h-full">
         {tabs.map(tab => {
           // 🎯 VERIFICACIÓN ROBUSTA DE PESTAÑA ACTIVA
           const isActive = isTabActive(activeTab, tab.id);
@@ -174,8 +174,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               key={tab.id}
               onClick={() => onSelectTab && onSelectTab(tab.id)}
-              style={{ fontSize: 'clamp(0.6rem, 1.1vw, 0.8rem)' }}
-              className={`px-1.5 py-0.5 rounded font-bold tracking-widest uppercase transition-all cursor-pointer whitespace-nowrap border shrink-0 ${
+              className={`px-2 py-0.5 rounded font-bold text-[9px] sm:text-[10px] tracking-wider uppercase transition-all cursor-pointer whitespace-nowrap border shrink-0 ${
                 isActive
                   ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.3)] font-black'
                   : 'bg-black/50 text-zinc-400 border-transparent hover:text-white hover:bg-cyan-950/30'

@@ -1333,8 +1333,9 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   // 🎯 VISTA 1: FLEET IN FLIGHT (CON MARCO EXPANDIDO)
   if (initialView === 'flights') {
     return (
-      <GalaxyFrame className="w-full max-w-7xl mx-auto font-mono text-left select-none text-white" innerPadding="p-5">
-        <div className="flex flex-col gap-4">
+      <div className="w-full flex-1 overflow-y-auto min-h-0 py-1">
+        <GalaxyFrame className="w-full max-w-7xl mx-auto font-mono text-left select-none text-white" innerPadding="p-3 sm:p-4">
+          <div className="flex flex-col gap-3">
           <div className="w-full bg-[#05070a] border border-cyan-500/30 p-3.5 rounded-xl flex justify-between items-center shrink-0">
             <div className="flex items-center gap-2.5">
               <h1 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
@@ -1402,7 +1403,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
             </div>
           </div>
 
-          <div className="flex-1 w-full flex flex-col gap-2.5 max-h-[440px] overflow-y-auto pr-1 font-mono custom-scrollbar">
+          <div className="flex-1 w-full flex flex-col gap-2 min-h-[160px] max-h-[50vh] sm:max-h-[60vh] overflow-y-auto pr-1 font-mono custom-scrollbar">
             {activeFlightCategory === 'HISTORIAL' ? (
               completedHistory.length === 0 ? (
                 <div className="col-span-full p-12 text-center text-zinc-500 text-[10px] uppercase tracking-widest bg-[#05070a] border border-cyan-500/10 rounded-xl">
@@ -1762,37 +1763,39 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
           )}
         </div>
       </GalaxyFrame>
+    </div>
     );
   }
 
   // 🎯 VISTA 2: MAPA ORIGINAL DE SELECCIÓN Y CONFIGURACIÓN DE EXPEDICIONES
   return (
-    <GalaxyFrame className="w-full max-w-7xl mx-auto my-1 font-mono text-left select-none text-white" innerPadding="p-4">
-      <div className="flex flex-col gap-2">
-        <div className="w-full bg-[#05070a] border border-cyan-500/30 p-3 rounded-xl flex justify-between items-center shrink-0">
-          <div className="flex flex-col gap-0.5 text-left">
-            <h1 className="text-sm font-black tracking-widest text-white uppercase flex items-center gap-2">
-              MATRIZ DE EXPEDICIONES DE CLUSTER
-            </h1>
-            <p className="text-cyan-400 text-[9.5px] tracking-wide font-bold uppercase leading-none">{formatBreadcrumbText()}</p>
+    <div className="w-full flex-1 overflow-y-auto min-h-0 py-0.5" id="swgoh-expedition-screen">
+      <GalaxyFrame className="w-full max-w-7xl mx-auto my-0.5 font-mono text-left select-none text-white" innerPadding="p-2 sm:p-4">
+        <div className="flex flex-col gap-2">
+          <div className="w-full bg-[#05070a] border border-cyan-500/30 p-2.5 rounded-xl flex justify-between items-center shrink-0">
+            <div className="flex flex-col gap-0.5 text-left">
+              <h1 className="text-xs sm:text-sm font-black tracking-widest text-white uppercase flex items-center gap-2">
+                MATRIZ DE EXPEDICIONES DE CLUSTER
+              </h1>
+              <p className="text-cyan-400 text-[8.5px] sm:text-[9.5px] tracking-wide font-bold uppercase leading-none">{formatBreadcrumbText()}</p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {isDispatchPanelActive && (
+                <button
+                  onClick={() => { playSfx(660); setIsDispatchPanelActive(false); }}
+                  className="flex items-center gap-1.5 px-2.5 py-1 border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 text-[8.5px] font-bold tracking-widest uppercase rounded-lg bg-cyan-950/80 transition-colors cursor-pointer"
+                >
+                  <CornerUpLeft className="w-3.5 h-3.5 text-cyan-400" /> RETORNAR A MAPA
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {isDispatchPanelActive && (
-              <button
-                onClick={() => { playSfx(660); setIsDispatchPanelActive(false); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 text-[9px] font-bold tracking-widest uppercase rounded-lg bg-cyan-950/80 transition-colors cursor-pointer"
-              >
-                <CornerUpLeft className="w-3.5 h-3.5 text-cyan-400" /> RETORNAR A MAPA
-              </button>
-            )}
-          </div>
-        </div>
+          {!isDispatchPanelActive ? (
+            <div className="w-full flex-1 flex flex-col sm:flex-row gap-2 overflow-hidden items-stretch min-h-0">
 
-        {!isDispatchPanelActive ? (
-          <div className="w-full flex-1 flex flex-col md:flex-row gap-3.5 overflow-hidden items-stretch">
-
-            <div className="w-full md:w-[320px] shrink-0 border border-cyan-500/20 bg-[#05070a] rounded-xl p-3 flex flex-col justify-between shadow-2xl h-[480px]">
+            <div className="w-full sm:w-[300px] shrink-0 border border-cyan-500/20 bg-[#05070a] rounded-xl p-2 flex flex-col justify-between shadow-2xl h-auto">
               <div className="flex flex-col gap-2">
                 
                 <div className="flex items-center justify-between border-b border-cyan-950 pb-2 text-left">
@@ -1845,7 +1848,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                   })}
                 </div>
 
-                <div className="p-1 flex flex-col gap-1.5 max-h-[310px] overflow-y-auto pr-1 custom-scrollbar">
+                <div className="p-1 flex flex-col gap-1 max-h-[40vh] sm:max-h-[280px] overflow-y-auto pr-1 custom-scrollbar">
                   {currentStep === 'GC' && (
                     gcList.length === 0 ? (
                       <div className="p-8 text-center text-zinc-600 text-[9px] uppercase italic">
@@ -2058,7 +2061,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               </div>
 
               {/* 🎯 BOTÓN DE ACCIÓN EN PANEL LATERAL RENOMBRADO A "ARMAR FLOTA" */}
-              <div className="h-[30%] w-full border-t border-cyan-500/30 flex items-center justify-center p-4 bg-[#020508]/80">
+              <div className="flex-shrink-0 w-full border-t border-cyan-500/30 flex items-center justify-center p-2 sm:p-4 bg-[#020508]/80">
                 {selectedSC && (
                   <button
                     onClick={() => { playSfx(880); setIsDispatchPanelActive(true); }}
@@ -2073,8 +2076,8 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
           </div>
         ) : (
-          <div className="w-full flex-1 flex flex-col md:flex-row gap-3.5 h-[480px]">
-            <div className="w-full md:w-[240px] border border-cyan-500/20 bg-[#05070a] rounded-xl shrink-0 p-3 flex flex-col justify-between h-full">
+          <div className="w-full flex-1 flex flex-col sm:flex-row gap-2 min-h-0 h-auto">
+            <div className="w-full sm:w-[220px] border border-cyan-500/20 bg-[#05070a] rounded-xl shrink-0 p-2 flex flex-col justify-between h-full">
               <div className="flex flex-col gap-1">
                 <span className="text-[8px] font-bold text-zinc-400 uppercase px-1 pb-1 border-b border-cyan-950">
                   SELECCIONAR CATEGORÍA
@@ -2157,7 +2160,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               </div>
 
               <div className="flex-1 border border-cyan-950/60 bg-black/40 rounded-xl p-1.5 overflow-hidden flex flex-col">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[145px] pr-1 custom-scrollbar">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 overflow-y-auto max-h-[30vh] sm:max-h-[145px] pr-1 custom-scrollbar">
                   {currentLeftCategory === 'Fleets' ? (
                     fleets.length === 0 ? (
                       <div className="col-span-full p-6 text-center text-zinc-600 text-[8.5px] uppercase tracking-widest">
@@ -2450,7 +2453,8 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         )}
       </div>
     </GalaxyFrame>
-  );
+  </div>
+);
 };
 
 export const ExpeditionsView = ExpeditionView;

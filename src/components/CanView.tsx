@@ -923,12 +923,12 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
 
         {/* MODAL 3: ACTIVE SKILLS DETALLADAS */}
         {showSkillsModal && (
-          <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 font-mono text-white overflow-hidden">
-            <GalaxyFrame className="w-full max-w-2xl sm:max-w-3xl h-auto max-h-[90vh] mx-auto my-auto overflow-hidden" innerPadding="p-4 sm:p-5">
-              <div className="flex flex-col gap-2 h-full">
+          <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[100] flex items-start sm:items-center justify-center p-2 pt-9 sm:p-3 sm:pt-3 font-mono text-white overflow-hidden">
+            <GalaxyFrame className="w-[92vw] max-w-4xl max-h-[calc(100dvh-2.5rem)] sm:max-h-[88vh] flex flex-col overflow-hidden" innerPadding="p-1.5 sm:p-3">
+              <div className="flex flex-col gap-1 h-full min-h-0">
                 
                 {/* CABECERA */}
-                <div className="flex justify-between items-center border-b border-cyan-950 pb-2 shrink-0">
+                <div className="flex justify-between items-center border-b border-cyan-500/30 p-2 shrink-0">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400 animate-pulse shrink-0" />
                     <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-widest truncate">
@@ -941,7 +941,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
                 </div>
 
                 {/* PESTAÑAS DE FILTRADO POR ORIGEN */}
-                <div className="flex items-center gap-1 overflow-x-auto pb-0.5 custom-scrollbar shrink-0">
+                <div className="flex items-center gap-1 overflow-x-auto py-0.5 custom-scrollbar shrink-0">
                   {[
                     { id: 'ALL', label: `TODAS (${activeSkills.length})` },
                     { id: 'CAN', label: `NODO C.A.N. (${activeSkills.filter(s => s.source === 'CAN').length})` },
@@ -952,7 +952,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
                     <button
                       key={tab.id}
                       onClick={() => handleFilterChange(tab.id as any)}
-                      className={`px-2.5 py-1 rounded-lg text-[7.5px] sm:text-[8px] font-black uppercase transition-all border whitespace-nowrap cursor-pointer shrink-0 ${
+                      className={`text-[9px] py-0.5 px-2 rounded font-black uppercase transition-all border whitespace-nowrap cursor-pointer shrink-0 ${
                         skillsModalFilter === tab.id
                           ? 'bg-cyan-950 text-cyan-300 border-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.3)]'
                           : 'bg-black/60 text-zinc-400 border-cyan-950 hover:text-white hover:border-cyan-800'
@@ -964,9 +964,9 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
                 </div>
 
                 {/* TARJETAS PAGINADAS */}
-                <div className="flex flex-col gap-1.5 flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1 justify-start">
+                <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1 space-y-1.5 justify-start">
                   {paginatedSkillsForModal.length === 0 ? (
-                    <div className="w-full my-auto text-center py-8 text-zinc-600 text-[8.5px] uppercase tracking-widest font-bold bg-black/40 rounded-xl border border-cyan-950">
+                    <div className="w-full my-auto text-center py-6 text-zinc-600 text-[8.5px] uppercase tracking-widest font-bold bg-black/40 rounded-xl border border-cyan-950">
                       NO HAY HABILIDADES ACTIVAS EN ESTA CATEGORÍA
                     </div>
                   ) : (
@@ -978,7 +978,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
                       return (
                         <div
                           key={sk.id}
-                          className={`p-2 rounded-lg border flex items-center gap-2 transition-all shrink-0 ${
+                          className={`p-1.5 sm:p-2 rounded-lg border flex items-center gap-2 transition-all shrink-0 ${
                             isCanon
                               ? 'bg-cyan-950/30 border-cyan-500/60 text-cyan-200'
                               : isStruct
@@ -988,7 +988,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
                               : 'bg-emerald-950/20 border-emerald-500/40 text-emerald-200'
                           }`}
                         >
-                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-md bg-black border border-cyan-950 overflow-hidden shrink-0 flex items-center justify-center p-0.5 relative">
+                          <div className="w-7 h-7 rounded-md bg-black border border-cyan-950 overflow-hidden shrink-0 flex items-center justify-center p-0.5 relative">
                             {sk.assetImageUrl ? (
                               <img src={sk.assetImageUrl} alt={sk.assetName} className="w-full h-full object-contain" />
                             ) : (
@@ -1006,7 +1006,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
 
                             <div className="flex items-center gap-1 pt-0.5">
                               <ChevronRight className="w-3 h-3 text-cyan-400 shrink-0" />
-                              <span className="text-[7.5px] sm:text-[8px] font-bold text-zinc-200 leading-tight truncate">{sk.effectDescription}</span>
+                              <span className="text-[10px] font-bold text-zinc-200 leading-tight truncate">{sk.effectDescription}</span>
                             </div>
                           </div>
                         </div>

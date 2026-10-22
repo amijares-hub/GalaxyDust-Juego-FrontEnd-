@@ -174,7 +174,7 @@ export const AuthView: React.FC = () => {
   };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#0C0D0E] flex flex-col justify-center items-center font-sans select-none text-white">
+    <div className="relative w-screen h-dvh overflow-hidden bg-[#0C0D0E] flex flex-col justify-start sm:justify-center items-center font-sans select-none text-white">
 
       {/* ─── FONDO ESPACIAL ─── */}
       <div
@@ -189,19 +189,20 @@ export const AuthView: React.FC = () => {
         <div className="absolute bottom-[-100px] right-[-100px] w-[500px] h-[500px] bg-[#111214] rounded-full blur-[140px]" />
       </div>
 
-      <div className="relative z-10 w-full max-w-sm px-4">
+      <div className="relative z-10 w-full max-w-md max-h-[calc(100dvh-0.5rem)] overflow-y-auto flex flex-col justify-center my-auto px-2 sm:px-4 py-2 sm:py-0">
 
         {/* ─── LOGO Y TÍTULO ─── */}
-        <div className="flex flex-col items-center mb-6">
+        <div className="flex flex-col items-center mb-1 sm:mb-3">
           <img
             src="https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Logo/1.png"
             alt="GalaxyDust Logo"
-            className="w-20 h-20 mb-2 object-contain drop-shadow-[0_0_15px_rgba(6,182,212,0.8)]"
+            className="h-6 sm:h-10 w-auto mb-0.5 sm:mb-1 object-contain drop-shadow-[0_0_15px_rgba(6,182,212,0.8)]"
           />
-          <h1 className="text-xl font-black uppercase tracking-[0.4em] text-white">GALAXYDUST</h1>
+          <h1 className="text-xs sm:text-base font-black uppercase tracking-[0.3em] text-white">GALAXYDUST</h1>
         </div>
 
-        <GalaxyFrame className="w-full rounded-2xl shadow-2xl overflow-hidden" innerPadding="p-6">
+        <GalaxyFrame className="w-full rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(86dvh-3.5rem)]" innerPadding="p-2.5 sm:p-4">
+          <div className="overflow-y-auto pr-0.5">
           <AnimatePresence mode="wait">
 
             {/* ─── FASE 0: POP-UP DE VERIFICACIÓN DE CORREO ─── */}
@@ -212,22 +213,22 @@ export const AuthView: React.FC = () => {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
-                className="flex flex-col items-center text-center gap-4 py-2"
+                className="flex flex-col items-center text-center gap-3 py-1"
               >
-                <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.3)]">
-                  <MailCheck className="w-8 h-8 text-cyan-400 animate-pulse" />
+                <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.3)]">
+                  <MailCheck className="w-6 h-6 text-cyan-400 animate-pulse" />
                 </div>
 
-                <div className="space-y-1.5">
-                  <h2 className="text-sm font-black tracking-[0.2em] uppercase text-white">
+                <div className="space-y-1">
+                  <h2 className="text-xs font-black tracking-[0.2em] uppercase text-white">
                     ¡CONFIRMA TU CORREO!
                   </h2>
-                  <p className="text-[10px] text-zinc-400 font-mono leading-relaxed px-1">
+                  <p className="text-[9px] text-zinc-400 font-mono leading-relaxed px-1">
                     Transmisión enviada a <strong className="text-cyan-300 font-bold">{email}</strong>. Revisa tu bandeja de entrada o SPAM para activar tu comandante.
                   </p>
                 </div>
 
-                <div className="w-full bg-[#1A1C20] border border-white/5 rounded-xl p-3 flex justify-between items-center text-[10px] font-mono">
+                <div className="w-full bg-[#1A1C20] border border-white/5 rounded-xl p-2 flex justify-between items-center text-[9px] font-mono">
                   <span className="text-zinc-400 uppercase">Redirigiendo en:</span>
                   <span className="text-cyan-400 font-black text-xs">{countdown}s</span>
                 </div>
@@ -235,10 +236,10 @@ export const AuthView: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleReturnToLogin}
-                  className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-black uppercase tracking-[0.2em] text-[10px] rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-black uppercase tracking-[0.2em] text-[9.5px] rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <span>IR AL INICIO DE SESIÓN</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </motion.div>
             ) : (screen === 'menu' || screen === 'login' || screen === 'register') && (
@@ -251,13 +252,13 @@ export const AuthView: React.FC = () => {
                 transition={{ duration: 0.2 }}
               >
                 {/* Selector de Pestañas */}
-                <div className="flex w-full mb-6 relative">
+                <div className="flex w-full mb-3 sm:mb-4 relative">
                   <div className="flex-1 text-center">
                     <button
                       type="button"
                       disabled={loading}
                       onClick={() => handleTabChange('login')}
-                      className={`w-full pb-2 text-[10px] font-bold uppercase tracking-widest transition-colors cursor-pointer ${activeTab === 'login' ? 'text-cyan-400' : 'text-white/40 hover:text-white/70'}`}
+                      className={`w-full pb-1.5 text-[9.5px] sm:text-[10px] font-bold uppercase tracking-widest transition-colors cursor-pointer ${activeTab === 'login' ? 'text-cyan-400' : 'text-white/40 hover:text-white/70'}`}
                     >
                       Iniciar Sesión
                     </button>
@@ -267,7 +268,7 @@ export const AuthView: React.FC = () => {
                       type="button"
                       disabled={loading}
                       onClick={() => handleTabChange('register')}
-                      className={`w-full pb-2 text-[10px] font-bold uppercase tracking-widest transition-colors cursor-pointer ${activeTab === 'register' ? 'text-cyan-400' : 'text-white/40 hover:text-white/70'}`}
+                      className={`w-full pb-1.5 text-[9.5px] sm:text-[10px] font-bold uppercase tracking-widest transition-colors cursor-pointer ${activeTab === 'register' ? 'text-cyan-400' : 'text-white/40 hover:text-white/70'}`}
                     >
                       Registro
                     </button>
@@ -280,32 +281,32 @@ export const AuthView: React.FC = () => {
                   <div className="absolute bottom-0 w-full h-[1px] bg-white/10 -z-10" />
                 </div>
 
-                <form onSubmit={handleFormSubmit} className="flex flex-col gap-3.5 text-left">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium ml-1">Correo Electrónico</label>
+                <form onSubmit={handleFormSubmit} className="flex flex-col gap-2.5 text-left">
+                  <div className="flex flex-col gap-0.5">
+                    <label className="text-[8.5px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium ml-1">Correo Electrónico</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"><Mail className="w-4 h-4" /></span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"><Mail className="w-3.5 h-3.5" /></span>
                       <input
                         type="email" 
                         value={email} 
                         onChange={(e) => setEmail(e.target.value)} 
                         disabled={loading}
-                        className="w-full bg-[#1A1C20] border border-white/5 rounded-xl pl-10 pr-3 py-2.5 text-xs text-white placeholder-white/20 focus:border-cyan-500/50 focus:bg-[#1C1E22] outline-none transition-all disabled:opacity-50"
+                        className="w-full bg-[#1A1C20] border border-white/5 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-white/20 focus:border-cyan-500/50 focus:bg-[#1C1E22] outline-none transition-all disabled:opacity-50"
                         placeholder="comandante@galaxydust.io"
                       />
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium ml-1">Clave de Seguridad</label>
+                  <div className="flex flex-col gap-0.5">
+                    <label className="text-[8.5px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium ml-1">Clave de Seguridad</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"><Lock className="w-4 h-4" /></span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"><Lock className="w-3.5 h-3.5" /></span>
                       <input
                         type="password" 
                         value={password} 
                         onChange={(e) => setPassword(e.target.value)} 
                         disabled={loading}
-                        className="w-full bg-[#1A1C20] border border-white/5 rounded-xl pl-10 pr-3 py-2.5 text-xs text-white placeholder-white/20 focus:border-cyan-500/50 focus:bg-[#1C1E22] outline-none transition-all disabled:opacity-50"
+                        className="w-full bg-[#1A1C20] border border-white/5 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-white/20 focus:border-cyan-500/50 focus:bg-[#1C1E22] outline-none transition-all disabled:opacity-50"
                         placeholder="••••••••"
                       />
                     </div>
@@ -314,50 +315,50 @@ export const AuthView: React.FC = () => {
                   {/* CAMPOS ADICIONALES PARA REGISTRO */}
                   {activeTab === 'register' && (
                     <>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[9px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium ml-1">Confirmar Clave</label>
+                      <div className="flex flex-col gap-0.5">
+                        <label className="text-[8.5px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium ml-1">Confirmar Clave</label>
                         <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"><Lock className="w-4 h-4" /></span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"><Lock className="w-3.5 h-3.5" /></span>
                           <input
                             type="password" 
                             value={confirmPassword} 
                             onChange={(e) => setConfirmPassword(e.target.value)} 
                             disabled={loading}
-                            className="w-full bg-[#1A1C20] border border-white/5 rounded-xl pl-10 pr-3 py-2.5 text-xs text-white placeholder-white/20 focus:border-cyan-500/50 focus:bg-[#1C1E22] outline-none transition-all disabled:opacity-50"
+                            className="w-full bg-[#1A1C20] border border-white/5 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-white/20 focus:border-cyan-500/50 focus:bg-[#1C1E22] outline-none transition-all disabled:opacity-50"
                             placeholder="••••••••"
                           />
                         </div>
                       </div>
 
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[9px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium ml-1">Fecha de Cumpleaños</label>
+                      <div className="flex flex-col gap-0.5">
+                        <label className="text-[8.5px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium ml-1">Fecha de Cumpleaños</label>
                         <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"><Calendar className="w-4 h-4" /></span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"><Calendar className="w-3.5 h-3.5" /></span>
                           <input
                             type="date" 
                             value={birthDate} 
                             onChange={(e) => setBirthDate(e.target.value)} 
                             disabled={loading}
-                            className="w-full bg-[#1A1C20] border border-white/5 rounded-xl pl-10 pr-3 py-2.5 text-xs text-white outline-none focus:border-cyan-500/50 focus:bg-[#1C1E22] transition-all disabled:opacity-50 [color-scheme:dark]"
+                            className="w-full bg-[#1A1C20] border border-white/5 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white outline-none focus:border-cyan-500/50 focus:bg-[#1C1E22] transition-all disabled:opacity-50 [color-scheme:dark]"
                           />
                         </div>
                       </div>
 
                       {/* CAPTCHA ANTI-BOT */}
-                      <div className="flex flex-col gap-1 pt-1">
+                      <div className="flex flex-col gap-0.5 pt-0.5">
                         <div className="flex justify-between items-center ml-1">
-                          <label className="text-[9px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium">Captcha Anti-Bot</label>
+                          <label className="text-[8.5px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium">Captcha Anti-Bot</label>
                           <button
                             type="button"
                             onClick={generateCaptcha}
-                            className="text-[8px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
+                            className="text-[7.5px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
                           >
                             <RefreshCw className="w-2.5 h-2.5" /> REGENERAR
                           </button>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="bg-[#1A1C20] border border-white/10 px-3 py-2 rounded-xl text-cyan-400 font-mono font-black text-xs shrink-0 flex items-center gap-1">
-                            <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                          <div className="bg-[#1A1C20] border border-white/10 px-2.5 py-1.5 rounded-xl text-cyan-400 font-mono font-black text-xs shrink-0 flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3 text-cyan-400" />
                             <span>{captchaNum1} + {captchaNum2} = ?</span>
                           </div>
                           <input
@@ -366,7 +367,7 @@ export const AuthView: React.FC = () => {
                             onChange={(e) => setUserCaptchaInput(e.target.value)}
                             disabled={loading}
                             placeholder="RESPUESTA"
-                            className="w-full bg-[#1A1C20] border border-white/5 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:border-cyan-500/50 outline-none transition-all"
+                            className="w-full bg-[#1A1C20] border border-white/5 rounded-xl px-3 py-1.5 text-xs text-white placeholder-white/20 focus:border-cyan-500/50 outline-none transition-all"
                           />
                         </div>
                       </div>
@@ -375,16 +376,16 @@ export const AuthView: React.FC = () => {
 
                   {/* OPCIÓN RECUÉRDAME (SOLO EN LOGIN) */}
                   {activeTab === 'login' && (
-                    <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center justify-between pt-0.5">
                       <button
                         type="button"
                         onClick={() => setRememberMe(!rememberMe)}
-                        className="flex items-center gap-2 text-[10px] text-white/50 hover:text-cyan-300 transition-colors cursor-pointer"
+                        className="flex items-center gap-1.5 text-[9px] text-white/50 hover:text-cyan-300 transition-colors cursor-pointer"
                       >
                         {rememberMe ? (
-                          <CheckSquare className="w-4 h-4 text-cyan-400" />
+                          <CheckSquare className="w-3.5 h-3.5 text-cyan-400" />
                         ) : (
-                          <Square className="w-4 h-4 text-white/20" />
+                          <Square className="w-3.5 h-3.5 text-white/20" />
                         )}
                         <span>RECUÉRDAME (MÁXIMO 7 DÍAS)</span>
                       </button>
@@ -392,25 +393,25 @@ export const AuthView: React.FC = () => {
                   )}
 
                   {(localError || errorMessage) && (
-                    <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 p-2.5 rounded-lg mt-1">
-                      <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
-                      <span className="text-[10px] font-mono text-red-400 uppercase leading-tight tracking-wider">{localError || errorMessage}</span>
+                    <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 p-2 rounded-lg mt-0.5">
+                      <AlertCircle className="w-3 h-3 text-red-500 flex-shrink-0" />
+                      <span className="text-[9px] font-mono text-red-400 uppercase leading-tight tracking-wider">{localError || errorMessage}</span>
                     </div>
                   )}
 
                   {successMessage && (
-                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg mt-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                      <span className="text-[10px] font-mono text-emerald-400 uppercase leading-tight tracking-wider">{successMessage}</span>
+                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-lg mt-0.5">
+                      <ShieldCheck className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                      <span className="text-[9px] font-mono text-emerald-400 uppercase leading-tight tracking-wider">{successMessage}</span>
                     </div>
                   )}
 
                   <button
                     type="submit" 
                     disabled={loading}
-                    className="mt-2 w-full py-3.5 bg-cyan-600 hover:bg-cyan-500 text-white font-black uppercase tracking-[0.2em] text-[10px] rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all active:scale-[0.98] disabled:opacity-70 flex items-center justify-center cursor-pointer"
+                    className="mt-1 w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold uppercase tracking-[0.15em] text-xs rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all active:scale-[0.98] disabled:opacity-70 flex items-center justify-center cursor-pointer"
                   >
-                    {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : (activeTab === 'login' ? 'INICIAR SESIÓN' : 'REGISTRAR FIRMA')}
+                    {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : (activeTab === 'login' ? 'INICIAR SESIÓN' : 'REGISTRAR FIRMA')}
                   </button>
                 </form>
               </motion.div>
@@ -471,6 +472,7 @@ export const AuthView: React.FC = () => {
             )}
 
           </AnimatePresence>
+          </div>
         </GalaxyFrame>
 
       </div>

@@ -232,59 +232,60 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
   };
 
   return (
-    <GalaxyFrame className="w-full max-w-7xl mx-auto my-2 font-mono text-left select-none text-white" innerPadding="p-4 sm:p-5">
-      <div className="w-full flex flex-col lg:flex-row gap-3 items-stretch">
-        
-        {/* HERO POSTER */}
-        <div className="w-full lg:w-3/12 shrink-0 relative rounded-xl overflow-hidden border border-cyan-500/40 bg-[#05070a] flex flex-col justify-between p-3 min-h-[360px] shadow-2xl group">
-          <div className="absolute inset-0 z-0">
-            <img
-              src="https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Phatom%20Station/Skin%20Original/phantom%20station.png"
-              alt="Phantom Station"
-              className="w-full h-full object-cover object-center brightness-75 group-hover:scale-105 transition-transform duration-700"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#080b0e] via-[#080b0e]/40 to-black/60 z-10" />
-            <div className="absolute inset-0 bg-cyan-950/20 mix-blend-overlay z-10" />
-          </div>
+    <div className="w-full flex-1 overflow-y-auto min-h-0 py-0.5">
+      <GalaxyFrame className="w-full max-w-7xl mx-auto font-mono text-left select-none text-white" innerPadding="p-2 sm:p-4">
+        <div className="w-full flex flex-col lg:flex-row gap-2 items-stretch">
+          
+          {/* HERO POSTER — oculto en landscape móvil para ganar espacio vertical */}
+          <div className="hidden sm:flex w-full lg:w-3/12 shrink-0 relative rounded-xl overflow-hidden border border-cyan-500/40 bg-[#05070a] flex-col justify-between p-2.5 min-h-[160px] lg:min-h-[260px] shadow-2xl group">
+            <div className="absolute inset-0 z-0">
+              <img
+                src="https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Phatom%20Station/Skin%20Original/phantom%20station.png"
+                alt="Phantom Station"
+                className="w-full h-full object-cover object-center brightness-75 group-hover:scale-105 transition-transform duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#080b0e] via-[#080b0e]/40 to-black/60 z-10" />
+              <div className="absolute inset-0 bg-cyan-950/20 mix-blend-overlay z-10" />
+            </div>
 
-          <div className="relative z-20 flex justify-between items-center">
-            <button
-              onClick={() => { playSfx(660); onBack(); }}
-              className="p-1.5 bg-black/80 hover:bg-cyan-950 border border-cyan-500/40 text-cyan-300 rounded-lg transition-all cursor-pointer backdrop-blur-md flex items-center gap-1 text-[8px] font-bold uppercase shadow-lg"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-              <span>VOLVER</span>
-            </button>
-          </div>
+            <div className="relative z-20 flex justify-between items-center">
+              <button
+                onClick={() => { playSfx(660); onBack(); }}
+                className="p-1.5 bg-black/80 hover:bg-cyan-950 border border-cyan-500/40 text-cyan-300 rounded-lg transition-all cursor-pointer backdrop-blur-md flex items-center gap-1 text-[8px] font-bold uppercase shadow-lg"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>VOLVER</span>
+              </button>
+            </div>
 
-          <div className="relative z-20 flex flex-col gap-1.5 mt-auto text-left">
-            <h1 className="text-lg lg:text-xl font-black text-white uppercase tracking-widest drop-shadow-[0_0_12px_rgba(6,182,212,0.6)]">
-              PHANTOM STATION
-            </h1>
+            <div className="relative z-20 flex flex-col gap-1 mt-auto text-left">
+              <h1 className="text-base lg:text-lg font-black text-white uppercase tracking-widest drop-shadow-[0_0_12px_rgba(6,182,212,0.6)]">
+                PHANTOM STATION
+              </h1>
 
-            <p className="text-[8px] text-zinc-300 font-sans normal-case leading-tight">
-              Estación espacial descentralizada para la adquisición de blueprints, prototipos de combate y tecnología coloidal.
-            </p>
+              <p className="text-[7.5px] text-zinc-300 font-sans normal-case leading-tight">
+                Estación espacial descentralizada para la adquisición de blueprints, prototipos de combate y tecnología coloidal.
+              </p>
 
-            <div className="flex items-center gap-1.5 mt-1 bg-black/80 border border-cyan-500/40 px-2.5 py-1 rounded-lg backdrop-blur-md w-fit">
-              <Clock className="w-3 h-3 text-cyan-400 animate-pulse shrink-0" />
-              <div className="flex items-center gap-1 text-[7.5px] font-mono uppercase">
-                <span className="text-zinc-400">REFRESCO EN:</span>
-                <span className="text-amber-400 font-black tracking-wider">{refreshCountdown}</span>
+              <div className="flex items-center gap-1.5 mt-0.5 bg-black/80 border border-cyan-500/40 px-2 py-0.5 rounded-lg backdrop-blur-md w-fit">
+                <Clock className="w-3 h-3 text-cyan-400 animate-pulse shrink-0" />
+                <div className="flex items-center gap-1 text-[7px] font-mono uppercase">
+                  <span className="text-zinc-400">REFRESCO EN:</span>
+                  <span className="text-amber-400 font-black tracking-wider">{refreshCountdown}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* GRID DE CARDS RESISTENTE A FALLOS */}
-        <div className="flex-1 w-full lg:w-9/12 bg-[#05070a] border border-cyan-500/20 p-2.5 rounded-xl flex flex-col justify-between min-h-[360px]">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center my-auto text-cyan-400 font-mono text-xs gap-2 py-20">
-              <RefreshCw className="animate-spin w-6 h-6" />
-              <span>Conectando con la Estación Phantom...</span>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full h-full">
+          {/* GRID DE CARDS RESISTENTE A FALLOS */}
+          <div className="flex-1 w-full lg:w-9/12 bg-[#05070a] border border-cyan-500/20 p-2 rounded-xl flex flex-col justify-between min-h-0 overflow-y-auto">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center my-auto text-cyan-400 font-mono text-xs gap-2 py-12">
+                <RefreshCw className="animate-spin w-5 h-5" />
+                <span>Conectando con la Estación Phantom...</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 w-full h-full p-1">
               {blueprints.map((bp) => {
                 const isGD = String(bp.currencyType || '').includes('GD');
                 const rarityUpper = String(bp.rarity || 'COMMON').toUpperCase();
@@ -310,7 +311,7 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
                     </div>
 
                     <div className="flex flex-col gap-1">
-                      <div className="w-full h-16 bg-black border border-cyan-950 rounded p-0.5 overflow-hidden flex items-center justify-center">
+                      <div className="w-full h-12 sm:h-16 bg-black border border-cyan-950 rounded p-0.5 overflow-hidden flex items-center justify-center">
                         <img
                           src={bp.image || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=300'}
                           alt={bp.name || 'Activo'}
@@ -376,7 +377,8 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
 
       </div>
     </GalaxyFrame>
-  );
+  </div>
+);
 };
 
 export default PhantomStationView;

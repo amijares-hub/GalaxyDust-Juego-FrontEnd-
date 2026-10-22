@@ -27,37 +27,91 @@
   background-size: 100% 4px;
 }
 
-/* ─── AUTO-ESCALADO EXTREMO PARA MÓVILES EN MODO HORIZONTAL (LANDSCAPE) ─── */
+/* ─── AUTO-ESCALADO GLOBAL PARA DISPOSITIVOS MÓVILES EN MODO HORIZONTAL (LANDSCAPE) ─── */
+/* Target: teléfonos en landscape con alto efectivo entre 320px y 500px */
 @media (max-height: 500px) and (orientation: landscape) {
+  :root {
+    --header-height: 2rem;       /* ~32px — header ultra-compacto */
+    --modal-max-h: 86vh;         /* máximo para modales */
+    --card-max-h: 160px;         /* tarjetas de la homepage */
+    --content-pt: 0.25rem;       /* padding-top del área de contenido */
+  }
+
   html {
-    font-size: 13px; /* Escala los rem globalmente */
+    font-size: 12px; /* Escala todos los rem globalmente */
   }
 
-  /* Reducir márgenes y paddings globales para aprovechar espacio vertical */
-  body {
-    overflow: hidden !important;
+  body, input, button, select, textarea {
+    font-size: 0.8rem;
   }
 
-  /* Ajuste de scrollbars para pantallas delgadas */
+  /* ── Scrollbars ultra-delgados para no desperdiciar espacio ── */
+  ::-webkit-scrollbar,
   .custom-scrollbar::-webkit-scrollbar {
-    width: 3px;
-    height: 3px;
+    width: 2px !important;
+    height: 2px !important;
   }
 
-  /* Forzar que los contenedores no superen la pantalla */
+  /* ── Layout principal: sin padding vertical extra ── */
+  .main-game-layout,
+  .app-container {
+    padding-top: 0 !important;
+    padding-bottom: 0.5rem !important;
+    min-height: 100dvh !important;
+  }
+
+  /* ── Header ultra-compacto en landscape ── */
+  header[class*="h-8"],
+  header[class*="h-9"] {
+    height: var(--header-height) !important;
+    min-height: var(--header-height) !important;
+  }
+
+  /* ── Modales: nunca deben sobrepasar la pantalla ── */
+  [role="dialog"],
+  .modal-overlay,
+  [class*="fixed inset-0"] {
+    align-items: flex-start !important;
+    padding-top: calc(var(--header-height) + 2px) !important;
+  }
+
+  /* ── Paneles con altura fija → altura dinámica ── */
+  [class*="h-[480px]"],
+  [class*="h-[440px]"],
+  [class*="h-[400px]"],
+  [class*="h-[380px]"] {
+    height: auto !important;
+    max-height: 78vh !important;
+  }
+
+  /* ── Contenedores de expediciones y notificaciones ── */
   #swgoh-expedition-screen,
   #swgoh-notifications-screen,
   .expedition-container {
-    max-height: calc(100vh - 2.5rem) !important;
-    padding: 0.5rem !important;
-    gap: 0.4rem !important;
+    max-height: calc(100dvh - var(--header-height) - 0.5rem) !important;
+    padding: 0.4rem !important;
+    gap: 0.3rem !important;
   }
 
-  /* Reducir altura de botones y paneles en landscape */
+  /* ── Botones: padding vertical reducido ── */
   button {
+    padding-top: 0.2rem !important;
+    padding-bottom: 0.2rem !important;
+    line-height: 1.2 !important;
+  }
+
+  /* ── Inputs: altura reducida ── */
+  input, select {
     padding-top: 0.25rem !important;
     padding-bottom: 0.25rem !important;
   }
+
+  /* ── Textos de tamaños sm/base → reducidos ── */
+  .text-sm { font-size: 0.75rem !important; }
+  .text-base { font-size: 0.8rem !important; }
+  .text-lg { font-size: 0.875rem !important; }
+  .text-xl { font-size: 0.95rem !important; }
+  .text-2xl { font-size: 1.1rem !important; }
 }
 
 html, body, #root {

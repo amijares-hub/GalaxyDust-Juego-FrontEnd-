@@ -493,19 +493,22 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       </div>
 
       {/* BOTONES ACCESO RÁPIDO Y POPUPS */}
-      <div className="fixed right-6 top-24 flex flex-col items-center gap-3 z-30 font-mono">
+      <div 
+        className="fixed top-10 sm:top-12 flex flex-col items-center gap-1.5 sm:gap-2 z-30 font-mono"
+        style={{ right: 'max(6px, env(safe-area-inset-right))' }}
+      >
         <button 
           onClick={() => setShowFlightsModal(true)} 
-          className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer relative hover:border-cyan-400 transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+          className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-lg cursor-pointer relative hover:border-cyan-400 transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)]"
           title="Expeditions in Flight"
         >
-          <Eye className="w-5 h-5 text-cyan-400 animate-pulse" />
+          <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400 animate-pulse" />
           {readyFlightsCount > 0 ? (
-            <span className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full border border-emerald-300 animate-bounce shadow-[0_0_10px_#10b981]">
+            <span className="absolute -top-1 -right-1 bg-emerald-500 text-black text-[7.5px] font-black px-1 py-0.2 rounded-full border border-emerald-300 animate-bounce shadow-[0_0_8px_#10b981]">
               {readyFlightsCount}
             </span>
           ) : activeFlights.length > 0 ? (
-            <span className="absolute -top-1.5 -right-1.5 bg-cyan-950 text-cyan-300 text-[9px] font-black px-1.5 py-0.5 rounded-full border border-cyan-500">
+            <span className="absolute -top-1 -right-1 bg-cyan-950 text-cyan-300 text-[7.5px] font-black px-1 py-0.2 rounded-full border border-cyan-500">
               {activeFlights.length}
             </span>
           ) : null}
@@ -517,12 +520,12 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
             setShowNotificationsModal(true);
             refreshNotifications();
           }} 
-          className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer relative hover:border-cyan-400 transition-all shadow-md"
+          className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-lg cursor-pointer relative hover:border-cyan-400 transition-all shadow-md"
           title="Comunicados Oficiales"
         >
-          <Bell className="w-5 h-5 text-cyan-400" />
+          <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white font-mono text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-[0_0_8px_rgba(239,68,68,0.8)] border border-black animate-pulse">
+            <span className="absolute -top-1 -right-1 bg-red-600 text-white font-mono text-[7px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-[0_0_8px_rgba(239,68,68,0.8)] border border-black animate-pulse">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
@@ -530,24 +533,24 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
 
         <button 
           onClick={() => { setActiveTab("home"); setActiveWindow("settings"); }} 
-          className="p-2.5 bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-xl cursor-pointer hover:border-cyan-400 transition-all"
+          className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-lg cursor-pointer hover:border-cyan-400 transition-all"
         >
-          <Settings className="w-5 h-5 text-cyan-400" />
+          <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
         </button>
       </div>
 
       {/* ÁREA DE CONTENIDO */}
-      <div className="w-full max-w-7xl flex-1 overflow-y-auto px-8 py-4 z-10 flex flex-col items-center justify-start">
+      <div className="w-full flex-1 overflow-y-auto px-2 sm:px-4 py-0.5 z-10 flex flex-col items-center justify-center min-h-0">
         <AnimatePresence mode="wait">
           {activeTab === "home" && (
             activeWindow === "home" ? (
-              <motion.div key="sector-home-screen" className="w-full my-auto">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+              <motion.div key="sector-home-screen" className="flex-1 flex items-center justify-center p-1.5 sm:p-2 gap-2 max-w-5xl mx-auto w-full my-auto">
+                <div className="grid grid-cols-2 min-[500px]:grid-cols-4 gap-1.5 sm:gap-2.5 w-full items-center">
                   {cards.map((card) => (
                     <GalaxyFrame
                       key={card.id}
-                      className={`h-[440px] w-full ${card.id === 'alliance' ? 'pointer-events-none' : 'cursor-pointer hover:scale-[1.02]'} transition-all duration-300 group shadow-2xl bg-transparent`}
-                      innerPadding="p-3.5"
+                      className={`h-full w-full ${card.id === 'alliance' ? 'pointer-events-none' : 'cursor-pointer hover:scale-[1.02]'} transition-all duration-300 group shadow-2xl bg-transparent`}
+                      innerPadding="p-1 sm:p-2"
                     >
                       <div
                         onClick={() => {
@@ -560,7 +563,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                             setActiveWindow("home");
                           }
                         }}
-                        className={`relative h-full w-full flex flex-col justify-between overflow-hidden rounded-lg bg-black/80 border border-cyan-950/60 ${card.id === 'alliance' ? 'opacity-40 grayscale' : ''}`}
+                        className={`relative flex flex-col justify-between overflow-hidden rounded-lg bg-black/80 border border-cyan-950/60 aspect-[16/10] max-h-[140px] sm:max-h-[220px] ${card.id === 'alliance' ? 'opacity-40 grayscale' : ''}`}
                       >
                         <div className="absolute inset-0 z-0">
                           <img
@@ -571,14 +574,14 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
                         </div>
 
-                        <div className="relative z-10 text-left p-4">
-                          <h2 className="text-lg font-black text-white uppercase tracking-widest group-hover:text-cyan-400 transition-colors">
+                        <div className="relative z-10 text-left p-2 sm:p-3">
+                          <h2 className="text-xs sm:text-sm lg:text-base font-black text-white uppercase tracking-widest group-hover:text-cyan-400 transition-colors">
                             {card.title}
                           </h2>
                         </div>
 
-                        <div className="relative z-10 mt-auto text-left p-4">
-                          <p className="text-[10px] font-mono text-zinc-200 leading-relaxed uppercase drop-shadow-md">
+                        <div className="relative z-10 mt-auto text-left p-2 sm:p-3">
+                          <p className="text-[8px] sm:text-[9.5px] font-mono text-zinc-200 leading-tight uppercase drop-shadow-md line-clamp-2">
                             {card.description}
                           </p>
                         </div>
@@ -587,10 +590,10 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                             <motion.div 
                               initial={{ opacity: 0, scale: 0.8 }}
                               animate={{ opacity: 1, scale: 1 }}
-                              className="bg-black/90 border border-cyan-500/50 rounded-lg px-4 py-3 flex flex-col items-center gap-2 shadow-[0_0_15px_rgba(6,182,212,0.3)] backdrop-blur-md"
+                              className="bg-black/90 border border-cyan-500/50 rounded-lg px-2.5 py-1.5 flex flex-col items-center gap-1 shadow-[0_0_15px_rgba(6,182,212,0.3)] backdrop-blur-md"
                             >
-                              <Lock className="w-6 h-6 text-cyan-400" />
-                              <span className="text-[10px] font-black text-cyan-300 tracking-widest uppercase">COMING SOON</span>
+                              <Lock className="w-4 h-4 text-cyan-400" />
+                              <span className="text-[8.5px] font-black text-cyan-300 tracking-widest uppercase">COMING SOON</span>
                             </motion.div>
                           </div>
                         )}
@@ -633,12 +636,12 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       {/* VENTANA POPUP 1: EXPEDITIONS IN FLIGHT */}
       <AnimatePresence>
         {showFlightsModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-start sm:items-center justify-center p-2 pt-9 sm:p-4 sm:pt-4 overflow-hidden">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-5xl relative"
+              className="w-full max-w-5xl max-h-[calc(100dvh-2.25rem)] overflow-y-auto relative"
             >
               <ExpeditionsView 
                 initialView="flights" 
@@ -653,14 +656,14 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       {/* VENTANA POPUP 2: NOTIFICACIONES / COMUNICADOS */}
       <AnimatePresence>
         {showNotificationsModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-start sm:items-center justify-center p-2 pt-9 sm:p-4 sm:pt-4 overflow-hidden">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-3xl relative"
+              className="w-full max-w-3xl max-h-[calc(100dvh-2.25rem)] overflow-y-auto relative"
             >
-              <GalaxyFrame className="w-full h-full overflow-hidden text-left" innerPadding="p-4 sm:p-6">
+              <GalaxyFrame className="w-full h-full overflow-hidden text-left" innerPadding="p-2 sm:p-5">
                 <NotificationsView onBack={() => setShowNotificationsModal(false)} triggerNotification={handleTriggerNotification} />
               </GalaxyFrame>
             </motion.div>
