@@ -24,8 +24,8 @@ export const useNotifications = () => {
 
       // 🎯 Consulta unificada de logs de expedición y notificaciones de sistema
       const { data, error } = await supabase
-        .from('expedition_logs')
-        .select('*')
+        .from('user_notifications')
+        .select('notification_id, title, message, category, box_type, is_read, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -53,7 +53,7 @@ export const useNotifications = () => {
   const markAsRead = async (id: string) => {
     setNotifications(prev => prev.map(n => n.notification_id === id ? { ...n, is_read: true } : n));
     setUnreadCount(prev => Math.max(0, prev - 1));
-    await supabase.from('expedition_logs').update({ is_read: true }).eq('id', id);
+    await supabase.from('user_notifications').update({ is_read: true }).eq('notification_id', id);
   };
 
   const markAllAsRead = async () => {
@@ -61,12 +61,12 @@ export const useNotifications = () => {
     if (!user) return;
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     setUnreadCount(0);
-    await supabase.from('expedition_logs').update({ is_read: true }).eq('user_id', user.id);
+    await supabase.from('user_notifications').update({ is_read: true }).eq('user_id', user.id);
   };
 
   const deleteNotification = async (id: string) => {
     setNotifications(prev => prev.filter(n => n.notification_id !== id));
-    await supabase.from('expedition_logs').delete().eq('id', id);
+    await supabase.from('user_notifications').delete().eq('notification_id', id);
   };
 
   useEffect(() => {

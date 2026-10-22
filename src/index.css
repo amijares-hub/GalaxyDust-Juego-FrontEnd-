@@ -69,6 +69,9 @@ html, body, #root {
   /* Habilita el desplazamiento táctil natural en móviles */
   overflow-x: hidden !important;
   overflow-y: auto !important;
+  /* Safe-area: evita colisión con notch/bordes curvos */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 /* Evita que los contenedores flexibles recorten la parte superior */

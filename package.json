@@ -8,13 +8,18 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "tauri": "tauri"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
     "@radix-ui/react-slot": "^1.2.4",
     "@supabase/supabase-js": "^2.106.1",
     "@tailwindcss/vite": "^4.1.14",
+    "@tauri-apps/api": "^3.0.0-alpha.2",
+    "@tauri-apps/plugin-dialog": "^3.0.0-alpha.1",
+    "@tauri-apps/plugin-process": "^3.0.0-alpha.1",
+    "@tauri-apps/plugin-updater": "^3.0.0-alpha.1",
     "@vitejs/plugin-react": "^5.0.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

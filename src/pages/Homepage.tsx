@@ -346,33 +346,29 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       await loadUserProfile(authUser);
       await loadActiveExpeditions(authUser.id);
 
-      profileChannel = supabase
-        .channel(`economy_hud_stream_${authUser.id}`)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_profiles' }, () => {
-          if (isMounted) loadUserProfile(authUser);
-        })
-        .subscribe();
+      const createSafeChannel = async (channelName: string, options: any, callback: () => void) => {
+        const existing = supabase.getChannels().find(ch => ch.topic === channelName || ch.topic === `realtime:${channelName}`);
+        if (existing) await supabase.removeChannel(existing);
+        return supabase.channel(channelName).on('postgres_changes', options, callback).subscribe();
+      };
 
-      expeditionsChannel = supabase
-        .channel(`active_expeditions_stream_${authUser.id}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'active_expeditions', filter: `user_id=eq.${authUser.id}` }, () => {
-          if (isMounted) loadActiveExpeditions(authUser.id);
-        })
-        .subscribe();
+      profileChannel = await createSafeChannel(
+        `economy_hud_stream_${authUser.id}`,
+        { event: 'UPDATE', schema: 'public', table: 'user_profiles' },
+        () => { if (isMounted) loadUserProfile(authUser); }
+      );
 
-      logsChannel = supabase
-        .channel(`expedition_logs_stream_${authUser.id}`)
-        .on('postgres_changes', { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'expedition_logs',
-          filter: `user_id=eq.${authUser.id}`
-        }, () => {
-          if (isMounted) {
-            refreshNotifications();
-          }
-        })
-        .subscribe();
+      expeditionsChannel = await createSafeChannel(
+        `active_expeditions_stream_${authUser.id}`,
+        { event: '*', schema: 'public', table: 'active_expeditions', filter: `user_id=eq.${authUser.id}` },
+        () => { if (isMounted) loadActiveExpeditions(authUser.id); }
+      );
+
+      logsChannel = await createSafeChannel(
+        `expedition_logs_stream_${authUser.id}`,
+        { event: 'INSERT', schema: 'public', table: 'expedition_logs', filter: `user_id=eq.${authUser.id}` },
+        () => { if (isMounted) refreshNotifications(); }
+      );
 
       pollInterval = setInterval(() => {
         if (isMounted) {

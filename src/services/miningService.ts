@@ -1,5 +1,9 @@
 import { supabase } from '../lib/supabase';
 
+// ============================================================================
+// ESTRUCTURAS E INTERFACES DEL SERVICIO DE MINERÍA Y C.A.N.
+// ============================================================================
+
 export interface MiningDrop {
   type: 'RESOURCE' | 'CURRENCY' | 'BLUEPRINT' | 'ASTROBOT';
   name: string;
@@ -9,7 +13,192 @@ export interface MiningDrop {
   numericAmount?: number;
 }
 
+export interface StructureSkill {
+  skill_code: string;
+  stat_affected: string;
+  operator: 'add' | 'multiply';
+  modifier_value: number;
+}
+
+export interface UserStructureActive {
+  id: string;
+  user_id: string;
+  structure_id: string;
+  structure_name: string;
+  is_active: boolean;
+  skills: StructureSkill[];
+}
+
+export interface CANProductionReport {
+  energyProduced: number;
+  energyRequired: number;
+  energyEfficiency: number; // Factor entre 0.0 (Sin energía) y 1.0 (100% Operativa)
+  hourlyProduction: {
+    metal: number;
+    crystal: number;
+    deuterium: number;
+    dark_matter: number;
+  };
+  storageLimits: {
+    metal: number;
+    crystal: number;
+    deuterium: number;
+    dark_matter: number;
+  };
+}
+
+// Configuración de almacenamiento base del jugador
+const BASE_STORAGE = {
+  metal: 10000,
+  crystal: 5000,
+  deuterium: 2500,
+  dark_matter: 100
+};
+
+// ============================================================================
+// MOTOR MAESTRO MINING SERVICE
+// ============================================================================
+
 export const miningService = {
+  /**
+   * CÁLCULO DE ESTRUCTURAS, ENERGÍA SOLAR Y LÍMITES DE ALMACENAMIENTO C.A.N.
+   * Audita estructuras activas, consumo de energía y producción por hora.
+   */
+  async calculateUserCANMetrics(userId: string): Promise<CANProductionReport> {
+    try {
+      const { data: userStructs } = await supabase
+        .from('user_structures')
+        .select(`
+          id,
+          user_id,
+          structure_id,
+          is_active,
+          seed_structures (
+            name,
+            skills
+          )
+        `)
+        .eq('user_id', userId)
+        .eq('is_active', true);
+
+      let energyProduced = 0;
+      let energyRequired = 0;
+
+      let rawMetalRates = 0;
+      let rawCrystalRates = 0;
+      let rawDeuteriumRates = 0;
+      let rawDarkMatterRates = 0;
+
+      let totalMineBoostPercent = 0;
+
+      let storageAdditions = {
+        metal: 0,
+        crystal: 0,
+        deuterium: 0,
+        dark_matter: 0
+      };
+
+      if (userStructs && userStructs.length > 0) {
+        for (const struct of userStructs) {
+          const rawSkills = (struct.seed_structures as any)?.skills || [];
+          let skillsList: StructureSkill[] = [];
+
+          if (Array.isArray(rawSkills)) {
+            skillsList = rawSkills;
+          } else if (typeof rawSkills === 'string') {
+            try { skillsList = JSON.parse(rawSkills); } catch { skillsList = []; }
+          }
+
+          for (const skill of skillsList) {
+            const val = Number(skill.modifier_value || 0);
+
+            switch (skill.stat_affected) {
+              // 1. Energía Solar
+              case 'energy_production':
+                energyProduced += val;
+                break;
+              case 'energy_required':
+                energyRequired += val;
+                break;
+
+              // 2. Extracción por Hora
+              case 'metal_production':
+                rawMetalRates += val;
+                break;
+              case 'crystal_production':
+                rawCrystalRates += val;
+                break;
+              case 'deuterium_production':
+                rawDeuteriumRates += val;
+                break;
+              case 'dark_matter_production':
+                rawDarkMatterRates += val;
+                break;
+
+              // 3. Potenciador %
+              case 'mine_boost':
+                totalMineBoostPercent += val;
+                break;
+
+              // 4. Capacidad de Almacenamiento
+              case 'metal_storage':
+                storageAdditions.metal += val;
+                break;
+              case 'crystal_storage':
+                storageAdditions.crystal += val;
+                break;
+              case 'deuterium_storage':
+                storageAdditions.deuterium += val;
+                break;
+              case 'dark_matter_storage':
+                storageAdditions.dark_matter += val;
+                break;
+            }
+          }
+        }
+      }
+
+      // 🛡️ Regla de Energía: Si la mina requiere energía y no hay Planta Solar activa, se apaga la producción (eficiencia 0.0)
+      let energyEfficiency = 1.0;
+      if (energyRequired > 0) {
+        if (energyProduced === 0) {
+          energyEfficiency = 0.0;
+        } else {
+          energyEfficiency = Math.min(1.0, energyProduced / energyRequired);
+        }
+      }
+
+      const boostMultiplier = 1.0 + totalMineBoostPercent;
+
+      return {
+        energyProduced,
+        energyRequired,
+        energyEfficiency,
+        hourlyProduction: {
+          metal: Math.floor(rawMetalRates * boostMultiplier * energyEfficiency),
+          crystal: Math.floor(rawCrystalRates * boostMultiplier * energyEfficiency),
+          deuterium: Math.floor(rawDeuteriumRates * boostMultiplier * energyEfficiency),
+          dark_matter: Math.floor(rawDarkMatterRates * boostMultiplier * energyEfficiency)
+        },
+        storageLimits: {
+          metal: BASE_STORAGE.metal + storageAdditions.metal,
+          crystal: BASE_STORAGE.crystal + storageAdditions.crystal,
+          deuterium: BASE_STORAGE.deuterium + storageAdditions.deuterium,
+          dark_matter: BASE_STORAGE.dark_matter + storageAdditions.dark_matter
+        }
+      };
+    } catch (error) {
+      console.error("Error al calcular métricas C.A.N.:", error);
+      return {
+        energyProduced: 0,
+        energyRequired: 0,
+        energyEfficiency: 0,
+        hourlyProduction: { metal: 0, crystal: 0, deuterium: 0, dark_matter: 0 },
+        storageLimits: BASE_STORAGE
+      };
+    }
+  },
+
   /**
    * Comprueba si el jugador tiene expediciones de minería en curso
    * para bloquear cambios de tecnología en inventario (Página 1, Req 4)
@@ -38,7 +227,6 @@ export const miningService = {
    * Acepta modificadores de riqueza estelar y bonos de rareza de la C.A.N.
    */
   calculateMiningDrop(starRichnessMultiplier: number = 1.0, userRarityBonusPct: number = 0): MiningDrop {
-    // Genera valor aleatorio de 0 a 100 modificando probabilidades según bonos de la C.A.N.
     const roll = Math.random() * 100;
     const effectiveRoll = Math.max(0, roll - userRarityBonusPct);
 
@@ -110,11 +298,10 @@ export const miningService = {
   },
 
   /**
-   * Rastra y devuelve el número de jugadores activos en línea en tiempo real (Página 1, Req 5 - KPI Backend)
+   * Rastrea y devuelve el número de jugadores activos en línea en tiempo real (Página 1, Req 5 - KPI Backend)
    */
   async getActivePlayersCount(): Promise<number> {
     try {
-      // Consulta usuarios activos con sesiones o actividad en los últimos 15 minutos
       const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
       const { count, error } = await supabase
@@ -123,7 +310,6 @@ export const miningService = {
         .gte('updated_at', fifteenMinutesAgo);
 
       if (error || count === null) {
-        // Fallback de consulta a expediciones activas
         const { count: expCount } = await supabase
           .from('active_expeditions')
           .select('user_id', { count: 'exact', head: true })
@@ -168,7 +354,6 @@ export const miningService = {
             .eq('id', userId);
         }
       } else {
-        // Registrar ítem raro en el inventario del usuario
         await supabase.from('user_inventory').insert({
           user_id: userId,
           title: drop.name,

@@ -127,7 +127,13 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   return (
-    <header className="w-full bg-[#05080c]/98 border-b border-cyan-500/40 px-2 sm:px-3 py-1 flex items-center justify-between gap-1 sm:gap-2 shrink-0 select-none z-50 font-mono backdrop-blur-md sticky top-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)]">
+    <header
+      className="w-full bg-[#05080c]/98 border-b border-cyan-500/40 py-1 flex items-center justify-between gap-1 shrink-0 select-none z-50 font-mono backdrop-blur-md sticky top-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)]"
+      style={{
+        paddingLeft: 'max(8px, env(safe-area-inset-left))',
+        paddingRight: 'max(8px, env(safe-area-inset-right))',
+      }}
+    >
       
       {/* 1. PERFIL / AVATAR */}
       <div
@@ -168,7 +174,8 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               key={tab.id}
               onClick={() => onSelectTab && onSelectTab(tab.id)}
-              className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded text-[8px] sm:text-[9.5px] font-bold tracking-widest uppercase transition-all cursor-pointer whitespace-nowrap border shrink-0 ${
+              style={{ fontSize: 'clamp(0.6rem, 1.1vw, 0.8rem)' }}
+              className={`px-1.5 py-0.5 rounded font-bold tracking-widest uppercase transition-all cursor-pointer whitespace-nowrap border shrink-0 ${
                 isActive
                   ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.3)] font-black'
                   : 'bg-black/50 text-zinc-400 border-transparent hover:text-white hover:bg-cyan-950/30'

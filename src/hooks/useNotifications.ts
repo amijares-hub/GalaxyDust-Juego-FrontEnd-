@@ -17,25 +17,36 @@ export interface NotificationRecord {
 export const useNotifications = () => {
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
 
-  const fetchNotifications = useCallback(async () => {
+  // Inicializar el usuario
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id);
+    });
+  }, []);
+
+  // 1. Cargar notificaciones desde la base de datos
+  const fetchNotifications = useCallback(async (currentUserId?: string) => {
+    const uid = currentUserId || userId;
+    if (!uid) return;
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
+      setLoading(true);
       const { data, error } = await supabase
-        .from('expedition_logs')
-        .select('*')
-        .eq('user_id', user.id)
+        .from('user_notifications')
+        .select('notification_id, user_id, title, message, category, box_type, is_read, created_at, action_url')
+        .eq('user_id', uid)
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
+      if (error) throw error;
+      if (data) {
         const mapped: NotificationRecord[] = data.map((item: any) => ({
-          notification_id: item.id?.toString() || item.notification_id?.toString() || Math.random().toString(),
+          notification_id: item.notification_id || Math.random().toString(),
           user_id: item.user_id,
           title: item.title || 'COMUNICADO OFICIAL',
           message: item.message || '',
-          category: item.event_type || item.category || 'EXPEDITION',
+          category: item.category || 'EXPEDITION',
           box_type: item.box_type || item.category,
           is_read: item.is_read ?? false,
           created_at: item.created_at || new Date().toISOString(),
@@ -44,75 +55,92 @@ export const useNotifications = () => {
         setNotifications(mapped);
       }
     } catch (err) {
-      console.error("Error cargando comunicados:", err);
+      console.error('[NOTIFICATIONS] Error cargando notificaciones:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
+  // 2. Manejo unificado de Realtime (sin funciones independientes)
   useEffect(() => {
-    fetchNotifications();
-
+    if (!userId) return;
+    
+    fetchNotifications(userId);
     let channel: any;
-    const subscribeRealtime = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
+    
+    const initRealtime = async () => {
+      const channelName = `realtime_user_notifications_${userId}`;
+      
+      // Desuscribir canal previo si ya existía en la memoria de Supabase
+      const existing = supabase.getChannels().find((ch) => ch.name === channelName);
+      if (existing) {
+        await supabase.removeChannel(existing);
+      }
+      
+      // Crear nuevo canal de forma sincrónica: .on() SIEMPRE antes de .subscribe()
       channel = supabase
-        .channel(`realtime_comunicados_count_${user.id}`)
+        .channel(channelName)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'expedition_logs', filter: `user_id=eq.${user.id}` },
+          {
+            event: '*',
+            schema: 'public',
+            table: 'user_notifications',
+            filter: `user_id=eq.${userId}`,
+          },
           () => {
-            fetchNotifications();
+            fetchNotifications(userId);
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('[REALTIME] Suscrito exitosamente a notificaciones');
+          }
+        });
     };
 
-    subscribeRealtime();
-
+    initRealtime();
+      
     return () => {
       if (channel) supabase.removeChannel(channel);
     };
-  }, [fetchNotifications]);
+  }, [userId, fetchNotifications]);
 
   // 🎯 FILTRADO STRICTO: Cuenta ÚNICAMENTE Comunicados Oficiales NO leídos
   const unreadCount = useMemo(() => {
     return notifications.filter(n => !n.is_read && isOfficialComunicado(n)).length;
   }, [notifications]);
 
+  // 3. Métodos auxiliares
   const markAsRead = async (notificationId: string) => {
-    setNotifications(prev => prev.map(n => n.notification_id === notificationId ? { ...n, is_read: true } : n));
-    await supabase.from('expedition_logs').update({ is_read: true }).eq('id', notificationId);
+    if (!userId) return;
+    await supabase.from('user_notifications').update({ is_read: true }).eq('notification_id', notificationId).eq('user_id', userId);
+    fetchNotifications(userId);
   };
 
   const markAllAsRead = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-    await supabase.from('expedition_logs').update({ is_read: true }).eq('user_id', user.id);
+    if (!userId) return;
+    await supabase.from('user_notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false);
+    fetchNotifications(userId);
   };
-
+  
   const deleteNotification = async (notificationId: string) => {
-    setNotifications(prev => prev.filter(n => n.notification_id !== notificationId));
-    await supabase.from('expedition_logs').delete().eq('id', notificationId);
+    if (!userId) return;
+    await supabase.from('user_notifications').delete().eq('notification_id', notificationId).eq('user_id', userId);
+    fetchNotifications(userId);
   };
 
   const deleteAllNotifications = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    setNotifications([]);
-    await supabase.from('expedition_logs').delete().eq('user_id', user.id);
+    if (!userId) return;
+    await supabase.from('user_notifications').delete().eq('user_id', userId);
+    fetchNotifications(userId);
   };
 
   return {
     notifications,
     unreadCount,
     loading,
-    refresh: fetchNotifications,
+    refresh: () => fetchNotifications(userId || undefined),
     markAsRead,
     markAllAsRead,
     deleteNotification,

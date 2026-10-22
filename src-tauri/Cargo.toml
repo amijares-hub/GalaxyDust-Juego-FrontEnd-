@@ -1,0 +1,40 @@
+[package]
+name = "app"
+version = "1.0.0"
+description = "GalaxyDust Game"
+authors = ["Sasorilabs"]
+license = ""
+repository = ""
+edition = "2024"
+rust-version = "1.95"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "3.0.0-alpha.2", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "3.0.0-alpha.3", features = ["custom-protocol", "webview2-com"] }
+tauri-runtime-wry = { version = "3.0.0-alpha.3" }
+tauri-plugin-log = "3.0.0-alpha.1"
+tauri-plugin-process = "3.0.0-alpha.1"
+# tauri-plugin-dialog@alpha.1 incompatible con tauri@alpha.3 (Manager trait bug)
+# Se re-habilitará cuando se publique una versión compatible
+tauri-plugin-updater = "3.0.0-alpha.1"
+sysinfo = "0.39.6"
+
+sha2 = "0.10"
+hex = "0.4"
+reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+tokio = { version = "1", features = ["full"] }
+tauri-plugin-single-instance = "3.0.0-alpha.1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_System_Diagnostics_Debug"] }

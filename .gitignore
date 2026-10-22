@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# 🔐 Claves criptográficas — NUNCA subir a Git
+keys/
+*.key
+*.keystore
+*.jks

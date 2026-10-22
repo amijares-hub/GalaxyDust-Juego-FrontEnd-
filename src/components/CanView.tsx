@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  BarChart2, Globe, AlertTriangle, RefreshCw, X, Sparkles, ChevronRight, ChevronLeft, Shield, Info, Lock
+  BarChart2, Globe, AlertTriangle, RefreshCw, X, Sparkles, ChevronRight, ChevronLeft, Shield, Info, Lock, BatteryCharging, Zap
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAudioEngine } from '../hooks/useAudioEngine';
 import { CanAssetsModal, CanAssetItem } from './CanAssetsModal';
+import { miningService, CANProductionReport } from '../services/miningService';
 import {
   SciFiCraftingIcon, SciFiSpeedIcon, SciFiWeaponIcon, SciFiNodeIcon, SciFiAtomIcon, SciFiLaserIcon, SciFiTimerIcon
 } from './SciFiIcons';
@@ -40,7 +41,6 @@ interface DiscoveredStar {
 
 const GALAXY_FRAME_PNG = "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Bordes,%20Frames/galaxy_dust_frame_clean.png";
 
-// 🖼️ MARCO SCI-FI NÍTIDO: 12px DE GROSOR, SIN DESENFOQUE Y CON MARGEN INTERNO DE SEGURIDAD
 export const GalaxyFrame: React.FC<{ children: React.ReactNode; className?: string; innerPadding?: string }> = ({
   children,
   className = "",
@@ -92,13 +92,13 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
   const [activeSkills, setActiveSkills] = useState<ActiveSkillItem[]>([]);
   const [discoveredStars, setDiscoveredStars] = useState<DiscoveredStar[]>([]);
 
-  const [dailyProduction, setDailyProduction] = useState({
-    metal: 0,
-    crystal: 0,
-    deuterium: 0,
-    darkMatter: 0,
-    fleetPowerMod: 0,
-    defenseShieldMod: 0
+  // Métricas reales de producción y energía C.A.N.
+  const [canMetrics, setCanMetrics] = useState<CANProductionReport>({
+    energyProduced: 0,
+    energyRequired: 0,
+    energyEfficiency: 1.0,
+    hourlyProduction: { metal: 0, crystal: 0, deuterium: 0, dark_matter: 0 },
+    storageLimits: { metal: 10000, crystal: 5000, deuterium: 2500, dark_matter: 100 }
   });
 
   const getSkillIcon = (source: string, desc: string = '') => {
@@ -162,74 +162,6 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
     return [`${desc} (+${bonus}%)`];
   };
 
-  const calculateRealProduction = async (user_id: string, current_can_level: number) => {
-    try {
-      const [
-        { data: uStructures },
-        { data: uTech },
-        { data: uBadgesUnlocked },
-        { data: uBadges }
-      ] = await Promise.all([
-        supabase.from('user_structures').select('*, seed_structures(*)').eq('user_id', user_id),
-        supabase.from('user_technologies').select('*, seed_technologies(*)').eq('user_id', user_id),
-        supabase.from('user_badges_unlocked').select('*, seed_badges(*)').eq('user_id', user_id),
-        supabase.from('user_badges').select('*, seed_badges(*)').eq('user_id', user_id)
-      ]);
-
-      let baseMetal = current_can_level * 1000;
-      let baseCrystal = current_can_level * 500;
-      let baseDeuterium = current_can_level * 200;
-      let baseDM = current_can_level * 10;
-      let fleetPowerMod = 10 + current_can_level * 2;
-      let shieldMod = 8 + current_can_level * 2;
-
-      (uStructures || []).forEach((item: any) => {
-        if (item.is_equipped !== true) return;
-        const seed = item.seed_structures || {};
-        const lvl = item.current_level || 1;
-        baseMetal += (seed.metal_daily || seed.power_score_base * 2.5 || 600) * lvl;
-        baseCrystal += (seed.crystal_daily || seed.power_score_base * 1.2 || 300) * lvl;
-        baseDeuterium += (seed.deuterium_daily || 120) * lvl;
-        fleetPowerMod += Number(seed.fleet_power_bonus || 2);
-        shieldMod += Number(seed.shield_bonus || 2);
-      });
-
-      (uTech || []).forEach((item: any) => {
-        if (item.is_equipped !== true) return;
-        const seed = item.seed_technologies || {};
-        baseMetal += Number(seed.metal_daily || seed.metal_bonus || 400);
-        baseCrystal += Number(seed.crystal_daily || seed.crystal_bonus || 450);
-        baseDeuterium += Number(seed.deuterium_daily || 200);
-        baseDM += Number(seed.dark_matter_daily || 5);
-        fleetPowerMod += Number(seed.fleet_power_bonus || 3);
-        shieldMod += Number(seed.shield_bonus || 3);
-      });
-
-      const badgesList = (uBadgesUnlocked && uBadgesUnlocked.length > 0) ? uBadgesUnlocked : (uBadges || []);
-      badgesList.forEach((item: any) => {
-        if (item.is_equipped !== true) return;
-        const seed = item.seed_badges || {};
-        baseMetal += Number(seed.metal_daily || 800);
-        baseCrystal += Number(seed.crystal_daily || 500);
-        baseDeuterium += Number(seed.deuterium_daily || 300);
-        baseDM += Number(seed.dark_matter_daily || 10);
-        fleetPowerMod += Number(seed.fleet_power_bonus || 5);
-        shieldMod += Number(seed.shield_bonus || 4);
-      });
-
-      setDailyProduction({
-        metal: Math.round(baseMetal),
-        crystal: Math.round(baseCrystal),
-        deuterium: Math.round(baseDeuterium),
-        darkMatter: Math.round(baseDM),
-        fleetPowerMod: Math.min(60, fleetPowerMod),
-        defenseShieldMod: Math.min(60, shieldMod)
-      });
-    } catch (err) {
-      console.error("Error al calcular producción diaria real:", err);
-    }
-  };
-
   const fetchCanData = async () => {
     setLoading(true);
     try {
@@ -237,6 +169,10 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
       if (!user) return;
 
       setCurrentUserId(user.id);
+
+      // Cargar métricas auditadas de C.A.N.
+      const calculatedMetrics = await miningService.calculateUserCANMetrics(user.id);
+      setCanMetrics(calculatedMetrics);
 
       const { data: profile } = await supabase
         .from('user_profiles')
@@ -373,8 +309,6 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
         calculatedPower = profile.power_score;
       }
       setGalacticPower(calculatedPower);
-
-      calculateRealProduction(user.id, lvl);
 
       const { count: starsCount } = await supabase
         .from('user_discovered_stars')
@@ -706,12 +640,9 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
             {/* DASHBOARD DE ACTIVE SKILLS DIVIDIDO EN 3 COLUMNAS */}
             <GalaxyFrame className="flex-1 min-h-[190px] overflow-hidden" innerPadding="p-4">
               <div className="flex flex-col justify-between h-full">
-                <div className="flex justify-between items-center mb-1.5 pb-1 border-b border-cyan-950">
-                  <span className="text-[9.5px] text-cyan-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" /> DASHBOARD DE ACTIVE SKILLS ({activeSkills.length})
-                  </span>
-                  <span className="text-[7px] bg-cyan-950 border border-cyan-800 text-cyan-300 px-1.5 py-0.5 rounded font-bold uppercase">
-                    TOUCH
+                <div className="flex justify-center items-center mb-1.5 pb-1 border-b border-cyan-950">
+                  <span className="text-[9.5px] text-cyan-400 font-bold uppercase tracking-wider text-center">
+                    DASHBOARD DE ACTIVE SKILLS ({activeSkills.length})
                   </span>
                 </div>
 
@@ -903,81 +834,87 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
           </div>
         )}
 
-        {/* MODAL 2: ESTADÍSTICAS Y PRODUCCIÓN DIARIA REAL */}
+        {/* MODAL 2: ESTADÍSTICAS Y PRODUCCIÓN DIARIA AUDITADA C.A.N. */}
         {showStatsModal && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 font-mono text-white overflow-hidden">
             <GalaxyFrame className="w-full max-w-lg h-auto max-h-[85vh] mx-auto my-auto overflow-hidden" innerPadding="p-4 sm:p-5">
               <div className="relative flex flex-col justify-between gap-2.5 h-full">
-                {/* OVERLAY DE COMING SOON */}
-                <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-xl p-6 text-center border border-cyan-900/50 shadow-[0_0_30px_rgba(6,182,212,0.2)]">
-                  <Lock className="w-8 h-8 sm:w-10 sm:h-10 text-cyan-400 mb-3 opacity-90" />
-                  <span className="text-xs sm:text-sm font-black text-cyan-300 tracking-widest uppercase drop-shadow-md">
-                    MÓDULO EN DESARROLLO / PRODUCCIÓN PASIVA C.A.N.
-                  </span>
-                  <button onClick={() => { playSfx(440); setShowStatsModal(false); }} className="mt-6 px-6 py-2 bg-cyan-950 border border-cyan-500/50 text-cyan-200 hover:text-white hover:bg-cyan-900 text-[9px] font-bold uppercase rounded-lg cursor-pointer transition-all shadow-md">
-                    CERRAR
+                
+                {/* CABECERA */}
+                <div className="flex justify-between items-center border-b border-purple-950 pb-2 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <BarChart2 className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400 animate-pulse shrink-0" />
+                    <h3 className="text-xs font-black text-white uppercase tracking-widest truncate">
+                      C.A.N. TELEMETRÍA Y ALMACENAMIENTO
+                    </h3>
+                  </div>
+                  <button onClick={() => { playSfx(440); setShowStatsModal(false); }} className="p-1 text-zinc-400 hover:text-white cursor-pointer shrink-0">
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                {/* CONTENIDO ORIGINAL OPACO */}
-                <div className="opacity-20 pointer-events-none flex flex-col justify-between gap-2.5 h-full grayscale">
-                  <div className="flex justify-between items-center border-b border-purple-950 pb-2 shrink-0">
-                    <div className="flex items-center gap-2">
-                      <BarChart2 className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400 animate-pulse shrink-0" />
-                      <h3 className="text-xs font-black text-white uppercase tracking-widest truncate">
-                        ESTADÍSTICAS Y PRODUCCIÓN DIARIA
-                      </h3>
-                    </div>
-                    <button className="p-1 text-zinc-400 shrink-0">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <div className="space-y-2 text-[8.5px] sm:text-[9px] flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
-                    <span className="text-cyan-400 font-bold uppercase block border-b border-purple-950 pb-1">
-                      PRODUCCIÓN REAL CALCULADA (24 HORAS)
-                    </span>
-
-                    <div className="grid grid-cols-2 gap-2 font-mono">
-                      <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                        <span className="text-zinc-400 uppercase">METAL:</span>
-                        <span className="text-cyan-200 font-bold text-[9.5px]">+{dailyProduction.metal.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
-                      </div>
-                      <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                        <span className="text-zinc-400 uppercase">CRISTAL:</span>
-                        <span className="text-purple-300 font-bold text-[9.5px]">+{dailyProduction.crystal.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
-                      </div>
-                      <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                        <span className="text-zinc-400 uppercase">DEUTERIO:</span>
-                        <span className="text-blue-300 font-bold text-[9.5px]">+{dailyProduction.deuterium.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
-                      </div>
-                      <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                        <span className="text-zinc-400 uppercase">MATERIA OSCURA:</span>
-                        <span className="text-indigo-300 font-bold text-[9.5px]">+{dailyProduction.darkMatter.toLocaleString()} <span className="text-[6.5px]">/D</span></span>
-                      </div>
+                {/* CONTENIDO AUDITADO DE PRODUCCIÓN REAL */}
+                <div className="space-y-3 text-[8.5px] sm:text-[9px] flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                  
+                  {/* RED DE ENERGÍA SOLAR */}
+                  <div className={`p-2.5 bg-black/80 border rounded-xl space-y-1 ${canMetrics.energyRequired > 0 && canMetrics.energyProduced === 0 ? 'border-red-500/80 shadow-[0_0_12px_rgba(239,68,68,0.3)]' : 'border-cyan-900/60'}`}>
+                    <div className="flex justify-between items-center text-cyan-400 font-bold uppercase">
+                      <span className="flex items-center gap-1.5">
+                        <BatteryCharging className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                        SUMINISTRO DE ENERGÍA SOLAR
+                      </span>
+                      <span className="text-white font-mono font-black">{canMetrics.energyProduced} / {canMetrics.energyRequired} UNIDADES</span>
                     </div>
 
-                    <span className="text-purple-400 font-bold uppercase block border-b border-purple-950 pb-1 pt-1.5">
-                      MODIFICADORES TÁCTICOS GLOBALES
-                    </span>
+                    {canMetrics.energyRequired > 0 && canMetrics.energyProduced === 0 ? (
+                      <p className="text-[7.5px] text-red-400 font-bold uppercase flex items-center gap-1 pt-1">
+                        <AlertTriangle className="w-3 h-3 text-red-500 shrink-0" />
+                        PLANTA SOLAR DESACTIVADA: PRODUCCIÓN DETENIDA AL 0%
+                      </p>
+                    ) : (
+                      <div className="flex justify-between items-center text-[7.5px] text-zinc-400 pt-0.5 font-mono">
+                        <span>EFICIENCIA OPERATIVA APLICADA:</span>
+                        <span className="text-emerald-400 font-black text-[8.5px]">{(canMetrics.energyEfficiency * 100).toFixed(0)}%</span>
+                      </div>
+                    )}
+                  </div>
 
-                    <div className="grid grid-cols-2 gap-2 font-mono">
-                      <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                        <span className="text-zinc-400 uppercase">PODER DE FLOTA:</span>
-                        <span className="text-emerald-400 font-bold text-[9.5px]">+{dailyProduction.fleetPowerMod}%</span>
-                      </div>
-                      <div className="p-2 bg-black/60 border border-purple-950 rounded-lg flex justify-between items-center">
-                        <span className="text-zinc-400 uppercase">ESCUDOS DE DEFENSA:</span>
-                        <span className="text-cyan-400 font-bold text-[9.5px]">+{dailyProduction.defenseShieldMod}%</span>
-                      </div>
+                  <span className="text-cyan-400 font-bold uppercase block border-b border-purple-950 pb-1">
+                    TASA DE EXTRACCIÓN Y CAPACIDAD MÁXIMA
+                  </span>
+
+                  <div className="grid grid-cols-2 gap-2 font-mono">
+                    <div className="p-2.5 bg-black/60 border border-purple-950 rounded-lg flex flex-col justify-between gap-1">
+                      <span className="text-zinc-400 uppercase font-bold">METAL</span>
+                      <span className="text-cyan-300 font-black text-[10px]">+{canMetrics.hourlyProduction.metal.toLocaleString()} <span className="text-[7px] text-zinc-500">/HORA</span></span>
+                      <span className="text-[7px] text-zinc-400 border-t border-purple-950/60 pt-0.5">ALMACÉN: {canMetrics.storageLimits.metal.toLocaleString()}</span>
+                    </div>
+
+                    <div className="p-2.5 bg-black/60 border border-purple-950 rounded-lg flex flex-col justify-between gap-1">
+                      <span className="text-zinc-400 uppercase font-bold">CRISTAL</span>
+                      <span className="text-purple-300 font-black text-[10px]">+{canMetrics.hourlyProduction.crystal.toLocaleString()} <span className="text-[7px] text-zinc-500">/HORA</span></span>
+                      <span className="text-[7px] text-zinc-400 border-t border-purple-950/60 pt-0.5">ALMACÉN: {canMetrics.storageLimits.crystal.toLocaleString()}</span>
+                    </div>
+
+                    <div className="p-2.5 bg-black/60 border border-purple-950 rounded-lg flex flex-col justify-between gap-1">
+                      <span className="text-zinc-400 uppercase font-bold">DEUTERIO</span>
+                      <span className="text-blue-300 font-black text-[10px]">+{canMetrics.hourlyProduction.deuterium.toLocaleString()} <span className="text-[7px] text-zinc-500">/HORA</span></span>
+                      <span className="text-[7px] text-zinc-400 border-t border-purple-950/60 pt-0.5">ALMACÉN: {canMetrics.storageLimits.deuterium.toLocaleString()}</span>
+                    </div>
+
+                    <div className="p-2.5 bg-black/60 border border-purple-950 rounded-lg flex flex-col justify-between gap-1">
+                      <span className="text-zinc-400 uppercase font-bold">MATERIA OSCURA</span>
+                      <span className="text-emerald-400 font-black text-[10px]">+{canMetrics.hourlyProduction.dark_matter.toLocaleString()} <span className="text-[7px] text-zinc-500">/HORA</span></span>
+                      <span className="text-[7px] text-zinc-400 border-t border-purple-950/60 pt-0.5">ALMACÉN: {canMetrics.storageLimits.dark_matter.toLocaleString()}</span>
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-purple-950 flex justify-end shrink-0">
-                    <button className="px-4 py-1.5 bg-black border border-zinc-800 text-zinc-300 text-[8.5px] font-bold uppercase rounded-lg">
-                      ACEPTAR
-                    </button>
-                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-purple-950 flex justify-end shrink-0">
+                  <button onClick={() => { playSfx(440); setShowStatsModal(false); }} className="px-4 py-1.5 bg-cyan-950 border border-cyan-500/50 hover:border-cyan-400 text-cyan-300 text-[8.5px] font-bold uppercase rounded-lg cursor-pointer">
+                    ACEPTAR
+                  </button>
                 </div>
               </div>
             </GalaxyFrame>

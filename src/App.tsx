@@ -3,12 +3,16 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthView } from './components/AuthView';
 import { Homepage } from './pages/Homepage';
 import { RefreshCw } from 'lucide-react';
-import { LandscapeGuard } from './components/ui/LandscapeGuard';
+
 import { GamePreloader } from './components/GamePreloader';
+import { useUpdater } from './hooks/useUpdater';
 
 function AppContent() {
   const { user, logout, isInitializing } = useAuth();
   const [isPreloaderFinished, setIsPreloaderFinished] = useState(false);
+
+  // 🔄 Verifica actualizaciones al arrancar (solo en Tauri Desktop)
+  useUpdater();
 
   if (isInitializing) {
     return (
@@ -35,10 +39,8 @@ function AppContent() {
 
 export default function App() {
   return (
-    <LandscapeGuard>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </LandscapeGuard>
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

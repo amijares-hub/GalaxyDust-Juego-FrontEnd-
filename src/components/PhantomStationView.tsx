@@ -315,6 +315,13 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
                           src={bp.image || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=300'}
                           alt={bp.name || 'Activo'}
                           className="w-full h-full object-cover rounded brightness-90 group-hover:scale-105 transition-transform"
+                          onError={(e) => {
+                            const t = e.target as HTMLImageElement;
+                            if (!t.src.includes('unsplash.com')) {
+                              t.onerror = null;
+                              t.src = 'https://images.unsplash.com/photo-1541185933-ef5d8ed016c2?q=80&w=300';
+                            }
+                          }}
                         />
                       </div>
 

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "GalaxyDust",
+  "version": "1.0.0",
+  "identifier": "com.galaxydust.game",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Galaxy Dust Online",
+        "width": 1280,
+        "height": 720,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://qldjeysusithpblfrmtq.supabase.co; media-src 'self' data: blob: https://qldjeysusithpblfrmtq.supabase.co; connect-src 'self' wss://qldjeysusithpblfrmtq.supabase.co https://qldjeysusithpblfrmtq.supabase.co; font-src 'self' https://fonts.reown.com;",
+      "freezePrototype": true
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU2Q0Q4MEJBNzk2MTMxNTQKUldSVU1XRjV1b0RONWc0UDNYbFVGTEwrUE1lYlZ1cENCVWtWU0kyR1NKaDI0WnNUSnY5dEtHZGoK",
+      "endpoints": [
+        "https://github.com/amijares-hub/GalaxyDust-Juego-FrontEnd-/releases/latest/download/latest.json"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "android": {
+      "debugApplicationIdSuffix": ".debug"
+    }
+  }
+}
