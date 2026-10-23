@@ -39,6 +39,19 @@ export interface Asset {
   max_metal_bonus?: number;
   min_crystal_bonus?: number;
   max_crystal_bonus?: number;
+  seed_ships?: any;
+  seed_data?: any;
+  raw_data?: any;
+  seed?: any;
+  tactical_stats?: any;
+  laser_attack?: number;
+  plasma_attack?: number;
+  ion_attack?: number;
+  graviton_attack?: number;
+  health?: number;
+  shield?: number;
+  cargo?: number;
+  production?: number;
 }
 
 export interface Fleet {
@@ -344,25 +357,63 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     return Number(modifierSum.toFixed(2));
   }, [activeGcObject, selectedAssets, selectedFleet, globalPassiveBonus]);
 
-  const fleetStats = useMemo(() => {
-    if (!selectedAssets || selectedAssets.length === 0) {
-      return { attack: 0, defense: 0, cargo: 0, speed: 0, fuel: 0 };
-    }
-    return selectedAssets.reduce((acc, item: any) => {
-      const attack = Number(item.attack || item.power_score || item.power || item.seed?.attack || 0);
-      const defense = Number(item.defense || item.shield || item.health || item.seed?.defense || 0);
-      const cargo = Number(item.cargo_capacity || item.capacity || item.cargo || item.seed?.cargo_capacity || 0);
-      const speed = Number(item.speed || item.ship_speed || item.seed?.speed || 0);
-      const fuel = Number(item.fuel_consumption || item.deuterium_cost || item.fuel || item.seed?.fuel_consumption || 0);
-      return {
-        attack: acc.attack + attack,
-        defense: acc.defense + defense,
-        cargo: acc.cargo + cargo,
-        speed: acc.speed === 0 ? speed : Math.min(acc.speed, speed),
-        fuel: acc.fuel + fuel
-      };
-    }, { attack: 0, defense: 0, cargo: 0, speed: 0, fuel: 0 });
+  const fleetTotalStats = useMemo(() => {
+    return (selectedAssets || []).reduce(
+      (acc, item: any) => {
+        const raw = item.seed_ships || item.seed_data || item.raw_data || item || {};
+        const stats = item.tactical_stats || {};
+        const qty = Number(item.quantity || 1);
+
+        // Matriz Ofensiva
+        const baseAtk = Number(raw.attack ?? item.attack ?? stats.attack ?? stats.kinetic_attack ?? 0);
+        const laser = Number(raw.laser_attack ?? raw.laserAttack ?? item.laser_attack ?? stats.laser_attack ?? 0);
+        const plasma = Number(raw.plasma_attack ?? raw.plasmaAttack ?? item.plasma_attack ?? stats.plasma_attack ?? 0);
+        const ion = Number(raw.ion_attack ?? raw.ionAttack ?? item.ion_attack ?? stats.ionic_attack ?? 0);
+        const graviton = Number(raw.graviton_attack ?? raw.gravitonAttack ?? item.graviton_attack ?? stats.graviton_attack ?? 0);
+
+        // Blindaje y Cinemática
+        const hp = Number(raw.health ?? item.health ?? raw.hp ?? stats.hp ?? 0);
+        const shd = Number(raw.shield ?? item.shield ?? stats.shield ?? 0);
+        const def = Number(raw.defense ?? item.defense ?? stats.defense ?? 0);
+        const spd = Number(raw.speed ?? item.speed ?? stats.speed ?? 0);
+
+        // Logística
+        const crg = Number(raw.cargo ?? raw.cargo_capacity ?? item.cargo ?? item.cargo_capacity ?? stats.cargo ?? 0);
+        const prod = Number(raw.production ?? item.production ?? stats.production ?? 0);
+
+        return {
+          attack: acc.attack + (baseAtk * qty),
+          laserAttack: acc.laserAttack + (laser * qty),
+          plasmaAttack: acc.plasmaAttack + (plasma * qty),
+          ionAttack: acc.ionAttack + (ion * qty),
+          gravitonAttack: acc.gravitonAttack + (graviton * qty),
+
+          health: acc.health + (hp * qty),
+          shield: acc.shield + (shd * qty),
+          defense: acc.defense + (def * qty),
+          speed: acc.speed === 0 ? spd : (spd > 0 ? Math.min(acc.speed, spd) : acc.speed), // La velocidad de flota la determina la nave más lenta
+
+          cargo: acc.cargo + (crg * qty),
+          production: acc.production + (prod * qty),
+        };
+      },
+      {
+        attack: 0,
+        laserAttack: 0,
+        plasmaAttack: 0,
+        ionAttack: 0,
+        gravitonAttack: 0,
+        health: 0,
+        shield: 0,
+        defense: 0,
+        speed: 0,
+        cargo: 0,
+        production: 0,
+      }
+    );
   }, [selectedAssets]);
+
+  const fleetStats = fleetTotalStats;
 
   const selectedTool = useMemo(() => {
     return (
@@ -935,7 +986,32 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               min_metal_bonus: seed?.min_metal_bonus,
               max_metal_bonus: seed?.max_metal_bonus,
               min_crystal_bonus: seed?.min_crystal_bonus,
-              max_crystal_bonus: seed?.max_crystal_bonus
+              max_crystal_bonus: seed?.max_crystal_bonus,
+              seed_ships: seed,
+              seed_data: seed,
+              raw_data: { ...seed, ...row },
+              seed: seed,
+              laser_attack: Number(seed?.laser_attack ?? seed?.laserAttack ?? row.laser_attack ?? row.laserAttack ?? 0),
+              plasma_attack: Number(seed?.plasma_attack ?? seed?.plasmaAttack ?? row.plasma_attack ?? row.plasmaAttack ?? 0),
+              ion_attack: Number(seed?.ion_attack ?? seed?.ionAttack ?? row.ion_attack ?? row.ionAttack ?? 0),
+              graviton_attack: Number(seed?.graviton_attack ?? seed?.gravitonAttack ?? row.graviton_attack ?? row.gravitonAttack ?? 0),
+              health: Number(seed?.health ?? seed?.hp ?? row.health ?? row.hp ?? 0),
+              shield: Number(seed?.shield ?? row.shield ?? 0),
+              cargo: Number(seed?.cargo ?? seed?.cargo_capacity ?? row.cargo ?? row.cargo_capacity ?? 0),
+              production: Number(seed?.production ?? row.production ?? 0),
+              tactical_stats: {
+                hp: Number(seed?.health ?? seed?.hp ?? row.health ?? row.hp ?? 0),
+                shield: Number(seed?.shield ?? row.shield ?? 0),
+                defense: Number(seed?.defense ?? row.defense ?? 0),
+                speed: Number(seed?.speed ?? row.speed ?? 0),
+                attack: Number(seed?.attack ?? row.attack ?? 0),
+                laser_attack: Number(seed?.laser_attack ?? seed?.laserAttack ?? row.laser_attack ?? row.laserAttack ?? 0),
+                plasma_attack: Number(seed?.plasma_attack ?? seed?.plasmaAttack ?? row.plasma_attack ?? row.plasmaAttack ?? 0),
+                ionic_attack: Number(seed?.ion_attack ?? seed?.ionAttack ?? row.ion_attack ?? row.ionAttack ?? 0),
+                graviton_attack: Number(seed?.graviton_attack ?? seed?.gravitonAttack ?? row.graviton_attack ?? row.gravitonAttack ?? 0),
+                cargo: Number(seed?.cargo ?? seed?.cargo_capacity ?? row.cargo ?? row.cargo_capacity ?? 0),
+                production: Number(seed?.production ?? row.production ?? 0),
+              }
             });
           });
 
@@ -2334,12 +2410,72 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 </div>
 
                 {selectedAssets && selectedAssets.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5 text-[7.5px] font-bold mt-1.5 pt-1 border-t border-cyan-950">
-                    <span className="text-zinc-500 uppercase">⚔️ <span className="text-red-400">{fleetStats.attack.toLocaleString()}</span></span>
-                    <span className="text-zinc-500 uppercase">🛡️ <span className="text-blue-400">{fleetStats.defense.toLocaleString()}</span></span>
-                    <span className="text-zinc-500 uppercase">📦 <span className="text-amber-400">{fleetStats.cargo.toLocaleString()} KG</span></span>
-                    <span className="text-zinc-500 uppercase">⚡ <span className="text-emerald-400">{fleetStats.speed.toLocaleString()} KM/H</span></span>
-                    <span className="text-zinc-500 uppercase">⛽ <span className="text-purple-400">{fleetStats.fuel.toLocaleString()} DEUT</span></span>
+                  <div className="shrink-0 w-full py-1.5 px-2 bg-[#020509]/95 border-t border-cyan-500/25 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar font-mono text-[8px] sm:text-[9px] select-none mt-1.5">
+                    
+                    {/* GRUPO 1: MATRIZ OFENSIVA (Rojos / Neón) */}
+                    <div className="flex items-center gap-1.5 shrink-0 bg-red-950/30 border border-red-500/30 px-2 py-0.5 rounded">
+                      <span className="text-red-400 font-bold uppercase tracking-wider text-[7.5px] border-r border-red-900/60 pr-1.5">
+                        OFENSIVA
+                      </span>
+                      <span className="text-white font-bold" title="Ataque Cinético Base">
+                        ⚔ {fleetTotalStats.attack} <span className="text-zinc-500 text-[7px]">DMG</span>
+                      </span>
+                      {fleetTotalStats.laserAttack > 0 && (
+                        <span className="text-cyan-300 font-bold" title="Láser">
+                          ⚡ {fleetTotalStats.laserAttack} <span className="text-cyan-600 text-[7px]">LAS</span>
+                        </span>
+                      )}
+                      {fleetTotalStats.plasmaAttack > 0 && (
+                        <span className="text-purple-300 font-bold" title="Plasma">
+                          🟣 {fleetTotalStats.plasmaAttack} <span className="text-purple-600 text-[7px]">PLS</span>
+                        </span>
+                      )}
+                      {fleetTotalStats.ionAttack > 0 && (
+                        <span className="text-blue-300 font-bold" title="Iónico">
+                          🔷 {fleetTotalStats.ionAttack} <span className="text-blue-600 text-[7px]">ION</span>
+                        </span>
+                      )}
+                      {fleetTotalStats.gravitonAttack > 0 && (
+                        <span className="text-emerald-300 font-bold" title="Gravitón">
+                          🌀 {fleetTotalStats.gravitonAttack} <span className="text-emerald-600 text-[7px]">GRV</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* GRUPO 2: BLINDAJE Y CINEMÁTICA (Azul / Cian / Violeta) */}
+                    <div className="flex items-center gap-1.5 shrink-0 bg-cyan-950/30 border border-cyan-500/30 px-2 py-0.5 rounded">
+                      <span className="text-cyan-400 font-bold uppercase tracking-wider text-[7.5px] border-r border-cyan-900/60 pr-1.5">
+                        CINEMÁTICA
+                      </span>
+                      <span className="text-white font-bold" title="Casco / HP">
+                        💚 {fleetTotalStats.health} <span className="text-zinc-500 text-[7px]">HP</span>
+                      </span>
+                      <span className="text-purple-400 font-bold" title="Escudos">
+                        🛡 {fleetTotalStats.shield} <span className="text-purple-600 text-[7px]">SHD</span>
+                      </span>
+                      <span className="text-cyan-300 font-bold" title="Defensa">
+                        🔰 {fleetTotalStats.defense} <span className="text-cyan-600 text-[7px]">DEF</span>
+                      </span>
+                      <span className="text-amber-400 font-bold" title="Velocidad de Flota">
+                        🚀 {fleetTotalStats.speed} <span className="text-amber-600 text-[7px]">SPD</span>
+                      </span>
+                    </div>
+
+                    {/* GRUPO 3: LOGÍSTICA Y EXTRACCIÓN (Ámbar / Esmeralda) */}
+                    <div className="flex items-center gap-1.5 shrink-0 bg-amber-950/30 border border-amber-500/30 px-2 py-0.5 rounded">
+                      <span className="text-amber-400 font-bold uppercase tracking-wider text-[7.5px] border-r border-amber-900/60 pr-1.5">
+                        LOGÍSTICA
+                      </span>
+                      <span className="text-amber-300 font-bold" title="Capacidad de Carga">
+                        📦 {fleetTotalStats.cargo.toLocaleString()} <span className="text-amber-600 text-[7px]">U</span>
+                      </span>
+                      {fleetTotalStats.production > 0 && (
+                        <span className="text-emerald-400 font-bold" title="Bonificación de Producción">
+                          ⛏ +{fleetTotalStats.production}%
+                        </span>
+                      )}
+                    </div>
+
                   </div>
                 )}
               </div>
