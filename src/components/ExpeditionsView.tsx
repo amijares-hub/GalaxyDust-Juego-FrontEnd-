@@ -2095,7 +2095,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                   <button
                     key={opt}
                     onClick={() => { playSfx(660); setCurrentLeftCategory(opt as LeftMenuCategory); }}
-                    className={`w-full text-left px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[8.5px] sm:text-[9.5px] font-bold uppercase border cursor-pointer flex items-center gap-1.5 sm:gap-2 ${
+                    className={`w-full text-left px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-xs font-bold uppercase border cursor-pointer flex items-center gap-1.5 ${
                       currentLeftCategory === opt ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black' : 'bg-[#0a0f14] text-zinc-400 border-transparent hover:text-zinc-200'
                     }`}
                   >
@@ -2105,29 +2105,29 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 ))}
               </div>
 
-              <div className="mt-auto space-y-1.5 shrink-0 pt-2 border-t border-cyan-950/60">
-                 <div className="bg-[#020508] p-1.5 rounded border border-cyan-900/50 flex flex-col gap-1 text-[7px] font-mono">
-                   <div className="flex items-center justify-between mb-0.5">
-                     <span className="text-cyan-400 font-bold uppercase">{t('expeditions.estimated_extraction_range')}</span>
+              <div className="mt-auto space-y-1 shrink-0 pt-1.5 border-t border-cyan-950/60">
+                 <div className="bg-[#020508] py-1 px-2 mb-1 rounded border border-cyan-900/50 flex flex-col gap-0.5 text-[10px] sm:text-xs font-mono">
+                   <div className="flex items-center justify-between">
+                     <span className="text-cyan-400 font-bold uppercase text-[9px] sm:text-[10px]">{t('expeditions.estimated_extraction_range')}</span>
                      {isSoloMetal && (
-                       <span className="text-[6px] bg-amber-950 text-amber-400 border border-amber-800 px-1 py-0.5 rounded font-black uppercase">{t('expeditions.metal_only')}</span>
+                       <span className="text-[7px] bg-amber-950 text-amber-400 border border-amber-800 px-1 py-0.5 rounded font-black uppercase">{t('expeditions.metal_only')}</span>
                      )}
                      {isSoloCrystal && (
-                       <span className="text-[6px] bg-purple-950 text-purple-400 border border-purple-800 px-1 py-0.5 rounded font-black uppercase">{t('expeditions.crystal_only')}</span>
+                       <span className="text-[7px] bg-purple-950 text-purple-400 border border-purple-800 px-1 py-0.5 rounded font-black uppercase">{t('expeditions.crystal_only')}</span>
                      )}
                    </div>
-                   <div className="flex justify-between items-center">
+                   <div className="flex justify-between items-center text-[8.5px] sm:text-[9.5px]">
                      <span className="text-zinc-400">Metal:</span>
                      {isSoloCrystal ? (
-                       <span className="text-red-500 font-black text-[6px] uppercase tracking-wide">{t('expeditions.disabled_tool')}</span>
+                       <span className="text-red-500 font-black text-[7px] uppercase tracking-wide">{t('expeditions.disabled_tool')}</span>
                      ) : (
                        <span className="text-cyan-300 font-bold">[{dynamicMiningRanges.minMetal.toLocaleString()} ~ {dynamicMiningRanges.maxMetal.toLocaleString()}]</span>
                      )}
                    </div>
-                   <div className="flex justify-between items-center">
+                   <div className="flex justify-between items-center text-[8.5px] sm:text-[9.5px]">
                      <span className="text-zinc-400">Cristal:</span>
                      {isSoloMetal ? (
-                       <span className="text-red-500 font-black text-[6px] uppercase tracking-wide">{t('expeditions.disabled_tool')}</span>
+                       <span className="text-red-500 font-black text-[7px] uppercase tracking-wide">{t('expeditions.disabled_tool')}</span>
                      ) : (
                        <span className="text-purple-300 font-bold">[{dynamicMiningRanges.minCrystal.toLocaleString()} ~ {dynamicMiningRanges.maxCrystal.toLocaleString()}]</span>
                      )}
@@ -2136,7 +2136,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
                 <button
                   onClick={handleOpenJourneyModal}
-                  className="w-full py-2 bg-gradient-to-r from-cyan-600 to-teal-600 text-white font-black text-[9px] sm:text-[10px] uppercase rounded border border-cyan-400 shadow-lg cursor-pointer hover:brightness-110 active:scale-95 transition-all"
+                  className="shrink-0 w-full py-1.5 sm:py-2 text-xs font-bold hud-chamfer-sm bg-gradient-to-r from-cyan-600 to-teal-600 text-white uppercase rounded border border-cyan-400 shadow-lg cursor-pointer hover:brightness-110 active:scale-95 transition-all"
                 >
                   {selectedPlanet ? t('expeditions.confirm_mining') : t('expeditions.confirm_recon')} ({totalExpeditionProbability}%)
                 </button>

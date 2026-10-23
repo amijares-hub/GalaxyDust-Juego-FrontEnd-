@@ -126,8 +126,6 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'MAIN', label: t('nav.main') },
     { id: 'CAN', label: t('nav.can') },
     { id: 'EXPEDITIONS', label: t('nav.expedition') },
-    { id: 'MARKET', label: t('nav.market') },
-    { id: 'PHANTOM', label: t('nav.phantom') },
     { id: 'INVENTORY', label: t('nav.inventory') },
     { id: 'MISSION', label: t('nav.mission') },
   ];
@@ -182,7 +180,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               key={tab.id}
               onClick={() => onSelectTab && onSelectTab(tab.id)}
-              className={`text-[11px] sm:text-xs font-bold tracking-wider px-2.5 sm:px-3 py-1.5 rounded-sm uppercase transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`text-xs sm:text-sm font-bold tracking-wider px-3 sm:px-4 py-1.5 rounded-md uppercase transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 isActive
                   ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.4)] font-black'
                   : 'bg-black/50 text-zinc-400 border border-transparent hover:text-white hover:bg-cyan-950/40 hover:border-cyan-800/40'
@@ -250,38 +248,6 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
         </div>
-
-        {/* CONMUTADOR DE IDIOMA [ ES | EN ] */}
-        <div className="flex items-center border border-cyan-500/40 bg-black/80 rounded px-1.5 py-1 text-xs font-mono font-bold tracking-wider">
-          <button
-            onClick={() => {
-              i18n.changeLanguage('es');
-              try { localStorage.setItem('gd_preferred_language', 'es'); } catch {}
-            }}
-            className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
-              currentLang === 'es'
-                ? 'bg-cyan-500/30 text-cyan-300 font-black shadow-[0_0_6px_rgba(34,211,238,0.5)]'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            ES
-          </button>
-          <span className="text-cyan-500/40 px-1 select-none">|</span>
-          <button
-            onClick={() => {
-              i18n.changeLanguage('en');
-              try { localStorage.setItem('gd_preferred_language', 'en'); } catch {}
-            }}
-            className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
-              currentLang === 'en'
-                ? 'bg-cyan-500/30 text-cyan-300 font-black shadow-[0_0_6px_rgba(34,211,238,0.5)]'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            EN
-          </button>
-        </div>
-
       </div>
 
     </header>

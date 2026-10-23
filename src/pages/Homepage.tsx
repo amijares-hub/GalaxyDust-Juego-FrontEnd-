@@ -12,6 +12,7 @@ import { CanView, GalaxyFrame } from '../components/CanView';
 import { ProfileView } from '../components/ProfileView';
 import { NotificationsView, isOfficialComunicado } from '../components/NotificationsView';
 import { MissionView } from '../components/MissionView';
+import { SettingsModal } from '../components/SettingsModal';
 import { ChatSystem } from '../components/ChatSystem';
 import { Header } from '../components/Header';
 import { miningService } from '../services/miningService';
@@ -130,6 +131,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
 
   const [showFlightsModal, setShowFlightsModal] = useState<boolean>(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState<boolean>(false);
+  const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
 
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string>(user.avatarUrl || '');
   const [utcTime, setUtcTime] = useState<string>(miningService.getFormattedUtcTime());
@@ -486,7 +488,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           setShowNotificationsModal(true);
           refreshNotifications();
         }}
-        onOpenSettings={() => { setActiveTab('home'); setActiveWindow('settings'); }}
+        onOpenSettings={() => setShowSettingsModal(true)}
         onOpenProfile={() => { setActiveTab('home'); setActiveWindow('profile'); }}
       />
 
@@ -530,8 +532,9 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         </button>
 
         <button 
-          onClick={() => { setActiveTab("home"); setActiveWindow("settings"); }} 
-          className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-lg cursor-pointer hover:border-cyan-400 transition-all"
+          onClick={() => setShowSettingsModal(true)} 
+          className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-lg cursor-pointer hover:border-cyan-400 transition-all shadow-md"
+          title="Ajustes del Sistema"
         >
           <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
         </button>
@@ -721,6 +724,13 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* VENTANA POPUP 3: AJUSTES (CONFIGURACIÓN) */}
+      <SettingsModal 
+        isOpen={showSettingsModal} 
+        onClose={() => setShowSettingsModal(false)} 
+        triggerNotification={handleTriggerNotification} 
+      />
 
       <ChatSystem userAllianceName={user.allianceName} triggerNotification={handleTriggerNotification} />
     </div>

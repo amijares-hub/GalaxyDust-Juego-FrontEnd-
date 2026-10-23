@@ -338,5 +338,15 @@
     "modal_desc": "This action will permanently delete all announcements recorded on your channel. This operation cannot be reversed.",
     "confirm_purge": "CONFIRM PURGE",
     "cancel": "CANCEL"
+  },
+  "settings": {
+    "title": "SYSTEM SETTINGS",
+    "language": "INTERFACE LANGUAGE",
+    "audio": "AUDIO CONFIGURATION",
+    "master_vol": "MASTER VOLUME",
+    "bgm_vol": "MUSIC / AMBIENCE (BGM)",
+    "sfx_vol": "SOUND EFFECTS (SFX)",
+    "close": "CLOSE",
+    "saved": "SETTINGS SAVED"
   }
 }

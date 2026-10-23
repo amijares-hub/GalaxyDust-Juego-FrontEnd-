@@ -338,5 +338,15 @@
     "modal_desc": "Esta acción eliminará de forma permanente todos los comunicados registrados en tu canal. Esta operación no se puede revertir.",
     "confirm_purge": "CONFIRMAR PURGA",
     "cancel": "CANCELAR"
+  },
+  "settings": {
+    "title": "AJUSTES DEL SISTEMA",
+    "language": "IDIOMA DE LA INTERFAZ",
+    "audio": "CONFIGURACIÓN DE AUDIO",
+    "master_vol": "VOLUMEN GENERAL",
+    "bgm_vol": "MÚSICA / AMBIENTE (BGM)",
+    "sfx_vol": "EFECTOS DE SONIDO (SFX)",
+    "close": "CERRAR",
+    "saved": "CONFIGURACIÓN GUARDADA"
   }
 }

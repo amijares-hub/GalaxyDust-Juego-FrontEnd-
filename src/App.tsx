@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthView } from './components/AuthView';
 import { Homepage } from './pages/Homepage';
@@ -6,7 +6,6 @@ import { RefreshCw } from 'lucide-react';
 
 import { GamePreloader } from './components/GamePreloader';
 import { useUpdater } from './hooks/useUpdater';
-import { LandscapeGuard } from './components/ui/LandscapeGuard';
 
 function AppContent() {
   const { user, logout, isInitializing } = useAuth();
@@ -14,6 +13,33 @@ function AppContent() {
 
   // 🔄 Verifica actualizaciones al arrancar (solo en Tauri Desktop)
   useUpdater();
+
+  // 🚀 Forzar Giro y Pantalla Completa Automáticos (Zero Click)
+  useEffect(() => {
+    // Intento inmediato al inicializar
+    if (window.screen?.orientation && 'lock' in window.screen.orientation) {
+      (window.screen.orientation as any).lock('landscape').catch(() => {});
+    }
+
+    // Listener global pasivo en primer gesto del usuario
+    const autoLockFullscreen = () => {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().then(() => {
+          (window.screen?.orientation as any)?.lock?.('landscape').catch(() => {});
+        }).catch(() => {});
+      } else if (window.screen?.orientation && 'lock' in window.screen.orientation) {
+        (window.screen.orientation as any).lock('landscape').catch(() => {});
+      }
+    };
+
+    window.addEventListener('click', autoLockFullscreen, { once: true });
+    window.addEventListener('touchstart', autoLockFullscreen, { once: true });
+
+    return () => {
+      window.removeEventListener('click', autoLockFullscreen);
+      window.removeEventListener('touchstart', autoLockFullscreen);
+    };
+  }, []);
 
   if (isInitializing) {
     return (
@@ -40,10 +66,8 @@ function AppContent() {
 
 export default function App() {
   return (
-    <LandscapeGuard>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </LandscapeGuard>
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
