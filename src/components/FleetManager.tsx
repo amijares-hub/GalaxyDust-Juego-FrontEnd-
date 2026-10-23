@@ -62,15 +62,10 @@ export const FleetManager: React.FC<FleetManagerProps> = ({ characters, triggerN
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
 
-    if (error || !data || data.length === 0) {
-      const { data: fallbackData } = await supabase
-        .from("sasori_fleets")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
-      setFleets((fallbackData || []) as SasoriFleet[]);
-    } else {
+    if (!error && data) {
       setFleets(data as SasoriFleet[]);
+    } else {
+      setFleets([]);
     }
 
     setLoadingFleets(false);

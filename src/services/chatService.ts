@@ -88,13 +88,13 @@ export const chatService = {
     if (user) {
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('name, alliance_role, avatar_url')
+        .select('username, display_name, role, avatar_url')
         .eq('user_id', user.id)
         .maybeSingle();
 
       if (profile) {
-        userName = profile.name || userName;
-        userRole = profile.alliance_role || userRole;
+        userName = (profile as any).display_name || profile.username || userName;
+        userRole = (profile as any).role || userRole;
         userAvatar = profile.avatar_url || userAvatar;
       }
     }

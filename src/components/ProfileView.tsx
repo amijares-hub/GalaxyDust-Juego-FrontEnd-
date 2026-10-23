@@ -151,7 +151,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
       const { count: shipsCount } = await supabase.from('user_ships').select('id', { count: 'exact', head: true }).eq('user_id', userId);
       const { count: toolsCount } = await supabase.from('user_tools').select('id', { count: 'exact', head: true }).eq('user_id', userId);
       const { count: fleetsCount } = await supabase.from('fleets').select('id', { count: 'exact', head: true }).eq('user_id', userId);
-      const { count: starsCount } = await supabase.from('user_discovered_stars').select('id', { count: 'exact', head: true }).eq('discoverer_id', userId);
+      const { count: starsCount } = await supabase.from('user_discovered_stars').select('star_id', { count: 'exact', head: true }).eq('discoverer_id', userId);
       setAssetStats({ ships: shipsCount || 0, tools: toolsCount || 0, fleets: fleetsCount || 0, discoveredStars: starsCount || 0 });
 
       const { data: logs } = await supabase.from('expedition_logs').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(10);

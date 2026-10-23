@@ -783,9 +783,12 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
       let globalNetBonus = 0;
       let hasCrystalUnlock = false;
 
-      const { data: uStructs } = await supabase.from('user_structures').select('*, seed_structures(*)').eq('user_id', userId);
-      (uStructs || []).forEach((s: any) => {
-        const item = s.seed_structures;
+      const { data: uStructsRaw } = await supabase.from('user_structures').select('*').eq('user_id', userId);
+      const { data: seedStructures } = await supabase.from('seed_structures').select('*');
+      const seedStructuresMap = new Map((seedStructures || []).map((s: any) => [String(s.id), s]));
+
+      (uStructsRaw || []).forEach((s: any) => {
+        const item = seedStructuresMap.get(String(s.structure_id || s.building_id));
         if (item) {
           globalNetBonus += Number(item.mining_bonus || item.effect || item.skill_bonus || 0);
           if (JSON.stringify(item.skills || {}).includes('crystal') || JSON.stringify(item.skills || {}).includes('cristal')) {
@@ -794,9 +797,12 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         }
       });
 
-      const { data: uTech } = await supabase.from('user_technologies').select('*, seed_technologies(*)').eq('user_id', userId);
-      (uTech || []).forEach((t: any) => {
-        const item = t.seed_technologies;
+      const { data: uTechRaw } = await supabase.from('user_technologies').select('*').eq('user_id', userId);
+      const { data: seedTech } = await supabase.from('seed_technologies').select('*');
+      const seedTechMap = new Map((seedTech || []).map((t: any) => [String(t.id), t]));
+
+      (uTechRaw || []).forEach((t: any) => {
+        const item = seedTechMap.get(String(t.technology_id));
         if (item) {
           globalNetBonus += Number(item.mining_bonus || item.effect || item.skill_bonus || 0);
           if (JSON.stringify(item.skills || {}).includes('crystal') || JSON.stringify(item.skills || {}).includes('cristal')) {
@@ -1428,7 +1434,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                   return (
                     <div
                       key={exp.id}
-                      className="w-full bg-[#0a121d] border border-cyan-500/40 rounded-xl p-2.5 flex flex-col gap-2 shadow-[0_0_12px_rgba(6,182,212,0.1)] text-white text-[10px] font-mono tracking-wider transition-all"
+                      className="w-full hud-panel hud-corners rounded-xl p-2.5 flex flex-col gap-2 shadow-[0_0_12px_rgba(6,182,212,0.15)] text-white text-[10px] font-mono tracking-wider transition-all"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-cyan-900/50 pb-1.5">
                         <div className="flex items-center gap-2">
@@ -1597,7 +1603,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 return (
                   <div
                     key={exp.id}
-                    className="w-full bg-[#0a121d] border border-cyan-500/40 rounded-xl p-2.5 flex flex-col gap-2 shadow-[0_0_12px_rgba(6,182,212,0.1)] text-white text-[10px] font-mono tracking-wider transition-all"
+                    className="w-full hud-panel hud-corners rounded-xl p-2.5 flex flex-col gap-2 shadow-[0_0_12px_rgba(6,182,212,0.15)] text-white text-[10px] font-mono tracking-wider transition-all"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-cyan-900/50 pb-1.5">
                       <div className="flex items-center gap-2">

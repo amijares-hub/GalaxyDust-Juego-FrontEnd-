@@ -438,7 +438,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         <div
                           key={uniqueKey}
                           onClick={() => { playSfx(char.sound); setSelectedChar(char); }}
-                          className="flex flex-col items-center justify-between relative group cursor-pointer transition-all duration-200 select-none p-2 rounded-xl border border-cyan-900/50 bg-[#070c12] hover:bg-[#0c1620] hover:border-cyan-400/80 shadow-lg text-center h-fit w-full"
+                          className="flex flex-col items-center justify-between relative group cursor-pointer transition-all duration-200 select-none p-2 rounded-xl hud-panel hover:border-cyan-400/80 shadow-lg text-center h-fit w-full"
                         >
                           <div className="relative w-full aspect-square rounded-lg border border-cyan-800/80 bg-black overflow-hidden mb-1 group-hover:scale-[1.02] transition-transform">
                             {char.is_in_flight && (
@@ -732,7 +732,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="w-full max-w-md max-h-[90dvh] flex flex-col bg-[#080d14] border-2 border-purple-500/60 rounded-2xl p-3 sm:p-4 relative overflow-hidden shadow-[0_0_60px_rgba(168,85,247,0.3)] text-left font-mono text-white"
+                className="w-full max-w-md max-h-[88dvh] flex flex-col hud-panel hud-corners border border-purple-500/60 rounded-2xl p-3 sm:p-4 relative overflow-hidden shadow-[0_0_60px_rgba(168,85,247,0.3)] text-left font-mono text-white"
               >
                 <div className="shrink-0 flex justify-between items-center border-b border-purple-900/50 pb-2 mb-2">
                   <div className="flex items-center gap-2">

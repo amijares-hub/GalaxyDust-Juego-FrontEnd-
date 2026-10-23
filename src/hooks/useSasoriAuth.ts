@@ -173,11 +173,11 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
 
       const { data: dbProfile } = await supabase
         .from('user_profiles')
-        .select('mfa_enabled, username, avatar_url')
+        .select('username, avatar_url')
         .eq('id', data.user.id)
         .maybeSingle();
 
-      if (dbProfile?.mfa_enabled) {
+      if ((dbProfile as any)?.mfa_enabled) {
         setScreenState('two_factor');
         setState('idle');
         setSuccessMessage('CREDENCIALES CORRECTAS • COMPILANDO VERIFICACIÓN MULTIFACTOR');

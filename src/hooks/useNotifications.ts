@@ -72,7 +72,7 @@ export const useNotifications = () => {
       const channelName = `realtime_user_notifications_${userId}`;
       
       // Desuscribir canal previo si ya existía en la memoria de Supabase
-      const existing = supabase.getChannels().find((ch) => ch.name === channelName);
+      const existing = supabase.getChannels().find((ch) => (ch as any).name === channelName || ch.topic === channelName || ch.topic === `realtime:${channelName}`);
       if (existing) {
         await supabase.removeChannel(existing);
       }

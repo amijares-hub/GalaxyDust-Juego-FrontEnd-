@@ -120,11 +120,13 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
       if (loadedItems.length === 0) {
         const { data: hudData } = await supabase
           .from('sasori_game_hud')
-          .select('config')
-          .eq('id', 'global_hud_config')
+          .select('hud_config')
+          .order('id', { ascending: false })
+          .limit(1)
           .maybeSingle();
 
-        const catalog = hudData?.config?.phantomStation?.suppliesCatalog;
+        const hudConfigObj = (hudData as any)?.hud_config || (hudData as any)?.config;
+        const catalog = hudConfigObj?.phantomStation?.suppliesCatalog;
         if (Array.isArray(catalog) && catalog.length > 0) {
           loadedItems = catalog.map((item: any, idx: number) => {
             const rawCat = String(item.category || 'MÓDULO').toUpperCase();
@@ -150,12 +152,14 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
 
       const { data: timerData } = await supabase
         .from('sasori_game_hud')
-        .select('config')
-        .eq('id', 'global_hud_config')
+        .select('hud_config')
+        .order('id', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      if (timerData?.config?.phantomStation?.autoRefreshStockTimerSeconds) {
-        setTimerSeconds(Number(timerData.config.phantomStation.autoRefreshStockTimerSeconds));
+      const timerConfig = (timerData as any)?.hud_config || (timerData as any)?.config;
+      if (timerConfig?.phantomStation?.autoRefreshStockTimerSeconds) {
+        setTimerSeconds(Number(timerConfig.phantomStation.autoRefreshStockTimerSeconds));
       }
     } catch (err) {
       console.error("Error cargando tienda:", err);
@@ -237,7 +241,7 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
         <div className="w-full flex flex-col lg:flex-row gap-2 items-stretch">
           
           {/* HERO POSTER — oculto en landscape móvil para ganar espacio vertical */}
-          <div className="hidden sm:flex w-full lg:w-3/12 shrink-0 relative rounded-xl overflow-hidden border border-cyan-500/40 bg-[#05070a] flex-col justify-between p-2.5 min-h-[160px] lg:min-h-[260px] shadow-2xl group">
+          <div className="hidden sm:flex w-full lg:w-3/12 shrink-0 relative rounded-xl overflow-hidden hud-panel hud-corners flex-col justify-between p-2.5 min-h-[160px] lg:min-h-[260px] shadow-2xl group">
             <div className="absolute inset-0 z-0">
               <img
                 src="https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Phatom%20Station/Skin%20Original/phantom%20station.png"
@@ -278,7 +282,7 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
           </div>
 
           {/* GRID DE CARDS RESISTENTE A FALLOS */}
-          <div className="flex-1 w-full lg:w-9/12 bg-[#05070a] border border-cyan-500/20 p-2 rounded-xl flex flex-col justify-between min-h-0 overflow-y-auto">
+          <div className="flex-1 w-full lg:w-9/12 hud-panel p-2 rounded-xl flex flex-col justify-between min-h-0 overflow-y-auto">
             {loading ? (
               <div className="flex flex-col items-center justify-center my-auto text-cyan-400 font-mono text-xs gap-2 py-12">
                 <RefreshCw className="animate-spin w-5 h-5" />
@@ -293,7 +297,7 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
                 return (
                   <div
                     key={bp.id}
-                    className="bg-[#050910] border border-cyan-500/30 hover:border-cyan-400 p-2 rounded-lg shadow-xl flex flex-col justify-between gap-1.5 transition-all relative group"
+                    className="hud-panel hud-corners hud-chamfer-sm p-2 rounded-lg shadow-xl flex flex-col justify-between gap-1.5 transition-all relative group"
                   >
                     <div className="flex justify-between items-center border-b border-cyan-950 pb-1">
                       <span className="text-[6.5px] text-cyan-400/80 font-bold uppercase truncate max-w-[70px]">

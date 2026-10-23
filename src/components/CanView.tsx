@@ -39,26 +39,15 @@ interface DiscoveredStar {
   discovered_at: string;
 }
 
-const GALAXY_FRAME_PNG = "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Bordes,%20Frames/galaxy_dust_frame_clean.png";
-
 export const GalaxyFrame: React.FC<{ children: React.ReactNode; className?: string; innerPadding?: string }> = ({
   children,
   className = "",
   innerPadding = "p-4"
 }) => {
   return (
-    <div className={`relative bg-[#05080d]/95 ${className}`}>
-      <div
-        className="absolute inset-0 pointer-events-none z-30"
-        style={{
-          borderStyle: 'solid',
-          borderWidth: '12px',
-          borderImageSource: `url("${GALAXY_FRAME_PNG}")`,
-          borderImageSlice: '120',
-          borderImageRepeat: 'stretch',
-          mixBlendMode: 'screen'
-        }}
-      />
+    <div className={`relative hud-panel hud-corners hud-chamfer-sm transition-all duration-300 ${className}`}>
+      {/* Línea de escaneo holográfica sutil superior */}
+      <div className="absolute top-0 inset-x-4 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent pointer-events-none z-10" />
       <div className={`relative z-20 h-full w-full ${innerPadding}`}>
         {children}
       </div>
@@ -193,23 +182,13 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
 
       const unifiedAssets: CanAssetItem[] = [];
 
-      let rawStructures: any[] = [];
-      const { data: strData, error: strErr } = await supabase
-        .from('user_structures')
-        .select('*, seed_structures(*)')
-        .eq('user_id', user.id);
-
-      if (!strErr && strData) {
-        rawStructures = strData;
-      } else {
-        const { data: strFallback } = await supabase.from('user_structures').select('*').eq('user_id', user.id);
-        const { data: seedStr } = await supabase.from('seed_structures').select('*');
-        const seedMap = new Map((seedStr || []).map((s: any) => [String(s.id), s]));
-        rawStructures = (strFallback || []).map((row: any) => ({
-          ...row,
-          seed_structures: seedMap.get(String(row.structure_id || row.building_id))
-        }));
-      }
+      const { data: strFallback } = await supabase.from('user_structures').select('*').eq('user_id', user.id);
+      const { data: seedStr } = await supabase.from('seed_structures').select('*');
+      const seedMap = new Map((seedStr || []).map((s: any) => [String(s.id), s]));
+      const rawStructures = (strFallback || []).map((row: any) => ({
+        ...row,
+        seed_structures: seedMap.get(String(row.structure_id || row.building_id))
+      }));
 
       rawStructures.forEach((s: any) => {
         const seed = s.seed_structures;
@@ -226,23 +205,13 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
         });
       });
 
-      let rawTech: any[] = [];
-      const { data: techData, error: techErr } = await supabase
-        .from('user_technologies')
-        .select('*, seed_technologies(*)')
-        .eq('user_id', user.id);
-
-      if (!techErr && techData) {
-        rawTech = techData;
-      } else {
-        const { data: techFallback } = await supabase.from('user_technologies').select('*').eq('user_id', user.id);
-        const { data: seedTech } = await supabase.from('seed_technologies').select('*');
-        const seedMap = new Map((seedTech || []).map((s: any) => [String(s.id), s]));
-        rawTech = (techFallback || []).map((row: any) => ({
-          ...row,
-          seed_technologies: seedMap.get(String(row.technology_id))
-        }));
-      }
+      const { data: techFallback } = await supabase.from('user_technologies').select('*').eq('user_id', user.id);
+      const { data: seedTech } = await supabase.from('seed_technologies').select('*');
+      const seedTechMap = new Map((seedTech || []).map((s: any) => [String(s.id), s]));
+      const rawTech = (techFallback || []).map((row: any) => ({
+        ...row,
+        seed_technologies: seedTechMap.get(String(row.technology_id))
+      }));
 
       rawTech.forEach((t: any) => {
         const seed = t.seed_technologies;
@@ -312,7 +281,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
 
       const { count: starsCount } = await supabase
         .from('user_discovered_stars')
-        .select('id', { count: 'exact', head: true })
+        .select('star_id', { count: 'exact', head: true })
         .eq('discoverer_id', user.id);
 
       setTotalDiscoveredStars(starsCount || 0);
@@ -738,7 +707,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
         {/* MODAL 1: A.M.I. */}
         {showAmiModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm">
-            <div className="w-full max-w-xl sm:max-w-2xl max-h-[90dvh] flex flex-col bg-[#05080c]/95 border border-cyan-500/50 rounded-lg shadow-[0_0_25px_rgba(6,182,212,0.25)] overflow-hidden font-mono text-white">
+            <div className="w-full max-w-xl sm:max-w-2xl max-h-[88dvh] flex flex-col hud-panel hud-corners border border-cyan-500/40 rounded-lg shadow-[0_0_30px_rgba(6,182,212,0.25)] overflow-hidden font-mono text-white">
               
               {/* CABECERA (shrink-0) */}
               <div className="shrink-0 px-3 py-2 border-b border-cyan-500/30 flex items-center justify-between bg-[#080d14]">
@@ -846,7 +815,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
         {/* MODAL 2: ESTADÍSTICAS Y PRODUCCIÓN DIARIA AUDITADA C.A.N. */}
         {showStatsModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm">
-            <div className="w-full max-w-lg max-h-[90dvh] flex flex-col bg-[#05080c]/95 border border-cyan-500/50 rounded-lg shadow-[0_0_25px_rgba(6,182,212,0.25)] overflow-hidden font-mono text-white">
+            <div className="w-full max-w-lg max-h-[88dvh] flex flex-col hud-panel hud-corners border border-cyan-500/40 rounded-lg shadow-[0_0_30px_rgba(6,182,212,0.25)] overflow-hidden font-mono text-white">
               
               {/* CABECERA (shrink-0) */}
               <div className="shrink-0 px-3 py-2 border-b border-cyan-500/30 flex items-center justify-between bg-[#080d14]">
@@ -940,7 +909,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
         {showSkillsModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm">
             {/* Caja del Modal con altura dinámica y contención estricta */}
-            <div className="w-full max-w-4xl max-h-[90dvh] flex flex-col bg-[#05080c]/95 border border-cyan-500/50 rounded-lg shadow-[0_0_25px_rgba(6,182,212,0.25)] overflow-hidden font-mono text-white">
+            <div className="w-full max-w-4xl max-h-[88dvh] flex flex-col hud-panel hud-corners border border-cyan-500/40 rounded-lg shadow-[0_0_30px_rgba(6,182,212,0.25)] overflow-hidden font-mono text-white">
               
               {/* 1. CABECERA SIEMPRE VISIBLE (shrink-0) */}
               <div className="shrink-0 px-3 py-2 border-b border-cyan-500/30 flex items-center justify-between bg-[#080d14]">

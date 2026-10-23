@@ -391,7 +391,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
 
   return (
     <main 
-      className="w-full min-h-screen bg-black flex flex-col items-center justify-start overflow-y-auto p-1 sm:p-3 bg-cover bg-center bg-no-repeat bg-fixed overflow-x-hidden font-sans select-none text-white relative"
+      className="w-full min-h-dvh bg-black flex flex-col items-stretch overflow-hidden bg-cover bg-center bg-no-repeat bg-fixed font-sans select-none text-white relative"
       style={{ backgroundImage: `url('${GAME_ASSETS.background}')` }}
     >
       <div className="fixed inset-0 bg-black/55 backdrop-blur-[1px] z-0 pointer-events-none" />
@@ -540,70 +540,110 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       </div>
 
       {/* ÁREA DE CONTENIDO */}
-      <div className="w-full flex-1 overflow-y-auto px-2 sm:px-4 py-0.5 z-10 flex flex-col items-center justify-center min-h-0">
+      <div className="w-full flex-1 overflow-hidden px-0 py-0 z-10 flex flex-col items-stretch min-h-0">
         <AnimatePresence mode="wait">
           {activeTab === "home" && (
             activeWindow === "home" ? (
-              <motion.div key="sector-home-screen" className="flex-1 w-full flex items-center justify-center my-auto">
-                <div className="flex-1 flex items-center justify-start sm:justify-center gap-3 px-4 overflow-x-auto snap-x snap-mandatory no-scrollbar py-2 w-full">
-                  {cards.map((card) => (
-                    <div
-                      key={card.id}
-                      className="snap-center shrink-0 w-[240px] sm:w-[280px] h-[58dvh] max-h-[260px] flex flex-col"
-                    >
-                      <GalaxyFrame
-                        className={`h-full w-full ${card.id === 'alliance' ? 'pointer-events-none' : 'cursor-pointer hover:scale-[1.02]'} transition-all duration-300 group shadow-2xl bg-transparent`}
-                        innerPadding="p-1 sm:p-1.5"
+              <motion.div
+                key="sector-home-screen"
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.97 }}
+                transition={{ duration: 0.35, ease: 'easeOut' }}
+                className="w-full h-full flex items-stretch justify-center"
+              >
+                {/* ── GRID TÁCTICO AAA: 4 tarjetas viewport-fit, sin scroll ── */}
+                <div className="w-full grid grid-cols-4 gap-2 sm:gap-3 px-2 sm:px-4 py-1"
+                  style={{ height: 'calc(100dvh - 7rem)' }}
+                >
+                  {cards.map((card, idx) => {
+                    const isLocked = card.id === 'alliance';
+                    const sectorLabels = ['SEC-01', 'SEC-02', 'SEC-03', 'SEC-04'];
+                    return (
+                      <motion.div
+                        key={card.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.07, duration: 0.4, ease: 'easeOut' }}
+                        className="relative h-full flex flex-col"
                       >
-                        <div
-                          onClick={() => {
-                            if (card.id === 'alliance') return;
-                            if (card.targetWindow) {
-                              setActiveTab("home");
-                              setActiveWindow(card.targetWindow);
-                            } else if (card.targetTab) {
-                              setActiveTab(card.targetTab);
-                              setActiveWindow("home");
-                            }
-                          }}
-                          className={`relative w-full h-full flex flex-col justify-between overflow-hidden rounded-lg bg-black/80 border border-cyan-950/60 ${card.id === 'alliance' ? 'opacity-40 grayscale' : ''}`}
+                        <GalaxyFrame
+                          className={`h-full w-full transition-all duration-300 group shadow-2xl bg-transparent
+                            ${isLocked
+                              ? 'pointer-events-none opacity-50 grayscale'
+                              : 'cursor-pointer hover:scale-[1.025] hover:shadow-[0_0_28px_rgba(6,182,212,0.35)] active:scale-[0.98]'
+                            }`}
+                          innerPadding="p-0"
                         >
-                          <div className="absolute inset-0 z-0">
+                          {/* ── Fondo imagen ── */}
+                          <div className="absolute inset-0 z-0 overflow-hidden rounded-[inherit]">
                             <img
                               src={card.imageSrc}
                               alt={card.title}
-                              className="w-full h-full object-cover brightness-60 group-hover:scale-105 group-hover:brightness-80 transition-all duration-500"
+                              className="w-full h-full object-cover brightness-50 group-hover:scale-110 group-hover:brightness-70 transition-all duration-700"
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+                            {/* Gradiente táctica inferior */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-transparent" />
+                            {/* Scan-line top glow */}
+                            <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-400/80 to-transparent group-hover:via-cyan-300 transition-colors duration-300 pointer-events-none" />
                           </div>
 
-                          <div className="relative z-10 text-left p-2.5 sm:p-3">
-                            <h2 className="text-xs sm:text-sm font-black text-white uppercase tracking-widest group-hover:text-cyan-400 transition-colors">
-                              {card.title}
-                            </h2>
+                          {/* ── Cuerpo de la tarjeta ── */}
+                          <div
+                            onClick={() => {
+                              if (isLocked) return;
+                              if (card.targetWindow) { setActiveTab("home"); setActiveWindow(card.targetWindow); }
+                              else if (card.targetTab) { setActiveTab(card.targetTab); setActiveWindow("home"); }
+                            }}
+                            className="relative z-10 h-full w-full flex flex-col justify-between p-2 sm:p-3"
+                          >
+                            {/* Header sector ID */}
+                            <div className="flex items-center justify-between">
+                              <span className="text-[7px] sm:text-[8px] font-mono font-black text-cyan-500/80 tracking-widest uppercase">
+                                {sectorLabels[idx]}
+                              </span>
+                              {/* Indicador de estado */}
+                              <span className={`w-1.5 h-1.5 rounded-full ${isLocked ? 'bg-zinc-600' : 'bg-cyan-400 animate-pulse shadow-[0_0_6px_rgba(6,182,212,0.8)]'}`} />
+                            </div>
+
+                            {/* Título */}
+                            <div className="mt-auto">
+                              <h2 className="text-xs sm:text-sm font-black text-white uppercase tracking-widest leading-tight group-hover:text-cyan-300 transition-colors drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+                                {card.title}
+                              </h2>
+                              <p className="text-[7px] sm:text-[8.5px] font-mono text-zinc-300/90 leading-snug uppercase mt-1 line-clamp-2 drop-shadow-md">
+                                {card.description}
+                              </p>
+
+                              {/* CTA bar */}
+                              {!isLocked && (
+                                <div className="mt-2 flex items-center gap-1 text-cyan-400 group-hover:text-cyan-200 transition-colors">
+                                  <div className="h-[1px] flex-1 bg-cyan-500/40 group-hover:bg-cyan-400/70 transition-colors" />
+                                  <span className="text-[6.5px] sm:text-[7.5px] font-black uppercase tracking-widest">ACCEDER</span>
+                                  <div className="h-[1px] w-3 bg-cyan-500/40 group-hover:bg-cyan-400/70 transition-colors" />
+                                </div>
+                              )}
+                            </div>
                           </div>
 
-                          <div className="relative z-10 mt-auto text-left p-2.5 sm:p-3">
-                            <p className="text-[8.5px] sm:text-[9.5px] font-mono text-zinc-200 leading-tight uppercase drop-shadow-md line-clamp-3">
-                              {card.description}
-                            </p>
-                          </div>
-                          {card.id === 'alliance' && (
-                            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none bg-black/40">
-                              <motion.div 
-                                initial={{ opacity: 0, scale: 0.8 }}
+                          {/* ── COMING SOON overlay ── */}
+                          {isLocked && (
+                            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none">
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.75 }}
                                 animate={{ opacity: 1, scale: 1 }}
-                                className="bg-black/90 border border-cyan-500/50 rounded-lg px-2.5 py-1.5 flex flex-col items-center gap-1 shadow-[0_0_15px_rgba(6,182,212,0.3)] backdrop-blur-md"
+                                transition={{ delay: 0.3 }}
+                                className="bg-black/90 border border-cyan-500/40 rounded-lg px-3 py-2 flex flex-col items-center gap-1.5 shadow-[0_0_20px_rgba(6,182,212,0.25)] backdrop-blur-md"
                               >
-                                <Lock className="w-4 h-4 text-cyan-400" />
-                                <span className="text-[8.5px] font-black text-cyan-300 tracking-widest uppercase">COMING SOON</span>
+                                <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
+                                <span className="text-[7.5px] sm:text-[8.5px] font-black text-cyan-300 tracking-widest uppercase">COMING SOON</span>
                               </motion.div>
                             </div>
                           )}
-                        </div>
-                      </GalaxyFrame>
-                    </div>
-                  ))}
+                        </GalaxyFrame>
+                      </motion.div>
+                    );
+                  })}
                 </div>
               </motion.div>
             ) : activeWindow === "expeditions" ? (
