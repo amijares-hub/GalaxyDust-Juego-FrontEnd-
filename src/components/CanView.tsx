@@ -737,308 +737,326 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
 
         {/* MODAL 1: A.M.I. */}
         {showAmiModal && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 font-mono text-white overflow-hidden">
-            <GalaxyFrame className="w-full max-w-xl sm:max-w-2xl h-auto max-h-[85vh] mx-auto my-auto overflow-hidden" innerPadding="p-4 sm:p-5">
-              <div className="flex flex-col gap-2.5 h-full">
-                <div className="flex justify-between items-center border-b border-cyan-950 pb-2 shrink-0">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <Globe className="w-4 h-4 text-cyan-400 animate-pulse shrink-0" />
-                    <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-widest truncate">
-                      A.M.I. - CATÁLOGO CARTOGRÁFICO
-                    </h3>
-                  </div>
-                  <button onClick={() => { playSfx(440); setShowAmiModal(false); }} className="p-1 text-zinc-400 hover:text-white cursor-pointer shrink-0">
-                    <X className="w-4 h-4" />
-                  </button>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm">
+            <div className="w-full max-w-xl sm:max-w-2xl max-h-[90dvh] flex flex-col bg-[#05080c]/95 border border-cyan-500/50 rounded-lg shadow-[0_0_25px_rgba(6,182,212,0.25)] overflow-hidden font-mono text-white">
+              
+              {/* CABECERA (shrink-0) */}
+              <div className="shrink-0 px-3 py-2 border-b border-cyan-500/30 flex items-center justify-between bg-[#080d14]">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <Globe className="w-4 h-4 text-cyan-400 animate-pulse shrink-0" />
+                  <span className="text-cyan-400 text-xs sm:text-sm font-bold tracking-wider uppercase truncate">
+                    A.M.I. - CATÁLOGO CARTOGRÁFICO
+                  </span>
                 </div>
-
-                <p className="text-[7.5px] sm:text-[8px] text-zinc-400 uppercase shrink-0">
-                  Catálogo oficial de Sistemas Solares (SS) mapeados en el registro.
-                </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
-                  {discoveredStars.length === 0 ? (
-                    <div className="col-span-full my-auto text-center text-zinc-600 text-[9px] py-10 uppercase font-bold bg-black/40 rounded-xl border border-cyan-950">
-                      SIN SISTEMAS SOLARES MAPEADOS EN EL REGISTRO
-                    </div>
-                  ) : (
-                    discoveredStars.map((star) => {
-                      const rank = star.discovery_order;
-                      const reward = star.reward_details || {};
-                      const coinReward = Number(reward.gd_coin || 0);
-                      const dynamicTitle = reward.title || `REGISTRO NATIVO (${rank}º+)`;
-
-                      let badgeColor = "bg-cyan-950/80 text-cyan-300 border-cyan-800";
-                      let badgeIcon = "📡";
-
-                      if (rank === 1) {
-                        badgeColor = "bg-amber-950/80 text-amber-300 border-amber-500/80 shadow-[0_0_8px_rgba(245,158,11,0.2)]";
-                        badgeIcon = "🥇";
-                      } else if (rank === 2) {
-                        badgeColor = "bg-slate-900/80 text-slate-200 border-slate-400/80";
-                        badgeIcon = "🥈";
-                      } else if (rank === 3) {
-                        badgeColor = "bg-amber-950/50 text-amber-500 border-amber-700/80";
-                        badgeIcon = "🥉";
-                      }
-
-                      return (
-                        <div 
-                          key={star.id} 
-                          className="bg-[#050910] border border-cyan-500/30 rounded-lg p-2.5 flex flex-col justify-between gap-1.5 shadow-md relative overflow-hidden"
-                        >
-                          <div className="flex justify-between items-start gap-1">
-                            <div className="flex flex-col text-left overflow-hidden">
-                              <span className="text-[9px] font-black text-white uppercase truncate" title={star.star_name}>
-                                {star.star_name}
-                              </span>
-                              <span className="text-[7px] text-cyan-400 font-bold uppercase truncate">
-                                CLÚSTER: {star.cluster}
-                              </span>
-                            </div>
-                            <span className="text-[6.5px] text-zinc-500 font-mono shrink-0">
-                              {star.discovered_at}
-                            </span>
-                          </div>
-
-                          <div className={`px-2 py-1 rounded border flex items-center justify-between text-[7.5px] font-bold ${badgeColor}`}>
-                            <span className="flex items-center gap-1 uppercase truncate">
-                              <span>{badgeIcon}</span>
-                              <span className="truncate">{dynamicTitle}</span>
-                            </span>
-                          </div>
-
-                          <div className="bg-black/60 px-2 py-1 rounded border border-cyan-950 text-[7px] font-mono flex justify-between items-center">
-                            <span className="text-zinc-400 uppercase">BOTÍN REGISTRADO:</span>
-                            {coinReward > 0 ? (
-                              <span className="text-amber-400 font-bold">
-                                +{coinReward.toLocaleString()} GD
-                              </span>
-                            ) : (
-                              <span className="text-zinc-600 uppercase font-bold">SIN PREMIO EXTRA</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                <div className="pt-2 border-t border-cyan-950 flex justify-end shrink-0">
-                  <button onClick={() => { playSfx(440); setShowAmiModal(false); }} className="px-4 py-1.5 bg-black border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 hover:text-white text-[8.5px] font-bold uppercase rounded-lg cursor-pointer transition-colors">
-                    ACEPTAR
-                  </button>
-                </div>
+                <button
+                  onClick={() => { playSfx(440); setShowAmiModal(false); }}
+                  className="p-1 rounded text-cyan-400 hover:text-white hover:bg-cyan-500/20 text-sm font-bold transition-colors cursor-pointer shrink-0"
+                >
+                  ✕
+                </button>
               </div>
-            </GalaxyFrame>
+
+              <div className="shrink-0 px-3 py-1.5 border-b border-cyan-500/20 bg-[#060a10] text-[7.5px] sm:text-[8px] text-zinc-400 uppercase">
+                Catálogo oficial de Sistemas Solares (SS) mapeados en el registro.
+              </div>
+
+              {/* CONTENIDO CON SCROLL EXCLUSIVO */}
+              <div className="flex-1 overflow-y-auto p-2 sm:p-3 overscroll-contain grid grid-cols-1 sm:grid-cols-2 gap-2 custom-scrollbar">
+                {discoveredStars.length === 0 ? (
+                  <div className="col-span-full my-auto text-center text-zinc-600 text-[9px] py-10 uppercase font-bold bg-black/40 rounded-xl border border-cyan-950">
+                    SIN SISTEMAS SOLARES MAPEADOS EN EL REGISTRO
+                  </div>
+                ) : (
+                  discoveredStars.map((star) => {
+                    const rank = star.discovery_order;
+                    const reward = star.reward_details || {};
+                    const coinReward = Number(reward.gd_coin || 0);
+                    const dynamicTitle = reward.title || `REGISTRO NATIVO (${rank}º+)`;
+
+                    let badgeColor = "bg-cyan-950/80 text-cyan-300 border-cyan-800";
+                    let badgeIcon = "📡";
+
+                    if (rank === 1) {
+                      badgeColor = "bg-amber-950/80 text-amber-300 border-amber-500/80 shadow-[0_0_8px_rgba(245,158,11,0.2)]";
+                      badgeIcon = "🥇";
+                    } else if (rank === 2) {
+                      badgeColor = "bg-slate-900/80 text-slate-200 border-slate-400/80";
+                      badgeIcon = "🥈";
+                    } else if (rank === 3) {
+                      badgeColor = "bg-amber-950/50 text-amber-500 border-amber-700/80";
+                      badgeIcon = "🥉";
+                    }
+
+                    return (
+                      <div 
+                        key={star.id} 
+                        className="bg-[#050910] border border-cyan-500/30 rounded-lg p-2.5 flex flex-col justify-between gap-1.5 shadow-md relative overflow-hidden"
+                      >
+                        <div className="flex justify-between items-start gap-1">
+                          <div className="flex flex-col text-left overflow-hidden">
+                            <span className="text-[9px] font-black text-white uppercase truncate" title={star.star_name}>
+                              {star.star_name}
+                            </span>
+                            <span className="text-[7px] text-cyan-400 font-bold uppercase truncate">
+                              CLÚSTER: {star.cluster}
+                            </span>
+                          </div>
+                          <span className="text-[6.5px] text-zinc-500 font-mono shrink-0">
+                            {star.discovered_at}
+                          </span>
+                        </div>
+
+                        <div className={`px-2 py-1 rounded border flex items-center justify-between text-[7.5px] font-bold ${badgeColor}`}>
+                          <span className="flex items-center gap-1 uppercase truncate">
+                            <span>{badgeIcon}</span>
+                            <span className="truncate">{dynamicTitle}</span>
+                          </span>
+                        </div>
+
+                        <div className="bg-black/60 px-2 py-1 rounded border border-cyan-950 text-[7px] font-mono flex justify-between items-center">
+                          <span className="text-zinc-400 uppercase">BOTÍN REGISTRADO:</span>
+                          {coinReward > 0 ? (
+                            <span className="text-amber-400 font-bold">
+                              +{coinReward.toLocaleString()} GD
+                            </span>
+                          ) : (
+                            <span className="text-zinc-600 uppercase font-bold">SIN PREMIO EXTRA</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* PIE (shrink-0) */}
+              <div className="shrink-0 p-2 border-t border-cyan-500/30 bg-[#080d14] flex justify-end">
+                <button
+                  onClick={() => { playSfx(440); setShowAmiModal(false); }}
+                  className="px-4 py-1.5 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 text-cyan-300 hover:text-white text-[8.5px] font-bold uppercase rounded-lg cursor-pointer transition-colors"
+                >
+                  ACEPTAR
+                </button>
+              </div>
+
+            </div>
           </div>
         )}
 
         {/* MODAL 2: ESTADÍSTICAS Y PRODUCCIÓN DIARIA AUDITADA C.A.N. */}
         {showStatsModal && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 font-mono text-white overflow-hidden">
-            <GalaxyFrame className="w-full max-w-lg h-auto max-h-[85vh] mx-auto my-auto overflow-hidden" innerPadding="p-4 sm:p-5">
-              <div className="relative flex flex-col justify-between gap-2.5 h-full">
-                
-                {/* CABECERA */}
-                <div className="flex justify-between items-center border-b border-purple-950 pb-2 shrink-0">
-                  <div className="flex items-center gap-2">
-                    <BarChart2 className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400 animate-pulse shrink-0" />
-                    <h3 className="text-xs font-black text-white uppercase tracking-widest truncate">
-                      C.A.N. TELEMETRÍA Y ALMACENAMIENTO
-                    </h3>
-                  </div>
-                  <button onClick={() => { playSfx(440); setShowStatsModal(false); }} className="p-1 text-zinc-400 hover:text-white cursor-pointer shrink-0">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* CONTENIDO AUDITADO DE PRODUCCIÓN REAL */}
-                <div className="space-y-3 text-[8.5px] sm:text-[9px] flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
-                  
-                  {/* RED DE ENERGÍA SOLAR */}
-                  <div className={`p-2.5 bg-black/80 border rounded-xl space-y-1 ${canMetrics.energyRequired > 0 && canMetrics.energyProduced === 0 ? 'border-red-500/80 shadow-[0_0_12px_rgba(239,68,68,0.3)]' : 'border-cyan-900/60'}`}>
-                    <div className="flex justify-between items-center text-cyan-400 font-bold uppercase">
-                      <span className="flex items-center gap-1.5">
-                        <BatteryCharging className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                        SUMINISTRO DE ENERGÍA SOLAR
-                      </span>
-                      <span className="text-white font-mono font-black">{canMetrics.energyProduced} / {canMetrics.energyRequired} UNIDADES</span>
-                    </div>
-
-                    {canMetrics.energyRequired > 0 && canMetrics.energyProduced === 0 ? (
-                      <p className="text-[7.5px] text-red-400 font-bold uppercase flex items-center gap-1 pt-1">
-                        <AlertTriangle className="w-3 h-3 text-red-500 shrink-0" />
-                        PLANTA SOLAR DESACTIVADA: PRODUCCIÓN DETENIDA AL 0%
-                      </p>
-                    ) : (
-                      <div className="flex justify-between items-center text-[7.5px] text-zinc-400 pt-0.5 font-mono">
-                        <span>EFICIENCIA OPERATIVA APLICADA:</span>
-                        <span className="text-emerald-400 font-black text-[8.5px]">{(canMetrics.energyEfficiency * 100).toFixed(0)}%</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <span className="text-cyan-400 font-bold uppercase block border-b border-purple-950 pb-1">
-                    TASA DE EXTRACCIÓN Y CAPACIDAD MÁXIMA
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm">
+            <div className="w-full max-w-lg max-h-[90dvh] flex flex-col bg-[#05080c]/95 border border-cyan-500/50 rounded-lg shadow-[0_0_25px_rgba(6,182,212,0.25)] overflow-hidden font-mono text-white">
+              
+              {/* CABECERA (shrink-0) */}
+              <div className="shrink-0 px-3 py-2 border-b border-cyan-500/30 flex items-center justify-between bg-[#080d14]">
+                <div className="flex items-center gap-2">
+                  <BarChart2 className="w-4 h-4 text-purple-400 animate-pulse shrink-0" />
+                  <span className="text-cyan-400 text-xs font-black uppercase tracking-widest truncate">
+                    C.A.N. TELEMETRÍA Y ALMACENAMIENTO
                   </span>
+                </div>
+                <button
+                  onClick={() => { playSfx(440); setShowStatsModal(false); }}
+                  className="p-1 rounded text-cyan-400 hover:text-white hover:bg-cyan-500/20 text-sm font-bold transition-colors cursor-pointer shrink-0"
+                >
+                  ✕
+                </button>
+              </div>
 
-                  <div className="grid grid-cols-2 gap-2 font-mono">
-                    <div className="p-2.5 bg-black/60 border border-purple-950 rounded-lg flex flex-col justify-between gap-1">
-                      <span className="text-zinc-400 uppercase font-bold">METAL</span>
-                      <span className="text-cyan-300 font-black text-[10px]">+{canMetrics.hourlyProduction.metal.toLocaleString()} <span className="text-[7px] text-zinc-500">/HORA</span></span>
-                      <span className="text-[7px] text-zinc-400 border-t border-purple-950/60 pt-0.5">ALMACÉN: {canMetrics.storageLimits.metal.toLocaleString()}</span>
-                    </div>
-
-                    <div className="p-2.5 bg-black/60 border border-purple-950 rounded-lg flex flex-col justify-between gap-1">
-                      <span className="text-zinc-400 uppercase font-bold">CRISTAL</span>
-                      <span className="text-purple-300 font-black text-[10px]">+{canMetrics.hourlyProduction.crystal.toLocaleString()} <span className="text-[7px] text-zinc-500">/HORA</span></span>
-                      <span className="text-[7px] text-zinc-400 border-t border-purple-950/60 pt-0.5">ALMACÉN: {canMetrics.storageLimits.crystal.toLocaleString()}</span>
-                    </div>
-
-                    <div className="p-2.5 bg-black/60 border border-purple-950 rounded-lg flex flex-col justify-between gap-1">
-                      <span className="text-zinc-400 uppercase font-bold">DEUTERIO</span>
-                      <span className="text-blue-300 font-black text-[10px]">+{canMetrics.hourlyProduction.deuterium.toLocaleString()} <span className="text-[7px] text-zinc-500">/HORA</span></span>
-                      <span className="text-[7px] text-zinc-400 border-t border-purple-950/60 pt-0.5">ALMACÉN: {canMetrics.storageLimits.deuterium.toLocaleString()}</span>
-                    </div>
-
-                    <div className="p-2.5 bg-black/60 border border-purple-950 rounded-lg flex flex-col justify-between gap-1">
-                      <span className="text-zinc-400 uppercase font-bold">MATERIA OSCURA</span>
-                      <span className="text-emerald-400 font-black text-[10px]">+{canMetrics.hourlyProduction.dark_matter.toLocaleString()} <span className="text-[7px] text-zinc-500">/HORA</span></span>
-                      <span className="text-[7px] text-zinc-400 border-t border-purple-950/60 pt-0.5">ALMACÉN: {canMetrics.storageLimits.dark_matter.toLocaleString()}</span>
-                    </div>
+              {/* CONTENIDO SCROLLABLE (flex-1) */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-3 text-[8.5px] sm:text-[9px] overscroll-contain custom-scrollbar">
+                
+                {/* RED DE ENERGÍA SOLAR */}
+                <div className={`p-2.5 bg-black/80 border rounded-xl space-y-1 ${canMetrics.energyRequired > 0 && canMetrics.energyProduced === 0 ? 'border-red-500/80 shadow-[0_0_12px_rgba(239,68,68,0.3)]' : 'border-cyan-900/60'}`}>
+                  <div className="flex justify-between items-center text-cyan-400 font-bold uppercase">
+                    <span className="flex items-center gap-1.5">
+                      <BatteryCharging className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                      SUMINISTRO DE ENERGÍA SOLAR
+                    </span>
+                    <span className="text-white font-mono font-black">{canMetrics.energyProduced} / {canMetrics.energyRequired} UNIDADES</span>
                   </div>
 
+                  {canMetrics.energyRequired > 0 && canMetrics.energyProduced === 0 ? (
+                    <p className="text-[7.5px] text-red-400 font-bold uppercase flex items-center gap-1 pt-1">
+                      <AlertTriangle className="w-3 h-3 text-red-500 shrink-0" />
+                      PLANTA SOLAR DESACTIVADA: PRODUCCIÓN DETENIDA AL 0%
+                    </p>
+                  ) : (
+                    <div className="flex justify-between items-center text-[7.5px] text-zinc-400 pt-0.5 font-mono">
+                      <span>EFICIENCIA OPERATIVA APLICADA:</span>
+                      <span className="text-emerald-400 font-black text-[8.5px]">{(canMetrics.energyEfficiency * 100).toFixed(0)}%</span>
+                    </div>
+                  )}
                 </div>
 
-                <div className="pt-2 border-t border-purple-950 flex justify-end shrink-0">
-                  <button onClick={() => { playSfx(440); setShowStatsModal(false); }} className="px-4 py-1.5 bg-cyan-950 border border-cyan-500/50 hover:border-cyan-400 text-cyan-300 text-[8.5px] font-bold uppercase rounded-lg cursor-pointer">
-                    ACEPTAR
-                  </button>
+                <span className="text-cyan-400 font-bold uppercase block border-b border-purple-950 pb-1">
+                  TASA DE EXTRACCIÓN Y CAPACIDAD MÁXIMA
+                </span>
+
+                <div className="grid grid-cols-2 gap-2 font-mono">
+                  <div className="p-2.5 bg-black/60 border border-purple-950 rounded-lg flex flex-col justify-between gap-1">
+                    <span className="text-zinc-400 uppercase font-bold">METAL</span>
+                    <span className="text-cyan-300 font-black text-[10px]">+{canMetrics.hourlyProduction.metal.toLocaleString()} <span className="text-[7px] text-zinc-500">/HORA</span></span>
+                    <span className="text-[7px] text-zinc-400 border-t border-purple-950/60 pt-0.5">ALMACÉN: {canMetrics.storageLimits.metal.toLocaleString()}</span>
+                  </div>
+
+                  <div className="p-2.5 bg-black/60 border border-purple-950 rounded-lg flex flex-col justify-between gap-1">
+                    <span className="text-zinc-400 uppercase font-bold">CRISTAL</span>
+                    <span className="text-purple-300 font-black text-[10px]">+{canMetrics.hourlyProduction.crystal.toLocaleString()} <span className="text-[7px] text-zinc-500">/HORA</span></span>
+                    <span className="text-[7px] text-zinc-400 border-t border-purple-950/60 pt-0.5">ALMACÉN: {canMetrics.storageLimits.crystal.toLocaleString()}</span>
+                  </div>
+
+                  <div className="p-2.5 bg-black/60 border border-purple-950 rounded-lg flex flex-col justify-between gap-1">
+                    <span className="text-zinc-400 uppercase font-bold">DEUTERIO</span>
+                    <span className="text-blue-300 font-black text-[10px]">+{canMetrics.hourlyProduction.deuterium.toLocaleString()} <span className="text-[7px] text-zinc-500">/HORA</span></span>
+                    <span className="text-[7px] text-zinc-400 border-t border-purple-950/60 pt-0.5">ALMACÉN: {canMetrics.storageLimits.deuterium.toLocaleString()}</span>
+                  </div>
+
+                  <div className="p-2.5 bg-black/60 border border-purple-950 rounded-lg flex flex-col justify-between gap-1">
+                    <span className="text-zinc-400 uppercase font-bold">MATERIA OSCURA</span>
+                    <span className="text-emerald-400 font-black text-[10px]">+{canMetrics.hourlyProduction.dark_matter.toLocaleString()} <span className="text-[7px] text-zinc-500">/HORA</span></span>
+                    <span className="text-[7px] text-zinc-400 border-t border-purple-950/60 pt-0.5">ALMACÉN: {canMetrics.storageLimits.dark_matter.toLocaleString()}</span>
+                  </div>
                 </div>
+
               </div>
-            </GalaxyFrame>
+
+              {/* PIE (shrink-0) */}
+              <div className="shrink-0 p-2 border-t border-cyan-500/30 bg-[#080d14] flex justify-end">
+                <button
+                  onClick={() => { playSfx(440); setShowStatsModal(false); }}
+                  className="px-4 py-1.5 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 text-cyan-300 text-[8.5px] font-bold uppercase rounded-lg cursor-pointer transition-colors"
+                >
+                  ACEPTAR
+                </button>
+              </div>
+
+            </div>
           </div>
         )}
 
         {/* MODAL 3: ACTIVE SKILLS DETALLADAS */}
         {showSkillsModal && (
-          <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[100] flex items-start sm:items-center justify-center p-2 pt-9 sm:p-3 sm:pt-3 font-mono text-white overflow-hidden">
-            <GalaxyFrame className="w-[92vw] max-w-4xl max-h-[calc(100dvh-2.5rem)] sm:max-h-[88vh] flex flex-col overflow-hidden" innerPadding="p-1.5 sm:p-3">
-              <div className="flex flex-col gap-1 h-full min-h-0">
-                
-                {/* CABECERA */}
-                <div className="flex justify-between items-center border-b border-cyan-500/30 p-2 shrink-0">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400 animate-pulse shrink-0" />
-                    <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-widest truncate">
-                      LISTA DETALLADA DE ACTIVE SKILLS TÁCTICAS ({filteredSkillsForModal.length})
-                    </h3>
-                  </div>
-                  <button onClick={() => { playSfx(440); setShowSkillsModal(false); }} className="p-1 text-zinc-400 hover:text-white cursor-pointer shrink-0">
-                    <X className="w-4 h-4" />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm">
+            {/* Caja del Modal con altura dinámica y contención estricta */}
+            <div className="w-full max-w-4xl max-h-[90dvh] flex flex-col bg-[#05080c]/95 border border-cyan-500/50 rounded-lg shadow-[0_0_25px_rgba(6,182,212,0.25)] overflow-hidden font-mono text-white">
+              
+              {/* 1. CABECERA SIEMPRE VISIBLE (shrink-0) */}
+              <div className="shrink-0 px-3 py-2 border-b border-cyan-500/30 flex items-center justify-between bg-[#080d14]">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse shrink-0" />
+                  <span className="text-cyan-400 text-xs sm:text-sm font-bold tracking-wider uppercase">
+                    LISTA DETALLADA DE ACTIVE SKILLS TÁCTICAS ({filteredSkillsForModal.length})
+                  </span>
+                </div>
+                <button 
+                  onClick={() => { playSfx(440); setShowSkillsModal(false); }}
+                  className="p-1 rounded text-cyan-400 hover:text-white hover:bg-cyan-500/20 text-sm font-bold transition-colors cursor-pointer shrink-0"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* 2. FILTROS/CATEGORÍAS SIEMPRE VISIBLES (shrink-0) */}
+              <div className="shrink-0 px-3 py-1.5 border-b border-cyan-500/20 flex gap-1.5 overflow-x-auto no-scrollbar bg-[#060a10]">
+                {[
+                  { id: 'ALL', label: `TODAS (${activeSkills.length})` },
+                  { id: 'CAN', label: `NODO C.A.N. (${activeSkills.filter(s => s.source === 'CAN').length})` },
+                  { id: 'STRUCTURE', label: `ESTRUCTURAS (${activeSkills.filter(s => s.source === 'STRUCTURE').length})` },
+                  { id: 'TECH', label: `TECNOLOGÍAS (${activeSkills.filter(s => s.source === 'TECH').length})` },
+                  { id: 'BADGE', label: `INSIGNIAS (${activeSkills.filter(s => s.source === 'BADGE').length})` }
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleFilterChange(tab.id as any)}
+                    className={`text-[10px] py-0.5 px-2 rounded font-bold uppercase transition-all border whitespace-nowrap cursor-pointer shrink-0 ${
+                      skillsModalFilter === tab.id
+                        ? 'bg-cyan-950 text-cyan-300 border-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.3)]'
+                        : 'bg-black/60 text-zinc-400 border-cyan-950 hover:text-white hover:border-cyan-800'
+                    }`}
+                  >
+                    {tab.label}
                   </button>
-                </div>
+                ))}
+              </div>
 
-                {/* PESTAÑAS DE FILTRADO POR ORIGEN */}
-                <div className="flex items-center gap-1 overflow-x-auto py-0.5 custom-scrollbar shrink-0">
-                  {[
-                    { id: 'ALL', label: `TODAS (${activeSkills.length})` },
-                    { id: 'CAN', label: `NODO C.A.N. (${activeSkills.filter(s => s.source === 'CAN').length})` },
-                    { id: 'STRUCTURE', label: `ESTRUCTURAS (${activeSkills.filter(s => s.source === 'STRUCTURE').length})` },
-                    { id: 'TECH', label: `TECNOLOGÍAS (${activeSkills.filter(s => s.source === 'TECH').length})` },
-                    { id: 'BADGE', label: `INSIGNIAS (${activeSkills.filter(s => s.source === 'BADGE').length})` }
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => handleFilterChange(tab.id as any)}
-                      className={`text-[9px] py-0.5 px-2 rounded font-black uppercase transition-all border whitespace-nowrap cursor-pointer shrink-0 ${
-                        skillsModalFilter === tab.id
-                          ? 'bg-cyan-950 text-cyan-300 border-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.3)]'
-                          : 'bg-black/60 text-zinc-400 border-cyan-950 hover:text-white hover:border-cyan-800'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
+              {/* 3. ÚNICO CONTENEDOR CON SCROLL (flex-1 overflow-y-auto) */}
+              <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-2 overscroll-contain custom-scrollbar">
+                {paginatedSkillsForModal.length === 0 ? (
+                  <div className="w-full my-auto text-center py-6 text-zinc-600 text-[9px] uppercase tracking-widest font-bold bg-black/40 rounded-xl border border-cyan-950">
+                    NO HAY HABILIDADES ACTIVAS EN ESTA CATEGORÍA
+                  </div>
+                ) : (
+                  paginatedSkillsForModal.map((sk) => {
+                    const isCanon = sk.source === 'CAN';
+                    const isStruct = sk.source === 'STRUCTURE';
+                    const isTech = sk.source === 'TECH';
 
-                {/* TARJETAS PAGINADAS */}
-                <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1 space-y-1.5 justify-start">
-                  {paginatedSkillsForModal.length === 0 ? (
-                    <div className="w-full my-auto text-center py-6 text-zinc-600 text-[8.5px] uppercase tracking-widest font-bold bg-black/40 rounded-xl border border-cyan-950">
-                      NO HAY HABILIDADES ACTIVAS EN ESTA CATEGORÍA
-                    </div>
-                  ) : (
-                    paginatedSkillsForModal.map((sk) => {
-                      const isCanon = sk.source === 'CAN';
-                      const isStruct = sk.source === 'STRUCTURE';
-                      const isTech = sk.source === 'TECH';
+                    return (
+                      <div
+                        key={sk.id}
+                        className={`p-1.5 sm:p-2 rounded-lg border flex items-center gap-2.5 transition-all shrink-0 ${
+                          isCanon
+                            ? 'bg-cyan-950/30 border-cyan-500/60 text-cyan-200'
+                            : isStruct
+                            ? 'bg-amber-950/20 border-amber-500/40 text-amber-200'
+                            : isTech
+                            ? 'bg-purple-950/20 border-purple-500/40 text-purple-200'
+                            : 'bg-emerald-950/20 border-emerald-500/40 text-emerald-200'
+                        }`}
+                      >
+                        <div className="w-8 h-8 rounded-md bg-black border border-cyan-950 overflow-hidden shrink-0 flex items-center justify-center p-0.5 relative">
+                          {sk.assetImageUrl ? (
+                            <img src={sk.assetImageUrl} alt={sk.assetName} className="w-full h-full object-contain" />
+                          ) : (
+                            getSkillIcon(sk.source, sk.effectDescription)
+                          )}
+                        </div>
 
-                      return (
-                        <div
-                          key={sk.id}
-                          className={`p-1.5 sm:p-2 rounded-lg border flex items-center gap-2 transition-all shrink-0 ${
-                            isCanon
-                              ? 'bg-cyan-950/30 border-cyan-500/60 text-cyan-200'
-                              : isStruct
-                              ? 'bg-amber-950/20 border-amber-500/40 text-amber-200'
-                              : isTech
-                              ? 'bg-purple-950/20 border-purple-500/40 text-purple-200'
-                              : 'bg-emerald-950/20 border-emerald-500/40 text-emerald-200'
-                          }`}
-                        >
-                          <div className="w-7 h-7 rounded-md bg-black border border-cyan-950 overflow-hidden shrink-0 flex items-center justify-center p-0.5 relative">
-                            {sk.assetImageUrl ? (
-                              <img src={sk.assetImageUrl} alt={sk.assetName} className="w-full h-full object-contain" />
-                            ) : (
-                              getSkillIcon(sk.source, sk.effectDescription)
-                            )}
+                        <div className="flex-1 flex flex-col gap-0.5 text-left overflow-hidden">
+                          <div className="flex justify-between items-center border-b border-cyan-950/80 pb-0.5">
+                            <span className="font-black text-white text-[9px] sm:text-[10px] uppercase truncate">{sk.assetName}</span>
+                            <span className="text-[7px] font-black uppercase px-1.5 py-0.2 rounded border bg-black/60 border-cyan-900 text-cyan-400 shrink-0">
+                              {sk.source} {sk.level ? `• LVL ${sk.level}` : ''}
+                            </span>
                           </div>
 
-                          <div className="flex-1 flex flex-col gap-0.5 text-left overflow-hidden">
-                            <div className="flex justify-between items-center border-b border-cyan-950/80 pb-0.5">
-                              <span className="font-black text-white text-[8.5px] sm:text-[9px] uppercase truncate">{sk.assetName}</span>
-                              <span className="text-[6.5px] font-black uppercase px-1.5 py-0.2 rounded border bg-black/60 border-cyan-900 text-cyan-400 shrink-0">
-                                {sk.source} {sk.level ? `• LVL ${sk.level}` : ''}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-1 pt-0.5">
-                              <ChevronRight className="w-3 h-3 text-cyan-400 shrink-0" />
-                              <span className="text-[10px] font-bold text-zinc-200 leading-tight truncate">{sk.effectDescription}</span>
-                            </div>
+                          <div className="flex items-center gap-1 pt-0.5">
+                            <ChevronRight className="w-3 h-3 text-cyan-400 shrink-0" />
+                            <span className="text-[10px] font-bold text-zinc-200 leading-tight truncate">{sk.effectDescription}</span>
                           </div>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                {/* CONTROLES DE PAGINACIÓN */}
-                <div className="flex items-center justify-between bg-black/80 border border-cyan-950 p-1 sm:p-1.5 rounded-lg text-[8px] sm:text-[8.5px] shrink-0">
-                  <button
-                    disabled={currentSkillsPage === 1}
-                    onClick={() => { playSfx(660); setSkillsPage(p => Math.max(1, p - 1)); }}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950 border border-cyan-500/50 hover:border-cyan-400 disabled:opacity-30 disabled:pointer-events-none text-cyan-300 font-bold uppercase rounded-md cursor-pointer transition-all shrink-0"
-                  >
-                    <ChevronLeft className="w-3 h-3" /> ANTERIOR
-                  </button>
-
-                  <span className="font-mono font-black text-cyan-400 uppercase tracking-widest text-[8px]">
-                    PÁGINA <span className="text-white">{currentSkillsPage}</span> DE <span className="text-white">{totalSkillsPages}</span>
-                  </span>
-
-                  <button
-                    disabled={currentSkillsPage >= totalSkillsPages}
-                    onClick={() => { playSfx(660); setSkillsPage(p => Math.min(totalSkillsPages, p + 1)); }}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950 border border-cyan-500/50 hover:border-cyan-400 disabled:opacity-30 disabled:pointer-events-none text-cyan-300 font-bold uppercase rounded-md cursor-pointer transition-all shrink-0"
-                  >
-                    SIGUIENTE <ChevronRight className="w-3 h-3" />
-                  </button>
-                </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
-            </GalaxyFrame>
+
+              {/* CONTROLES DE PAGINACIÓN (shrink-0) */}
+              <div className="shrink-0 flex items-center justify-between bg-[#080d14] border-t border-cyan-500/30 p-2 text-[8px] sm:text-[8.5px]">
+                <button
+                  disabled={currentSkillsPage === 1}
+                  onClick={() => { playSfx(660); setSkillsPage(p => Math.max(1, p - 1)); }}
+                  className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950 border border-cyan-500/50 hover:border-cyan-400 disabled:opacity-30 disabled:pointer-events-none text-cyan-300 font-bold uppercase rounded-md cursor-pointer transition-all shrink-0"
+                >
+                  <ChevronLeft className="w-3 h-3" /> ANTERIOR
+                </button>
+
+                <span className="font-mono font-black text-cyan-400 uppercase tracking-widest text-[8px]">
+                  PÁGINA <span className="text-white">{currentSkillsPage}</span> DE <span className="text-white">{totalSkillsPages}</span>
+                </span>
+
+                <button
+                  disabled={currentSkillsPage >= totalSkillsPages}
+                  onClick={() => { playSfx(660); setSkillsPage(p => Math.min(totalSkillsPages, p + 1)); }}
+                  className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950 border border-cyan-500/50 hover:border-cyan-400 disabled:opacity-30 disabled:pointer-events-none text-cyan-300 font-bold uppercase rounded-md cursor-pointer transition-all shrink-0"
+                >
+                  SIGUIENTE <ChevronRight className="w-3 h-3" />
+                </button>
+              </div>
+
+            </div>
           </div>
         )}
 

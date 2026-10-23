@@ -544,61 +544,65 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         <AnimatePresence mode="wait">
           {activeTab === "home" && (
             activeWindow === "home" ? (
-              <motion.div key="sector-home-screen" className="flex-1 flex items-center justify-center p-1.5 sm:p-2 gap-2 max-w-5xl mx-auto w-full my-auto">
-                <div className="grid grid-cols-2 min-[500px]:grid-cols-4 gap-1.5 sm:gap-2.5 w-full items-center">
+              <motion.div key="sector-home-screen" className="flex-1 w-full flex items-center justify-center my-auto">
+                <div className="flex-1 flex items-center justify-start sm:justify-center gap-3 px-4 overflow-x-auto snap-x snap-mandatory no-scrollbar py-2 w-full">
                   {cards.map((card) => (
-                    <GalaxyFrame
+                    <div
                       key={card.id}
-                      className={`h-full w-full ${card.id === 'alliance' ? 'pointer-events-none' : 'cursor-pointer hover:scale-[1.02]'} transition-all duration-300 group shadow-2xl bg-transparent`}
-                      innerPadding="p-1 sm:p-2"
+                      className="snap-center shrink-0 w-[240px] sm:w-[280px] h-[58dvh] max-h-[260px] flex flex-col"
                     >
-                      <div
-                        onClick={() => {
-                          if (card.id === 'alliance') return;
-                          if (card.targetWindow) {
-                            setActiveTab("home");
-                            setActiveWindow(card.targetWindow);
-                          } else if (card.targetTab) {
-                            setActiveTab(card.targetTab);
-                            setActiveWindow("home");
-                          }
-                        }}
-                        className={`relative flex flex-col justify-between overflow-hidden rounded-lg bg-black/80 border border-cyan-950/60 aspect-[16/10] max-h-[140px] sm:max-h-[220px] ${card.id === 'alliance' ? 'opacity-40 grayscale' : ''}`}
+                      <GalaxyFrame
+                        className={`h-full w-full ${card.id === 'alliance' ? 'pointer-events-none' : 'cursor-pointer hover:scale-[1.02]'} transition-all duration-300 group shadow-2xl bg-transparent`}
+                        innerPadding="p-1 sm:p-1.5"
                       >
-                        <div className="absolute inset-0 z-0">
-                          <img
-                            src={card.imageSrc}
-                            alt={card.title}
-                            className="w-full h-full object-cover brightness-60 group-hover:scale-105 group-hover:brightness-80 transition-all duration-500"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
-                        </div>
-
-                        <div className="relative z-10 text-left p-2 sm:p-3">
-                          <h2 className="text-xs sm:text-sm lg:text-base font-black text-white uppercase tracking-widest group-hover:text-cyan-400 transition-colors">
-                            {card.title}
-                          </h2>
-                        </div>
-
-                        <div className="relative z-10 mt-auto text-left p-2 sm:p-3">
-                          <p className="text-[8px] sm:text-[9.5px] font-mono text-zinc-200 leading-tight uppercase drop-shadow-md line-clamp-2">
-                            {card.description}
-                          </p>
-                        </div>
-                        {card.id === 'alliance' && (
-                          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none bg-black/40">
-                            <motion.div 
-                              initial={{ opacity: 0, scale: 0.8 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              className="bg-black/90 border border-cyan-500/50 rounded-lg px-2.5 py-1.5 flex flex-col items-center gap-1 shadow-[0_0_15px_rgba(6,182,212,0.3)] backdrop-blur-md"
-                            >
-                              <Lock className="w-4 h-4 text-cyan-400" />
-                              <span className="text-[8.5px] font-black text-cyan-300 tracking-widest uppercase">COMING SOON</span>
-                            </motion.div>
+                        <div
+                          onClick={() => {
+                            if (card.id === 'alliance') return;
+                            if (card.targetWindow) {
+                              setActiveTab("home");
+                              setActiveWindow(card.targetWindow);
+                            } else if (card.targetTab) {
+                              setActiveTab(card.targetTab);
+                              setActiveWindow("home");
+                            }
+                          }}
+                          className={`relative w-full h-full flex flex-col justify-between overflow-hidden rounded-lg bg-black/80 border border-cyan-950/60 ${card.id === 'alliance' ? 'opacity-40 grayscale' : ''}`}
+                        >
+                          <div className="absolute inset-0 z-0">
+                            <img
+                              src={card.imageSrc}
+                              alt={card.title}
+                              className="w-full h-full object-cover brightness-60 group-hover:scale-105 group-hover:brightness-80 transition-all duration-500"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
                           </div>
-                        )}
-                      </div>
-                    </GalaxyFrame>
+
+                          <div className="relative z-10 text-left p-2.5 sm:p-3">
+                            <h2 className="text-xs sm:text-sm font-black text-white uppercase tracking-widest group-hover:text-cyan-400 transition-colors">
+                              {card.title}
+                            </h2>
+                          </div>
+
+                          <div className="relative z-10 mt-auto text-left p-2.5 sm:p-3">
+                            <p className="text-[8.5px] sm:text-[9.5px] font-mono text-zinc-200 leading-tight uppercase drop-shadow-md line-clamp-3">
+                              {card.description}
+                            </p>
+                          </div>
+                          {card.id === 'alliance' && (
+                            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none bg-black/40">
+                              <motion.div 
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="bg-black/90 border border-cyan-500/50 rounded-lg px-2.5 py-1.5 flex flex-col items-center gap-1 shadow-[0_0_15px_rgba(6,182,212,0.3)] backdrop-blur-md"
+                              >
+                                <Lock className="w-4 h-4 text-cyan-400" />
+                                <span className="text-[8.5px] font-black text-cyan-300 tracking-widest uppercase">COMING SOON</span>
+                              </motion.div>
+                            </div>
+                          )}
+                        </div>
+                      </GalaxyFrame>
+                    </div>
                   ))}
                 </div>
               </motion.div>

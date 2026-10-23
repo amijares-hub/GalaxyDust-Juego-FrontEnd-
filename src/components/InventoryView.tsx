@@ -727,14 +727,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         {/* POPUP DEDICADO DE SKILLS */}
         <AnimatePresence>
           {showSkillsPopup && selectedChar && (
-            <div className="fixed inset-0 bg-black/95 backdrop-blur-lg flex items-center justify-center p-4 z-[10000]">
+            <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 z-[10000]">
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="w-full max-w-md bg-[#080d14] border-2 border-purple-500/60 rounded-3xl p-5 relative overflow-hidden shadow-[0_0_60px_rgba(168,85,247,0.3)] text-left font-mono text-white"
+                className="w-full max-w-md max-h-[90dvh] flex flex-col bg-[#080d14] border-2 border-purple-500/60 rounded-2xl p-3 sm:p-4 relative overflow-hidden shadow-[0_0_60px_rgba(168,85,247,0.3)] text-left font-mono text-white"
               >
-                <div className="flex justify-between items-center border-b border-purple-900/50 pb-2.5 mb-3">
+                <div className="shrink-0 flex justify-between items-center border-b border-purple-900/50 pb-2 mb-2">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
                     <h3 className="text-xs font-black text-white uppercase tracking-widest">
@@ -749,7 +749,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   </button>
                 </div>
 
-                <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar overscroll-contain">
                   <div className="p-2 bg-black/60 border border-purple-950 rounded-xl flex items-center justify-between opacity-50 grayscale pointer-events-none">
                     <span className="text-[9.5px] text-white font-bold uppercase">{selectedChar.name}</span>
                     <span className="text-[7.5px] bg-purple-950 text-purple-300 px-2 py-0.5 rounded font-bold uppercase border border-purple-800">
@@ -757,7 +757,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     </span>
                   </div>
 
-                  <div className="flex flex-col items-center justify-center p-8 bg-black/80 rounded-xl border border-purple-900/50 relative overflow-hidden">
+                  <div className="flex flex-col items-center justify-center p-6 bg-black/80 rounded-xl border border-purple-900/50 relative overflow-hidden">
                     <Lock className="w-8 h-8 text-purple-400 mb-2 opacity-80" />
                     <span className="text-[12px] font-black text-purple-300 tracking-widest uppercase">
                       [ SKILLS COMING SOON ]
@@ -768,7 +768,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   </div>
                 </div>
 
-                <div className="mt-3 pt-2.5 border-t border-purple-900/40 flex justify-end">
+                <div className="shrink-0 mt-2 pt-2 border-t border-purple-900/40 flex justify-end">
                   <button
                     onClick={() => setShowSkillsPopup(false)}
                     className="w-full py-1.5 bg-purple-950 hover:bg-purple-900 border border-purple-500/50 text-purple-200 text-[9px] font-black uppercase rounded-xl transition-all cursor-pointer text-center"

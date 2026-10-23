@@ -13,6 +13,13 @@
   .text-shadow-white {
     text-shadow: 0 0 10px rgba(255, 255, 255, 0.6), 0 0 20px rgba(255, 255, 255, 0.4);
   }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
 /* Custom sci-fi scanlines or cosmic overlay effects if needed */
@@ -67,10 +74,8 @@
     min-height: var(--header-height) !important;
   }
 
-  /* ── Modales: nunca deben sobrepasar la pantalla ── */
-  [role="dialog"],
-  .modal-overlay,
-  [class*="fixed inset-0"] {
+  /* ── Modales antiguos o legacy ── */
+  .modal-legacy-overlay {
     align-items: flex-start !important;
     padding-top: calc(var(--header-height) + 2px) !important;
   }

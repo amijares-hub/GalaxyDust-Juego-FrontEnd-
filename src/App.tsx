@@ -6,6 +6,7 @@ import { RefreshCw } from 'lucide-react';
 
 import { GamePreloader } from './components/GamePreloader';
 import { useUpdater } from './hooks/useUpdater';
+import { LandscapeGuard } from './components/ui/LandscapeGuard';
 
 function AppContent() {
   const { user, logout, isInitializing } = useAuth();
@@ -39,8 +40,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <LandscapeGuard>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </LandscapeGuard>
   );
 }

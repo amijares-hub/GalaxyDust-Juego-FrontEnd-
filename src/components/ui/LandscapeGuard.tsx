@@ -1,47 +1,50 @@
 import React, { useState, useEffect } from 'react';
-import { RotateCw, Monitor } from 'lucide-react';
+import { Smartphone, RotateCw } from 'lucide-react';
 
 interface LandscapeGuardProps {
   children: React.ReactNode;
 }
 
 export const LandscapeGuard: React.FC<LandscapeGuardProps> = ({ children }) => {
-  const [isPortrait, setIsPortrait] = useState<boolean>(false);
+  const [isPortrait, setIsPortrait] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(orientation: portrait)').matches || window.innerHeight > window.innerWidth;
+  });
 
   useEffect(() => {
     const checkOrientation = () => {
-      // Detectar si el ancho es menor que el alto (Modo Retrato/Vertical)
-      const portrait = window.innerHeight > window.innerWidth;
-      const isMobileOrTablet = window.innerWidth <= 1024 || window.innerHeight <= 1024;
-      
-      setIsPortrait(portrait && isMobileOrTablet);
-    };
-
-    // Intentar bloquear la orientación si el navegador lo permite
-    const tryLockLandscape = async () => {
-      try {
-        if (screen.orientation && 'lock' in screen.orientation) {
-          // @ts-ignore
-          await screen.orientation.lock('landscape');
-        }
-      } catch (e) {
-        // En iOS Safari o sin pantalla completa, se usará la alerta visual
-      }
+      const mediaMatch = window.matchMedia('(orientation: portrait)').matches;
+      const dimensionMatch = window.innerHeight > window.innerWidth;
+      setIsPortrait(mediaMatch || dimensionMatch);
     };
 
     checkOrientation();
-    tryLockLandscape();
 
+    const mediaQuery = window.matchMedia('(orientation: portrait)');
+    
+    // Escucha cambios en matchMedia
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', checkOrientation);
+    } else {
+      mediaQuery.addListener(checkOrientation);
+    }
+
+    // Escucha eventos clásicos de redimensionado y giro
     window.addEventListener('resize', checkOrientation);
     window.addEventListener('orientationchange', checkOrientation);
 
     return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', checkOrientation);
+      } else {
+        mediaQuery.removeListener(checkOrientation);
+      }
       window.removeEventListener('resize', checkOrientation);
       window.removeEventListener('orientationchange', checkOrientation);
     };
   }, []);
 
-  const handleFullscreenAndLock = async () => {
+  const handleFullscreen = async () => {
     try {
       if (!document.fullscreenElement) {
         await document.documentElement.requestFullscreen();
@@ -50,41 +53,47 @@ export const LandscapeGuard: React.FC<LandscapeGuardProps> = ({ children }) => {
         // @ts-ignore
         await screen.orientation.lock('landscape');
       }
-    } catch (err) {
-      console.warn("Bloqueo de orientación no soportado directamente:", err);
+    } catch {
+      // Ignorar fallos de fullscreen si el navegador no los permite
     }
   };
 
   return (
     <>
-      {/* OVERLAY DE BLOQUEO OBLIGATORIO SI ESTÁ EN VERTICAL */}
+      {/* OVERLAY DE ROTACIÓN OBLIGATORIA EN MODO PORTRAIT */}
       {isPortrait && (
-        <div className="fixed inset-0 z-[99999] bg-[#030609] text-white flex flex-col items-center justify-center p-6 text-center font-mono select-none">
-          <div className="relative mb-6">
-            <div className="w-20 h-20 rounded-2xl border-2 border-cyan-500/40 bg-cyan-950/30 flex items-center justify-center animate-pulse">
-              <RotateCw className="w-10 h-10 text-cyan-400 animate-spin-slow" />
+        <div className="fixed inset-0 z-[999999] bg-[#05080c] flex flex-col items-center justify-center p-6 text-center select-none font-mono">
+          <div className="relative mb-6 flex items-center justify-center">
+            {/* Anillo de pulso neón cian */}
+            <div className="absolute w-28 h-28 rounded-full border border-cyan-500/30 animate-ping pointer-events-none" />
+            
+            {/* Contenedor del icono sci-fi */}
+            <div className="relative w-24 h-24 rounded-2xl border border-cyan-500/50 bg-[#080e18] shadow-[0_0_35px_rgba(6,182,212,0.4)] flex items-center justify-center">
+              <Smartphone className="w-12 h-12 text-cyan-400 animate-bounce" />
+              <div className="absolute -bottom-2 -right-2 bg-[#05080c] border border-cyan-400/80 rounded-full p-1.5 shadow-[0_0_15px_rgba(6,182,212,0.6)]">
+                <RotateCw className="w-5 h-5 text-cyan-300 animate-spin" style={{ animationDuration: '3s' }} />
+              </div>
             </div>
-            <Monitor className="w-8 h-8 text-amber-400 absolute -bottom-2 -right-2 bg-black rounded-lg p-1 border border-amber-500/50" />
           </div>
 
-          <h2 className="text-lg font-black tracking-widest text-cyan-300 uppercase mb-2">
-            MODO HORIZONTAL OBLIGATORIO
-          </h2>
+          <h1 className="text-sm sm:text-base md:text-lg font-black tracking-widest text-cyan-400 uppercase mb-2 drop-shadow-[0_0_12px_rgba(6,182,212,0.6)]">
+            ACCESO RESTRINGIDO // ROTACIÓN REQUERIDA
+          </h1>
 
-          <p className="text-[11px] text-zinc-400 max-w-xs uppercase leading-relaxed mb-6">
-            Para garantizar la telemetría táctica y visualización del Command Action Node (C.A.N.), debes girar tu dispositivo a posición horizontal.
+          <p className="text-xs text-zinc-400 max-w-sm uppercase leading-relaxed tracking-wider mb-6">
+            Gira tu dispositivo a posición horizontal (Landscape) para calibrar los sistemas tácticos de la nave.
           </p>
 
           <button
-            onClick={handleFullscreenAndLock}
-            className="px-6 py-3 bg-gradient-to-r from-cyan-600 to-teal-600 border border-cyan-400 text-white text-[10px] font-black uppercase rounded-xl tracking-widest shadow-[0_0_20px_rgba(6,182,212,0.4)] active:scale-95 transition-all"
+            onClick={handleFullscreen}
+            className="px-5 py-2.5 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-400/60 hover:border-cyan-400 text-cyan-300 hover:text-white text-[10px] font-black uppercase rounded-lg tracking-widest shadow-[0_0_18px_rgba(6,182,212,0.3)] active:scale-95 transition-all cursor-pointer"
           >
-            ACTIVAR PANTALLA COMPLETA
+            CALIBRAR PANTALLA COMPLETA
           </button>
         </div>
       )}
 
-      {/* CONTENIDO DEL JUEGO (RESCALADO A LANDSCAPE) */}
+      {/* CONTENIDO DE LA APLICACIÓN */}
       <div className="w-full h-full min-h-screen overflow-hidden bg-black">
         {children}
       </div>
