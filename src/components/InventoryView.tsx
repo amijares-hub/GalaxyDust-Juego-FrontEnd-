@@ -176,7 +176,7 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, isSelected, onClick
     <div
       onClick={onClick}
       className={`
-        group relative aspect-[3/4] rounded-md overflow-hidden cursor-pointer select-none
+        group relative aspect-[3/4] min-h-[130px] sm:min-h-[150px] rounded-md overflow-hidden cursor-pointer select-none
         bg-gradient-to-b from-[#0b1320] via-[#05080e] to-[#020408]
         border transition-all duration-200 transform-gpu
         hover:scale-[1.03] hover:z-10
@@ -528,14 +528,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <FleetManager characters={characters} triggerNotification={triggerNotification} />
           </div>
         ) : (
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1.5 p-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 gap-2.5 content-start custom-scrollbar">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1.5 p-2 grid grid-cols-5 gap-2.5 content-start no-scrollbar">
             {isLoading ? (
-              <div className="col-span-3 sm:col-span-4 md:col-span-5 xl:col-span-6 flex flex-col items-center justify-center h-full gap-2 text-cyan-500 py-12">
+              <div className="col-span-5 flex flex-col items-center justify-center h-full gap-2 text-cyan-500 py-12">
                 <div className="w-7 h-7 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
                 <span className="text-[9px] font-mono tracking-widest uppercase animate-pulse">{t('inventory.loading')}</span>
               </div>
             ) : getFilteredCharacters.length === 0 ? (
-              <div className="col-span-3 sm:col-span-4 md:col-span-5 xl:col-span-6 flex items-center justify-center h-full text-zinc-500 text-[9px] font-mono uppercase tracking-widest py-12">
+              <div className="col-span-5 flex items-center justify-center h-full text-zinc-500 text-[9px] font-mono uppercase tracking-widest py-12">
                 {loadError ? (
                   <span className="text-red-500 font-bold">{loadError}</span>
                 ) : (
