@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  BarChart2, Globe, AlertTriangle, RefreshCw, X, Sparkles, ChevronRight, ChevronLeft, Shield, Info, Lock, BatteryCharging, Zap
+  BarChart2, Globe, AlertTriangle, RefreshCw, X, Sparkles, ChevronRight, ChevronLeft, Shield, Info, BatteryCharging
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
@@ -43,11 +43,10 @@ interface DiscoveredStar {
 export const GalaxyFrame: React.FC<{ children: React.ReactNode; className?: string; innerPadding?: string }> = ({
   children,
   className = "",
-  innerPadding = "p-4"
+  innerPadding = "p-3 sm:p-4"
 }) => {
   return (
     <div className={`relative hud-panel hud-corners hud-chamfer-sm transition-all duration-300 ${className}`}>
-      {/* Línea de escaneo holográfica sutil superior */}
       <div className="absolute top-0 inset-x-4 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent pointer-events-none z-10" />
       <div className={`relative z-20 h-full w-full ${innerPadding}`}>
         {children}
@@ -76,14 +75,13 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
   const [skillsModalFilter, setSkillsModalFilter] = useState<'ALL' | 'CAN' | 'STRUCTURE' | 'TECH' | 'BADGE'>('ALL');
   const [skillsPage, setSkillsPage] = useState<number>(1);
 
-  const [hoveredSkill, setHoveredSkill] = useState<ActiveSkillItem | null>(null);
+  const [hoveredAsset, setHoveredAsset] = useState<CanAssetItem | null>(null);
   const [activeFlightsCount, setActiveFlightsCount] = useState<number>(0);
   const [canAssetsList, setCanAssetsList] = useState<CanAssetItem[]>([]);
   const [totalDiscoveredStars, setTotalDiscoveredStars] = useState<number>(0);
   const [activeSkills, setActiveSkills] = useState<ActiveSkillItem[]>([]);
   const [discoveredStars, setDiscoveredStars] = useState<DiscoveredStar[]>([]);
 
-  // Métricas reales de producción y energía C.A.N.
   const [canMetrics, setCanMetrics] = useState<CANProductionReport>({
     energyProduced: 0,
     energyRequired: 0,
@@ -126,14 +124,10 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
     if (!seed) return [`Efecto pasivo de ${defaultType} (+${defaultBonus}%)`];
 
     if (seed.skills) {
-      if (Array.isArray(seed.skills) && seed.skills.length > 0) {
-        return seed.skills.map(String);
-      }
+      if (Array.isArray(seed.skills) && seed.skills.length > 0) return seed.skills.map(String);
       if (typeof seed.skills === 'object' && seed.skills !== null) {
         const entries = Object.entries(seed.skills);
-        if (entries.length > 0) {
-          return entries.map(([k, v]) => `${k.toUpperCase().replace(/_/g, ' ')}: +${v}`);
-        }
+        if (entries.length > 0) return entries.map(([k, v]) => `${k.toUpperCase().replace(/_/g, ' ')}: +${v}`);
       }
       if (typeof seed.skills === 'string' && seed.skills.trim() !== '') {
         try {
@@ -160,8 +154,6 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
       if (!user) return;
 
       setCurrentUserId(user.id);
-
-      // Cargar métricas auditadas de C.A.N.
       const calculatedMetrics = await miningService.calculateUserCANMetrics(user.id);
       setCanMetrics(calculatedMetrics);
 
@@ -382,7 +374,6 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
 
     try {
       const { data, error } = await supabase.rpc('upgrade_can_node_secure');
-
       if (error) throw error;
 
       playSfx(1200);
@@ -392,82 +383,19 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
       if (triggerNotification) {
         triggerNotification(`⚡ NODO C.A.N. ELEVADO A NIVEL ${data.new_level} CON ÉXITO`);
       }
-
       fetchCanData();
     } catch (err: any) {
       console.error("Error al subir nivel C.A.N.:", err);
       playSfx(300);
-      if (triggerNotification) {
-        triggerNotification(`⛔ ERROR AL ELEVAR NODO: ${err.message}`);
-      }
+      if (triggerNotification) triggerNotification(`⛔ ERROR AL ELEVAR NODO: ${err.message}`);
     } finally {
       setIsUpgrading(false);
     }
   };
 
-  const equippedStructuresCount = useMemo(() => {
-    return canAssetsList.filter(a => a.type === 'Estructuras' && a.is_equipped).length;
-  }, [canAssetsList]);
-
-  const equippedTechCount = useMemo(() => {
-    return canAssetsList.filter(a => a.type === 'Tecnologias' && a.is_equipped).length;
-  }, [canAssetsList]);
-
-  const equippedBadgesCount = useMemo(() => {
-    return canAssetsList.filter(a => a.type === 'Insignias' && a.is_equipped).length;
-  }, [canAssetsList]);
-
-  const structSkills = useMemo(() => {
-    return activeSkills.filter(s => s.source === 'STRUCTURE' || s.source === 'CAN');
-  }, [activeSkills]);
-
-  const techSkills = useMemo(() => {
-    return activeSkills.filter(s => s.source === 'TECH');
-  }, [activeSkills]);
-
-  const badgeSkills = useMemo(() => {
-    return activeSkills.filter(s => s.source === 'BADGE');
-  }, [activeSkills]);
-
-  const renderSkillChipsSection = (skillsList: ActiveSkillItem[], emptyMessage: string) => {
-    if (skillsList.length === 0) {
-      return (
-        <div className="w-full h-full flex items-center justify-center text-[7.5px] text-zinc-600 font-bold uppercase tracking-wider text-center p-2">
-          {emptyMessage}
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex flex-wrap items-center gap-1.5 p-1 pt-1.5 overflow-x-hidden overflow-y-auto max-h-[105px] custom-scrollbar w-full">
-        {skillsList.map((sk) => {
-          const icon = getSkillIcon(sk.source, sk.effectDescription);
-          const isCanon = sk.source === 'CAN';
-          const isStruct = sk.source === 'STRUCTURE';
-          const isTech = sk.source === 'TECH';
-
-          return (
-            <div
-              key={sk.id}
-              onMouseEnter={() => setHoveredSkill(sk)}
-              onClick={() => setHoveredSkill(sk)}
-              className={`relative cursor-pointer w-6 h-6 sm:w-7 sm:h-7 rounded-md border flex items-center justify-center transition-all duration-200 shrink-0 ${
-                isCanon
-                  ? 'bg-cyan-950/80 border-cyan-400/80 shadow-[0_0_6px_rgba(6,182,212,0.3)]'
-                  : isStruct
-                  ? 'bg-amber-950/40 border-amber-500/60 shadow-[0_0_6px_rgba(245,158,11,0.2)]'
-                  : isTech
-                  ? 'bg-purple-950/40 border-purple-500/60 shadow-[0_0_6px_rgba(168,85,247,0.2)]'
-                  : 'bg-emerald-950/40 border-emerald-500/60 shadow-[0_0_6px_rgba(16,185,129,0.2)]'
-              } hover:scale-110 active:scale-95`}
-            >
-              {icon}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
+  const equippedStructures = useMemo(() => canAssetsList.filter(a => a.type === 'Estructuras' && a.is_equipped), [canAssetsList]);
+  const equippedTech = useMemo(() => canAssetsList.filter(a => a.type === 'Tecnologias' && a.is_equipped), [canAssetsList]);
+  const equippedBadges = useMemo(() => canAssetsList.filter(a => a.type === 'Insignias' && a.is_equipped), [canAssetsList]);
 
   const filteredSkillsForModal = useMemo(() => {
     if (skillsModalFilter === 'ALL') return activeSkills;
@@ -493,178 +421,204 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
     setSkillsPage(1);
   };
 
+  // RENDERIZADOR DE GALERÍA DE ASSETS ACTIVOS
+  const renderAssetGallery = (title: string, assets: CanAssetItem[], borderColor: string, textColor: string, bgHeader: string) => (
+    <div className={`bg-[#03060a] border ${borderColor} rounded-lg flex flex-col shrink-0 min-h-[100px] overflow-hidden`}>
+      <div className={`text-[7px] sm:text-[8px] font-black ${textColor} uppercase tracking-wider ${bgHeader} border-b ${borderColor} px-2 py-1.5 flex items-center justify-between shrink-0`}>
+        <span>{title}</span>
+        <span className="text-white font-bold bg-black/60 px-1.5 py-0.5 rounded-sm shadow-inner border border-white/10">ACTIVOS: {assets.length}</span>
+      </div>
+      
+      {assets.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center text-[7.5px] text-zinc-600 font-bold uppercase p-2 text-center">
+          {t('can.no_assets_equipped', 'SIN ACTIVOS EQUIPADOS')}
+        </div>
+      ) : (
+        <div className="flex-1 flex gap-2 overflow-x-auto custom-scrollbar p-2 items-center">
+          {assets.map(asset => (
+            <div
+              key={asset.id}
+              onMouseEnter={() => setHoveredAsset(asset)}
+              onMouseLeave={() => setHoveredAsset(null)}
+              className={`w-[65px] sm:w-[75px] shrink-0 bg-[#05080c] border ${borderColor.replace('30', '50')} rounded-md overflow-hidden flex flex-col group hover:scale-[1.03] transition-transform cursor-crosshair shadow-md`}
+            >
+              <div className="h-[45px] sm:h-[55px] w-full relative flex items-center justify-center bg-gradient-to-b from-[#0a111c] to-[#020306]">
+                <img
+                  src={asset.image_url || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=150'}
+                  alt={asset.name}
+                  className="max-w-full max-h-full object-contain p-1 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
+                />
+                {asset.level && (
+                  <div className="absolute top-0.5 right-0.5 text-[5px] sm:text-[6px] font-black bg-black/90 text-white px-0.5 rounded-sm border border-cyan-900 shadow">
+                    LVL {asset.level}
+                  </div>
+                )}
+              </div>
+              <div className={`p-1 border-t ${borderColor.replace('30', '50')} bg-[#020408] flex flex-col items-center justify-center h-[30px]`}>
+                <div className="text-[5.5px] sm:text-[6px] font-bold text-white truncate w-full text-center uppercase leading-tight">{asset.name}</div>
+                <div className={`text-[5.5px] sm:text-[6.5px] font-black ${textColor} text-center mt-0.5 leading-none bg-black/50 px-1 py-0.5 rounded border border-white/5 shadow-inner`}>
+                  +{asset.effect_bonus}%
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <GalaxyFrame className="w-full max-w-7xl mx-auto h-full max-h-full font-mono text-left select-none backdrop-blur-md relative overflow-hidden text-white flex flex-col min-h-0" innerPadding="p-3 sm:p-4 h-full flex flex-col justify-between overflow-y-auto custom-scrollbar">
-      <div className="space-y-2.5 flex-1 min-h-0 flex flex-col justify-between">
+    <GalaxyFrame
+      className="w-full max-w-7xl mx-auto h-full max-h-full font-mono text-left select-none backdrop-blur-md relative overflow-hidden text-white flex flex-col min-h-0"
+      innerPadding="p-2 sm:p-3 h-full flex flex-col min-h-0 overflow-hidden"
+    >
+      <div className="flex-1 min-h-0 flex flex-col gap-2">
         
-        {/* HEADER DE C.A.N. STATION */}
-        <div className="flex justify-between items-center border-b border-cyan-900/50 pb-2.5 gap-2 relative z-20">
+        {/* HEADER C.A.N. (shrink-0) */}
+        <div className="shrink-0 flex justify-between items-center border-b border-cyan-900/50 pb-1.5 gap-2 relative z-20">
           <div className="flex items-center gap-2">
             <div>
-              <span className="text-[8px] sm:text-[8.5px] font-mono text-cyan-400 tracking-widest block font-bold uppercase">
+              <span className="text-[7.5px] sm:text-[8px] font-mono text-cyan-400 tracking-widest block font-bold uppercase leading-none">
                 {t('can.command_action_node')}
               </span>
-              <h2 className="text-sm sm:text-base font-black tracking-widest text-white uppercase">
+              <h2 className="text-xs sm:text-sm font-black tracking-widest text-white uppercase mt-0.5 leading-none">
                 {t('can.can_station')}
               </h2>
             </div>
           </div>
         </div>
 
-        {/* BANNER DE RESTRICCIÓN DE VUELO */}
         {activeFlightsCount > 0 && (
-          <div className="p-2 bg-red-950/40 border border-red-500/60 rounded-xl flex items-center justify-between gap-2 text-red-300 text-[8px] sm:text-[8.5px] relative z-20">
+          <div className="shrink-0 p-1.5 bg-red-950/40 border border-red-500/60 rounded-lg flex items-center justify-between gap-2 text-red-300 text-[7.5px] sm:text-[8px] relative z-20">
             <div className="flex items-center gap-1.5 overflow-hidden">
               <AlertTriangle className="w-3.5 h-3.5 text-red-400 animate-pulse shrink-0" />
               <span className="font-bold uppercase tracking-wider truncate">
                 {t('can.flight_restriction', { count: activeFlightsCount })}
               </span>
             </div>
-            <span className="text-[7px] bg-red-900/80 px-2 py-0.5 rounded font-black border border-red-600 uppercase shrink-0">
+            <span className="text-[7px] bg-red-900/80 px-1.5 py-0.5 rounded font-black border border-red-600 uppercase shrink-0">
               {t('can.locked')}
             </span>
           </div>
         )}
 
         {/* ESTRUCTURA PRINCIPAL */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch min-h-[340px] relative z-20">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 sm:gap-2.5 flex-1 min-h-0 items-stretch relative z-20">
           
-          {/* COLUMNA 1: NIVEL CAN & GALACTIC POWER */}
-          <GalaxyFrame className="lg:col-span-3 flex flex-col justify-between" innerPadding="p-4">
-            <div className="flex flex-col items-center justify-between text-center gap-2 h-full">
-              <span className="text-[9.5px] text-cyan-400 font-bold uppercase tracking-wider">
+          {/* COLUMNA 1: NIVEL CAN */}
+          <GalaxyFrame className="lg:col-span-3 flex flex-col h-full" innerPadding="p-3 flex flex-col justify-between h-full">
+            <div className="flex flex-col items-center justify-between text-center gap-1.5 h-full">
+              <span className="text-[8.5px] sm:text-[9px] text-cyan-400 font-bold uppercase tracking-wider">
                 {t('can.level')}
               </span>
 
-              <div className="my-2 relative flex items-center justify-center">
-                <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-full border-2 border-dashed border-cyan-500/40 animate-spin-slow absolute inset-0" />
-                <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full border-2 border-cyan-400 bg-cyan-950/40 flex items-center justify-center text-2xl sm:text-3xl font-black text-white shadow-[0_0_20px_rgba(6,182,212,0.4)] relative z-10">
+              <div className="my-auto relative flex items-center justify-center py-1">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-dashed border-cyan-500/40 animate-spin-slow absolute inset-0" />
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border-2 border-cyan-400 bg-cyan-950/40 flex items-center justify-center text-xl sm:text-2xl font-black text-white shadow-[0_0_20px_rgba(6,182,212,0.4)] relative z-10">
                   {canLevel}
                 </div>
               </div>
 
-              <div className="p-2 bg-purple-950/40 border border-purple-800 text-purple-200 text-center w-full rounded-lg mb-1">
+              <div className="p-1.5 bg-purple-950/40 border border-purple-800 text-purple-200 text-center w-full rounded-lg mb-1">
                 <div className="text-[7px] text-zinc-400 uppercase">{t('can.galactic_power')}</div>
-                <div className="text-sm sm:text-base font-black text-white">{galacticPower.toLocaleString()} <span className="text-[10px] font-bold text-purple-300">POW</span></div>
+                <div className="text-xs sm:text-sm font-black text-white">
+                  {galacticPower.toLocaleString()} <span className="text-[9px] font-bold text-purple-300">POW</span>
+                </div>
               </div>
 
               <button
                 onClick={handleUpgradeCan}
                 disabled={isUpgrading}
-                className="w-full py-2 bg-gradient-to-r from-cyan-600 to-teal-600 hover:brightness-110 border border-cyan-400 text-white text-[8.5px] font-black uppercase tracking-widest rounded-lg shadow-lg cursor-pointer transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                className="w-full py-1.5 bg-gradient-to-r from-cyan-600 to-teal-600 hover:brightness-110 border border-cyan-400 text-white text-[8px] sm:text-[8.5px] font-black uppercase tracking-widest rounded-lg shadow-lg cursor-pointer transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
                 {isUpgrading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : t('can.upgrade_node')}
               </button>
             </div>
           </GalaxyFrame>
 
-          {/* COLUMNA 2: ASSETS ACTIVADOS & ACTIVE SKILLS */}
-          <div className="lg:col-span-5 flex flex-col gap-3">
+          {/* COLUMNA 2: ASSETS ACTIVADOS & GALERÍA */}
+          <div className="lg:col-span-5 flex flex-col gap-2 h-full min-h-0">
             
-            <GalaxyFrame className="w-full" innerPadding="p-4">
-              <span className="text-[9.5px] text-cyan-400 font-bold uppercase tracking-wider block text-center mb-2 border-b border-cyan-950 pb-1">
+            {/* 1. Botones de Categorías */}
+            <GalaxyFrame className="w-full shrink-0" innerPadding="p-2 sm:p-2.5">
+              <span className="text-[8px] sm:text-[8.5px] text-cyan-400 font-bold uppercase tracking-wider block text-center mb-1.5 border-b border-cyan-950 pb-0.5">
                 {t('can.activated_assets')}
               </span>
 
-              {/* TRES BOTONES INTERACTIVOS */}
-              <div className="grid grid-cols-3 gap-2 items-center">
-                
+              <div className="grid grid-cols-3 gap-1.5 items-center">
                 <button
                   onClick={() => { playSfx(660); setActiveModalCategory('Estructuras'); }}
-                  className="bg-[#050910] border border-cyan-900 hover:border-cyan-400 transition-all rounded-lg p-2 text-center flex flex-col items-center justify-center cursor-pointer hover:scale-[1.02] active:scale-95 group shadow-md"
+                  className="bg-[#050910] border border-cyan-900 hover:border-cyan-400 transition-all rounded-lg p-1.5 text-center flex flex-col items-center justify-center cursor-pointer hover:scale-[1.02] active:scale-95 group shadow-md"
                 >
-                  <span className="text-xs sm:text-sm font-black text-white group-hover:text-cyan-300 transition-colors">
-                    {equippedStructuresCount}
+                  <span className="text-xs sm:text-sm font-black text-white group-hover:text-cyan-300 transition-colors leading-none">
+                    {equippedStructures.length}
                   </span>
-                  <span className="text-[7.5px] font-bold text-zinc-300 group-hover:text-cyan-400 uppercase mt-0.5">
+                  <span className="text-[7px] font-bold text-zinc-400 group-hover:text-cyan-400 uppercase mt-0.5">
                     STRUCTURES
                   </span>
                 </button>
 
                 <button
                   onClick={() => { playSfx(660); setActiveModalCategory('Tecnologias'); }}
-                  className="bg-[#050910] border border-cyan-900 hover:border-cyan-400 transition-all rounded-lg p-2 text-center flex flex-col items-center justify-center cursor-pointer hover:scale-[1.02] active:scale-95 group shadow-md"
+                  className="bg-[#050910] border border-cyan-900 hover:border-cyan-400 transition-all rounded-lg p-1.5 text-center flex flex-col items-center justify-center cursor-pointer hover:scale-[1.02] active:scale-95 group shadow-md"
                 >
-                  <span className="text-xs sm:text-sm font-black text-white group-hover:text-cyan-300 transition-colors">
-                    {equippedTechCount}
+                  <span className="text-xs sm:text-sm font-black text-white group-hover:text-cyan-300 transition-colors leading-none">
+                    {equippedTech.length}
                   </span>
-                  <span className="text-[7.5px] font-bold text-zinc-300 group-hover:text-cyan-400 uppercase mt-0.5">
+                  <span className="text-[7px] font-bold text-zinc-400 group-hover:text-cyan-400 uppercase mt-0.5">
                     TECH
                   </span>
                 </button>
 
                 <button
                   onClick={() => { playSfx(660); setActiveModalCategory('Insignias'); }}
-                  className="bg-[#050910] border border-cyan-900 hover:border-cyan-400 transition-all rounded-lg p-2 text-center flex flex-col items-center justify-center cursor-pointer hover:scale-[1.02] active:scale-95 group shadow-md"
+                  className="bg-[#050910] border border-cyan-900 hover:border-cyan-400 transition-all rounded-lg p-1.5 text-center flex flex-col items-center justify-center cursor-pointer hover:scale-[1.02] active:scale-95 group shadow-md"
                 >
-                  <span className="text-xs sm:text-sm font-black text-cyan-300 group-hover:text-white transition-colors">
-                    {equippedBadgesCount} / 5
+                  <span className="text-xs sm:text-sm font-black text-cyan-300 group-hover:text-white transition-colors leading-none">
+                    {equippedBadges.length} / 5
                   </span>
-                  <span className="text-[7.5px] font-bold text-zinc-300 group-hover:text-cyan-400 uppercase mt-0.5">
+                  <span className="text-[7px] font-bold text-zinc-400 group-hover:text-cyan-400 uppercase mt-0.5">
                     BADGES
                   </span>
                 </button>
-
               </div>
             </GalaxyFrame>
 
-            {/* DASHBOARD DE ACTIVE SKILLS DIVIDIDO EN 3 COLUMNAS */}
-            <GalaxyFrame className="flex-1 min-h-[190px] overflow-hidden" innerPadding="p-4">
-              <div className="flex flex-col justify-between h-full">
-                <div className="flex justify-center items-center mb-1.5 pb-1 border-b border-cyan-950">
-                  <span className="text-[9.5px] text-cyan-400 font-bold uppercase tracking-wider text-center">
-                    {t('can.skills_dashboard')} ({activeSkills.length})
+            {/* 2. Galerías de Hardware Táctico Equipado */}
+            <GalaxyFrame className="flex-1 min-h-0 overflow-hidden flex flex-col" innerPadding="p-2 sm:p-2.5 flex flex-col justify-between h-full min-h-0">
+              <div className="flex flex-col justify-between h-full min-h-0 gap-1.5">
+                <div className="shrink-0 flex justify-center items-center pb-1 border-b border-cyan-950">
+                  <span className="text-[8px] sm:text-[8.5px] text-cyan-400 font-bold uppercase tracking-wider text-center">
+                    {t('can.equipped_hardware_title', 'HARDWARE TÁCTICO EQUIPADO')}
                   </span>
                 </div>
 
-                {/* SECCIÓN TRIPARTITA: ESTRUCTURAS | TECNOLOGÍAS | INSIGNIAS */}
-                <div className="grid grid-cols-3 gap-1.5 flex-1 min-h-[110px] overflow-hidden">
-                  
-                  <div className="bg-[#03060a] border border-amber-500/30 rounded-lg p-1 flex flex-col justify-start overflow-hidden">
-                    <div className="text-[7px] font-black text-amber-400 uppercase tracking-wider border-b border-amber-950/60 pb-0.5 mb-0.5 flex items-center justify-between shrink-0">
-                      <span>{t('can.structures')}</span>
-                      <span className="text-zinc-500 font-bold">({structSkills.length})</span>
-                    </div>
-                    {renderSkillChipsSection(structSkills, t('can.no_structures'))}
-                  </div>
-
-                  <div className="bg-[#03060a] border border-purple-500/30 rounded-lg p-1 flex flex-col justify-start overflow-hidden">
-                    <div className="text-[7px] font-black text-purple-400 uppercase tracking-wider border-b border-purple-950/60 pb-0.5 mb-0.5 flex items-center justify-between shrink-0">
-                      <span>{t('can.tech')}</span>
-                      <span className="text-zinc-500 font-bold">({techSkills.length})</span>
-                    </div>
-                    {renderSkillChipsSection(techSkills, t('can.no_tech'))}
-                  </div>
-
-                  <div className="bg-[#03060a] border border-emerald-500/30 rounded-lg p-1 flex flex-col justify-start overflow-hidden">
-                    <div className="text-[7px] font-black text-emerald-400 uppercase tracking-wider border-b border-emerald-950/60 pb-0.5 mb-0.5 flex items-center justify-between shrink-0">
-                      <span>{t('can.badges')}</span>
-                      <span className="text-zinc-500 font-bold">({badgeSkills.length})</span>
-                    </div>
-                    {renderSkillChipsSection(badgeSkills, t('can.no_badges'))}
-                  </div>
-
+                {/* Grid Vertical Scrollable de Galerías */}
+                <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-2 pr-1">
+                  {renderAssetGallery(t('can.structures', 'ESTRUCTURAS'), equippedStructures, 'border-amber-500/30', 'text-amber-400', 'bg-amber-950/40')}
+                  {renderAssetGallery(t('can.tech', 'TECNOLOGÍAS'), equippedTech, 'border-purple-500/30', 'text-purple-400', 'bg-purple-950/40')}
+                  {renderAssetGallery(t('can.badges', 'INSIGNIAS'), equippedBadges, 'border-emerald-500/30', 'text-emerald-400', 'bg-emerald-950/40')}
                 </div>
 
-                {/* BARRA TICKER HUD MUESTRA HABILIDAD EN TIEMPO REAL */}
-                <div className="mt-1.5 bg-[#020408] border border-cyan-950 p-1.5 rounded-lg flex items-center gap-1.5 text-[7.5px] font-mono shrink-0">
+                {/* Ticker HUD Interactivo */}
+                <div className="shrink-0 bg-[#020408] border border-cyan-950 p-1.5 rounded-lg flex items-center gap-1.5 text-[7px] sm:text-[7.5px] font-mono">
                   <Info className="w-3 h-3 text-cyan-400 shrink-0" />
-                  {hoveredSkill ? (
+                  {hoveredAsset ? (
                     <span className="text-cyan-200 font-bold uppercase truncate">
-                      <strong className="text-white">{hoveredSkill.assetName}:</strong> {hoveredSkill.effectDescription}
+                      <strong className="text-white">{hoveredAsset.name}:</strong> {hoveredAsset.description || `Módulo activo con bonificación táctica de +${hoveredAsset.effect_bonus}%`}
                     </span>
                   ) : (
                     <span className="text-zinc-500 uppercase truncate">
-                      {t('can.hover_skill_hint')}
+                      {t('can.hover_hardware_hint', 'SELECCIONA UN HARDWARE PARA VER DETALLES')}
                     </span>
                   )}
                 </div>
 
                 <button
                   onClick={() => { playSfx(660); setSkillsPage(1); setShowSkillsModal(true); }}
-                  className="mt-1.5 w-full py-1.5 bg-gradient-to-r from-cyan-950 to-cyan-900 hover:from-cyan-900 border border-cyan-500/60 text-cyan-200 text-[8px] font-black uppercase tracking-widest rounded-lg cursor-pointer transition-colors shadow-inner flex items-center justify-center gap-1 shrink-0"
+                  className="shrink-0 w-full py-1.5 bg-gradient-to-r from-cyan-950 to-cyan-900 hover:from-cyan-900 border border-cyan-500/60 text-cyan-200 text-[7.5px] sm:text-[8px] font-black uppercase tracking-widest rounded-lg cursor-pointer transition-colors shadow-inner flex items-center justify-center gap-1"
                 >
-                  {t('can.full_skills_btn')}
+                  {t('can.full_skills_btn', 'VER TODAS LAS HABILIDADES TÁCTICAS')}
                 </button>
               </div>
             </GalaxyFrame>
@@ -672,11 +626,11 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
           </div>
 
           {/* COLUMNA 3: A.M.I. & STATS */}
-          <div className="lg:col-span-4 flex flex-col justify-between gap-3">
+          <div className="lg:col-span-4 flex flex-col justify-between gap-2 h-full min-h-0">
             
-            <GalaxyFrame className="flex-1 min-h-[100px] hover:scale-[1.02] active:scale-95 transition-all cursor-pointer group" innerPadding="p-4">
+            <GalaxyFrame className="flex-1 min-h-0 hover:scale-[1.01] active:scale-98 transition-all cursor-pointer group" innerPadding="p-3 flex flex-col items-center justify-center h-full">
               <div onClick={() => { playSfx(660); setShowAmiModal(true); }} className="w-full h-full flex flex-col items-center justify-center text-center gap-1">
-                <Globe className="w-6 h-6 text-cyan-400 animate-pulse group-hover:scale-110 transition-transform" />
+                <Globe className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400 animate-pulse group-hover:scale-110 transition-transform" />
                 <div className="text-xs font-black text-white uppercase tracking-widest">A.M.I.</div>
                 <div className="text-xs font-bold text-cyan-300 mt-0.5">
                   {totalDiscoveredStars.toLocaleString()} <span className="text-[7.5px] text-cyan-500 uppercase">{t('can.mapped_stars')}</span>
@@ -684,10 +638,10 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
               </div>
             </GalaxyFrame>
 
-            <GalaxyFrame className="flex-1 min-h-[100px] hover:scale-[1.02] active:scale-95 transition-all cursor-pointer group" innerPadding="p-4">
+            <GalaxyFrame className="flex-1 min-h-0 hover:scale-[1.01] active:scale-98 transition-all cursor-pointer group" innerPadding="p-3 flex flex-col items-center justify-center h-full">
               <div onClick={() => { playSfx(660); setShowStatsModal(true); }} className="w-full h-full flex flex-col items-center justify-center text-center gap-1">
-                <BarChart2 className="w-6 h-6 text-purple-400 animate-pulse group-hover:scale-110 transition-transform" />
-                <div className="text-[10.5px] font-black text-white uppercase tracking-wider">{t('can.stats_title')}</div>
+                <BarChart2 className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400 animate-pulse group-hover:scale-110 transition-transform" />
+                <div className="text-[9.5px] sm:text-[10px] font-black text-white uppercase tracking-wider">{t('can.stats_title')}</div>
               </div>
             </GalaxyFrame>
 
@@ -695,7 +649,7 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
 
         </div>
 
-        {/* MODAL DESPLEGABLE DE ASSETS (ESTRUCTURAS, TECH, BADGES) */}
+        {/* MODALES DEL SISTEMA */}
         <CanAssetsModal
           isOpen={activeModalCategory !== null}
           onClose={() => setActiveModalCategory(null)}
@@ -706,12 +660,9 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
           triggerNotification={triggerNotification}
         />
 
-        {/* MODAL 1: A.M.I. */}
         {showAmiModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm">
             <div className="w-full max-w-xl sm:max-w-2xl max-h-[88dvh] flex flex-col hud-panel hud-corners border border-cyan-500/40 rounded-lg shadow-[0_0_30px_rgba(6,182,212,0.25)] overflow-hidden font-mono text-white">
-              
-              {/* CABECERA (shrink-0) */}
               <div className="shrink-0 px-3 py-2 border-b border-cyan-500/30 flex items-center justify-between bg-[#080d14]">
                 <div className="flex items-center gap-2 overflow-hidden">
                   <Globe className="w-4 h-4 text-cyan-400 animate-pulse shrink-0" />
@@ -719,24 +670,12 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
                     {t('can.ami_modal.title')}
                   </span>
                 </div>
-                <button
-                  onClick={() => { playSfx(440); setShowAmiModal(false); }}
-                  className="p-1 rounded text-cyan-400 hover:text-white hover:bg-cyan-500/20 text-sm font-bold transition-colors cursor-pointer shrink-0"
-                >
-                  ✕
-                </button>
+                <button onClick={() => { playSfx(440); setShowAmiModal(false); }} className="p-1 rounded text-cyan-400 hover:text-white hover:bg-cyan-500/20 text-sm font-bold transition-colors cursor-pointer shrink-0">✕</button>
               </div>
-
-              <div className="shrink-0 px-3 py-1.5 border-b border-cyan-500/20 bg-[#060a10] text-[7.5px] sm:text-[8px] text-zinc-400 uppercase">
-                {t('can.ami_modal.subtitle')}
-              </div>
-
-              {/* CONTENIDO CON SCROLL EXCLUSIVO */}
+              <div className="shrink-0 px-3 py-1.5 border-b border-cyan-500/20 bg-[#060a10] text-[7.5px] sm:text-[8px] text-zinc-400 uppercase">{t('can.ami_modal.subtitle')}</div>
               <div className="flex-1 overflow-y-auto p-2 sm:p-3 overscroll-contain grid grid-cols-1 sm:grid-cols-2 gap-2 custom-scrollbar">
                 {discoveredStars.length === 0 ? (
-                  <div className="col-span-full my-auto text-center text-zinc-600 text-[9px] py-10 uppercase font-bold bg-black/40 rounded-xl border border-cyan-950">
-                    {t('can.ami_modal.empty')}
-                  </div>
+                  <div className="col-span-full my-auto text-center text-zinc-600 text-[9px] py-10 uppercase font-bold bg-black/40 rounded-xl border border-cyan-950">{t('can.ami_modal.empty')}</div>
                 ) : (
                   discoveredStars.map((star) => {
                     const rank = star.discovery_order;
@@ -759,37 +698,21 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
                     }
 
                     return (
-                      <div 
-                        key={star.id} 
-                        className="bg-[#050910] border border-cyan-500/30 rounded-lg p-2.5 flex flex-col justify-between gap-1.5 shadow-md relative overflow-hidden"
-                      >
+                      <div key={star.id} className="bg-[#050910] border border-cyan-500/30 rounded-lg p-2.5 flex flex-col justify-between gap-1.5 shadow-md relative overflow-hidden">
                         <div className="flex justify-between items-start gap-1">
                           <div className="flex flex-col text-left overflow-hidden">
-                            <span className="text-[9px] font-black text-white uppercase truncate" title={star.star_name}>
-                              {star.star_name}
-                            </span>
-                            <span className="text-[7px] text-cyan-400 font-bold uppercase truncate">
-                              {t('can.ami_modal.cluster')}: {star.cluster}
-                            </span>
+                            <span className="text-[9px] font-black text-white uppercase truncate" title={star.star_name}>{star.star_name}</span>
+                            <span className="text-[7px] text-cyan-400 font-bold uppercase truncate">{t('can.ami_modal.cluster')}: {star.cluster}</span>
                           </div>
-                          <span className="text-[6.5px] text-zinc-500 font-mono shrink-0">
-                            {star.discovered_at}
-                          </span>
+                          <span className="text-[6.5px] text-zinc-500 font-mono shrink-0">{star.discovered_at}</span>
                         </div>
-
                         <div className={`px-2 py-1 rounded border flex items-center justify-between text-[7.5px] font-bold ${badgeColor}`}>
-                          <span className="flex items-center gap-1 uppercase truncate">
-                            <span>{badgeIcon}</span>
-                            <span className="truncate">{dynamicTitle}</span>
-                          </span>
+                          <span className="flex items-center gap-1 uppercase truncate"><span>{badgeIcon}</span><span className="truncate">{dynamicTitle}</span></span>
                         </div>
-
                         <div className="bg-black/60 px-2 py-1 rounded border border-cyan-950 text-[7px] font-mono flex justify-between items-center">
                           <span className="text-zinc-400 uppercase">{t('can.ami_modal.loot_recorded')}</span>
                           {coinReward > 0 ? (
-                            <span className="text-amber-400 font-bold">
-                              +{coinReward.toLocaleString()} GD
-                            </span>
+                            <span className="text-amber-400 font-bold">+{coinReward.toLocaleString()} GD</span>
                           ) : (
                             <span className="text-zinc-600 uppercase font-bold">{t('can.ami_modal.no_extra_loot')}</span>
                           )}
@@ -799,60 +722,33 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
                   })
                 )}
               </div>
-
-              {/* PIE (shrink-0) */}
               <div className="shrink-0 p-2 border-t border-cyan-500/30 bg-[#080d14] flex justify-end">
-                <button
-                  onClick={() => { playSfx(440); setShowAmiModal(false); }}
-                  className="px-4 py-1.5 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 text-cyan-300 hover:text-white text-[8.5px] font-bold uppercase rounded-lg cursor-pointer transition-colors"
-                >
+                <button onClick={() => { playSfx(440); setShowAmiModal(false); }} className="px-4 py-1.5 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 text-cyan-300 hover:text-white text-[8.5px] font-bold uppercase rounded-lg cursor-pointer transition-colors">
                   {t('can.ami_modal.accept')}
                 </button>
               </div>
-
             </div>
           </div>
         )}
 
-        {/* MODAL 2: ESTADÍSTICAS Y PRODUCCIÓN DIARIA AUDITADA C.A.N. */}
         {showStatsModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm">
             <div className="w-full max-w-lg max-h-[88dvh] flex flex-col hud-panel hud-corners border border-cyan-500/40 rounded-lg shadow-[0_0_30px_rgba(6,182,212,0.25)] overflow-hidden font-mono text-white">
-              
-              {/* CABECERA (shrink-0) */}
               <div className="shrink-0 px-3 py-2 border-b border-cyan-500/30 flex items-center justify-between bg-[#080d14]">
                 <div className="flex items-center gap-2">
                   <BarChart2 className="w-4 h-4 text-purple-400 animate-pulse shrink-0" />
-                  <span className="text-cyan-400 text-xs font-black uppercase tracking-widest truncate">
-                    {t('can.stats_modal.title')}
-                  </span>
+                  <span className="text-cyan-400 text-xs font-black uppercase tracking-widest truncate">{t('can.stats_modal.title')}</span>
                 </div>
-                <button
-                  onClick={() => { playSfx(440); setShowStatsModal(false); }}
-                  className="p-1 rounded text-cyan-400 hover:text-white hover:bg-cyan-500/20 text-sm font-bold transition-colors cursor-pointer shrink-0"
-                >
-                  ✕
-                </button>
+                <button onClick={() => { playSfx(440); setShowStatsModal(false); }} className="p-1 rounded text-cyan-400 hover:text-white hover:bg-cyan-500/20 text-sm font-bold transition-colors cursor-pointer shrink-0">✕</button>
               </div>
-
-              {/* CONTENIDO SCROLLABLE (flex-1) */}
               <div className="flex-1 overflow-y-auto p-3 space-y-3 text-[8.5px] sm:text-[9px] overscroll-contain custom-scrollbar">
-                
-                {/* RED DE ENERGÍA SOLAR */}
                 <div className={`p-2.5 bg-black/80 border rounded-xl space-y-1 ${canMetrics.energyRequired > 0 && canMetrics.energyProduced === 0 ? 'border-red-500/80 shadow-[0_0_12px_rgba(239,68,68,0.3)]' : 'border-cyan-900/60'}`}>
                   <div className="flex justify-between items-center text-cyan-400 font-bold uppercase">
-                    <span className="flex items-center gap-1.5">
-                      <BatteryCharging className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                      {t('can.stats_modal.solar_supply')}
-                    </span>
+                    <span className="flex items-center gap-1.5"><BatteryCharging className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />{t('can.stats_modal.solar_supply')}</span>
                     <span className="text-white font-mono font-black">{canMetrics.energyProduced} / {canMetrics.energyRequired} {t('can.stats_modal.units')}</span>
                   </div>
-
                   {canMetrics.energyRequired > 0 && canMetrics.energyProduced === 0 ? (
-                    <p className="text-[7.5px] text-red-400 font-bold uppercase flex items-center gap-1 pt-1">
-                      <AlertTriangle className="w-3 h-3 text-red-500 shrink-0" />
-                      {t('can.stats_modal.solar_offline')}
-                    </p>
+                    <p className="text-[7.5px] text-red-400 font-bold uppercase flex items-center gap-1 pt-1"><AlertTriangle className="w-3 h-3 text-red-500 shrink-0" />{t('can.stats_modal.solar_offline')}</p>
                   ) : (
                     <div className="flex justify-between items-center text-[7.5px] text-zinc-400 pt-0.5 font-mono">
                       <span>{t('can.stats_modal.efficiency')}</span>
@@ -860,76 +756,47 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
                     </div>
                   )}
                 </div>
-
-                <span className="text-cyan-400 font-bold uppercase block border-b border-purple-950 pb-1">
-                  {t('can.stats_modal.extraction_capacity')}
-                </span>
-
+                <span className="text-cyan-400 font-bold uppercase block border-b border-purple-950 pb-1">{t('can.stats_modal.extraction_capacity')}</span>
                 <div className="grid grid-cols-2 gap-2 font-mono">
                   <div className="p-2.5 bg-black/60 border border-purple-950 rounded-lg flex flex-col justify-between gap-1">
                     <span className="text-zinc-400 uppercase font-bold">{t('can.stats_modal.metal')}</span>
                     <span className="text-cyan-300 font-black text-[10px]">+{canMetrics.hourlyProduction.metal.toLocaleString()} <span className="text-[7px] text-zinc-500">{t('can.stats_modal.per_hour')}</span></span>
                     <span className="text-[7px] text-zinc-400 border-t border-purple-950/60 pt-0.5">{t('can.stats_modal.storage')}: {canMetrics.storageLimits.metal.toLocaleString()}</span>
                   </div>
-
                   <div className="p-2.5 bg-black/60 border border-purple-950 rounded-lg flex flex-col justify-between gap-1">
                     <span className="text-zinc-400 uppercase font-bold">{t('can.stats_modal.crystal')}</span>
                     <span className="text-purple-300 font-black text-[10px]">+{canMetrics.hourlyProduction.crystal.toLocaleString()} <span className="text-[7px] text-zinc-500">{t('can.stats_modal.per_hour')}</span></span>
                     <span className="text-[7px] text-zinc-400 border-t border-purple-950/60 pt-0.5">{t('can.stats_modal.storage')}: {canMetrics.storageLimits.crystal.toLocaleString()}</span>
                   </div>
-
                   <div className="p-2.5 bg-black/60 border border-purple-950 rounded-lg flex flex-col justify-between gap-1">
                     <span className="text-zinc-400 uppercase font-bold">{t('can.stats_modal.deuterium')}</span>
                     <span className="text-blue-300 font-black text-[10px]">+{canMetrics.hourlyProduction.deuterium.toLocaleString()} <span className="text-[7px] text-zinc-500">{t('can.stats_modal.per_hour')}</span></span>
                     <span className="text-[7px] text-zinc-400 border-t border-purple-950/60 pt-0.5">{t('can.stats_modal.storage')}: {canMetrics.storageLimits.deuterium.toLocaleString()}</span>
                   </div>
-
                   <div className="p-2.5 bg-black/60 border border-purple-950 rounded-lg flex flex-col justify-between gap-1">
                     <span className="text-zinc-400 uppercase font-bold">{t('can.stats_modal.dark_matter')}</span>
                     <span className="text-emerald-400 font-black text-[10px]">+{canMetrics.hourlyProduction.dark_matter.toLocaleString()} <span className="text-[7px] text-zinc-500">{t('can.stats_modal.per_hour')}</span></span>
                     <span className="text-[7px] text-zinc-400 border-t border-purple-950/60 pt-0.5">{t('can.stats_modal.storage')}: {canMetrics.storageLimits.dark_matter.toLocaleString()}</span>
                   </div>
                 </div>
-
               </div>
-
-              {/* PIE (shrink-0) */}
               <div className="shrink-0 p-2 border-t border-cyan-500/30 bg-[#080d14] flex justify-end">
-                <button
-                  onClick={() => { playSfx(440); setShowStatsModal(false); }}
-                  className="px-4 py-1.5 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 text-cyan-300 text-[8.5px] font-bold uppercase rounded-lg cursor-pointer transition-colors"
-                >
-                  {t('can.stats_modal.accept')}
-                </button>
+                <button onClick={() => { playSfx(440); setShowStatsModal(false); }} className="px-4 py-1.5 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 text-cyan-300 text-[8.5px] font-bold uppercase rounded-lg cursor-pointer transition-colors">{t('can.stats_modal.accept')}</button>
               </div>
-
             </div>
           </div>
         )}
 
-        {/* MODAL 3: ACTIVE SKILLS DETALLADAS */}
         {showSkillsModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm">
-            {/* Caja del Modal con altura dinámica y contención estricta */}
             <div className="w-full max-w-4xl max-h-[88dvh] flex flex-col hud-panel hud-corners border border-cyan-500/40 rounded-lg shadow-[0_0_30px_rgba(6,182,212,0.25)] overflow-hidden font-mono text-white">
-              
-              {/* 1. CABECERA SIEMPRE VISIBLE (shrink-0) */}
               <div className="shrink-0 px-3 py-2 border-b border-cyan-500/30 flex items-center justify-between bg-[#080d14]">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse shrink-0" />
-                  <span className="text-cyan-400 text-xs sm:text-sm font-bold tracking-wider uppercase">
-                    {t('skills.modal_title')} ({filteredSkillsForModal.length})
-                  </span>
+                  <span className="text-cyan-400 text-xs sm:text-sm font-bold tracking-wider uppercase">{t('skills.modal_title')} ({filteredSkillsForModal.length})</span>
                 </div>
-                <button 
-                  onClick={() => { playSfx(440); setShowSkillsModal(false); }}
-                  className="p-1 rounded text-cyan-400 hover:text-white hover:bg-cyan-500/20 text-sm font-bold transition-colors cursor-pointer shrink-0"
-                >
-                  ✕
-                </button>
+                <button onClick={() => { playSfx(440); setShowSkillsModal(false); }} className="p-1 rounded text-cyan-400 hover:text-white hover:bg-cyan-500/20 text-sm font-bold transition-colors cursor-pointer shrink-0">✕</button>
               </div>
-
-              {/* 2. FILTROS/CATEGORÍAS SIEMPRE VISIBLES (shrink-0) */}
               <div className="shrink-0 px-3 py-1.5 border-b border-cyan-500/20 flex gap-1.5 overflow-x-auto no-scrollbar bg-[#060a10]">
                 {[
                   { id: 'ALL', label: `${t('skills.filter_all')} (${activeSkills.length})` },
@@ -938,61 +805,29 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
                   { id: 'TECH', label: `${t('skills.filter_tech')} (${activeSkills.filter(s => s.source === 'TECH').length})` },
                   { id: 'BADGE', label: `${t('skills.filter_badges')} (${activeSkills.filter(s => s.source === 'BADGE').length})` }
                 ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => handleFilterChange(tab.id as any)}
-                    className={`text-[10px] py-0.5 px-2 rounded font-bold uppercase transition-all border whitespace-nowrap cursor-pointer shrink-0 ${
-                      skillsModalFilter === tab.id
-                        ? 'bg-cyan-950 text-cyan-300 border-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.3)]'
-                        : 'bg-black/60 text-zinc-400 border-cyan-950 hover:text-white hover:border-cyan-800'
-                    }`}
-                  >
+                  <button key={tab.id} onClick={() => handleFilterChange(tab.id as any)} className={`text-[10px] py-0.5 px-2 rounded font-bold uppercase transition-all border whitespace-nowrap cursor-pointer shrink-0 ${skillsModalFilter === tab.id ? 'bg-cyan-950 text-cyan-300 border-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.3)]' : 'bg-black/60 text-zinc-400 border-cyan-950 hover:text-white hover:border-cyan-800'}`}>
                     {tab.label}
                   </button>
                 ))}
               </div>
-
-              {/* 3. ÚNICO CONTENEDOR CON SCROLL (flex-1 overflow-y-auto) */}
               <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-2 overscroll-contain custom-scrollbar">
                 {paginatedSkillsForModal.length === 0 ? (
-                  <div className="w-full my-auto text-center py-6 text-zinc-600 text-[9px] uppercase tracking-widest font-bold bg-black/40 rounded-xl border border-cyan-950">
-                    {t('can.no_skills_category')}
-                  </div>
+                  <div className="w-full my-auto text-center py-6 text-zinc-600 text-[9px] uppercase tracking-widest font-bold bg-black/40 rounded-xl border border-cyan-950">{t('can.no_skills_category')}</div>
                 ) : (
                   paginatedSkillsForModal.map((sk) => {
                     const isCanon = sk.source === 'CAN';
                     const isStruct = sk.source === 'STRUCTURE';
                     const isTech = sk.source === 'TECH';
-
                     return (
-                      <div
-                        key={sk.id}
-                        className={`p-1.5 sm:p-2 rounded-lg border flex items-center gap-2.5 transition-all shrink-0 ${
-                          isCanon
-                            ? 'bg-cyan-950/30 border-cyan-500/60 text-cyan-200'
-                            : isStruct
-                            ? 'bg-amber-950/20 border-amber-500/40 text-amber-200'
-                            : isTech
-                            ? 'bg-purple-950/20 border-purple-500/40 text-purple-200'
-                            : 'bg-emerald-950/20 border-emerald-500/40 text-emerald-200'
-                        }`}
-                      >
+                      <div key={sk.id} className={`p-1.5 sm:p-2 rounded-lg border flex items-center gap-2.5 transition-all shrink-0 ${isCanon ? 'bg-cyan-950/30 border-cyan-500/60 text-cyan-200' : isStruct ? 'bg-amber-950/20 border-amber-500/40 text-amber-200' : isTech ? 'bg-purple-950/20 border-purple-500/40 text-purple-200' : 'bg-emerald-950/20 border-emerald-500/40 text-emerald-200'}`}>
                         <div className="w-8 h-8 rounded-md bg-black border border-cyan-950 overflow-hidden shrink-0 flex items-center justify-center p-0.5 relative">
-                          {sk.assetImageUrl ? (
-                            <img src={sk.assetImageUrl} alt={sk.assetName} className="w-full h-full object-contain" />
-                          ) : (
-                            getSkillIcon(sk.source, sk.effectDescription)
-                          )}
+                          {sk.assetImageUrl ? <img src={sk.assetImageUrl} alt={sk.assetName} className="w-full h-full object-contain" /> : getSkillIcon(sk.source, sk.effectDescription)}
                         </div>
-
                         <div className="flex-1 flex flex-col gap-0.5 text-left overflow-hidden">
                           <div className="flex justify-between items-center border-b border-cyan-950/80 pb-0.5">
                             <span className="font-black text-white text-[9px] sm:text-[10px] uppercase truncate">{sk.assetName}</span>
-                            <span className="text-[7px] font-black uppercase px-1.5 py-0.2 rounded border bg-black/60 border-cyan-900 text-cyan-400 shrink-0">
-                              {sk.source} {sk.level ? `• LVL ${sk.level}` : ''}
-                            </span>
+                            <span className="text-[7px] font-black uppercase px-1.5 py-0.2 rounded border bg-black/60 border-cyan-900 text-cyan-400 shrink-0">{sk.source} {sk.level ? `• LVL ${sk.level}` : ''}</span>
                           </div>
-
                           <div className="flex items-center gap-1 pt-0.5">
                             <ChevronRight className="w-3 h-3 text-cyan-400 shrink-0" />
                             <span className="text-[10px] font-bold text-zinc-200 leading-tight truncate">{sk.effectDescription}</span>
@@ -1003,30 +838,17 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
                   })
                 )}
               </div>
-
-              {/* CONTROLES DE PAGINACIÓN (shrink-0) */}
               <div className="shrink-0 flex items-center justify-between bg-[#080d14] border-t border-cyan-500/30 p-2 text-[8px] sm:text-[8.5px]">
-                <button
-                  disabled={currentSkillsPage === 1}
-                  onClick={() => { playSfx(660); setSkillsPage(p => Math.max(1, p - 1)); }}
-                  className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950 border border-cyan-500/50 hover:border-cyan-400 disabled:opacity-30 disabled:pointer-events-none text-cyan-300 font-bold uppercase rounded-md cursor-pointer transition-all shrink-0"
-                >
+                <button disabled={currentSkillsPage === 1} onClick={() => { playSfx(660); setSkillsPage(p => Math.max(1, p - 1)); }} className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950 border border-cyan-500/50 hover:border-cyan-400 disabled:opacity-30 disabled:pointer-events-none text-cyan-300 font-bold uppercase rounded-md cursor-pointer transition-all shrink-0">
                   <ChevronLeft className="w-3 h-3" /> {t('can.prev')}
                 </button>
-
                 <span className="font-mono font-black text-cyan-400 uppercase tracking-widest text-[8px]">
                   {t('can.page')} <span className="text-white">{currentSkillsPage}</span> {t('can.of')} <span className="text-white">{totalSkillsPages}</span>
                 </span>
-
-                <button
-                  disabled={currentSkillsPage >= totalSkillsPages}
-                  onClick={() => { playSfx(660); setSkillsPage(p => Math.min(totalSkillsPages, p + 1)); }}
-                  className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950 border border-cyan-500/50 hover:border-cyan-400 disabled:opacity-30 disabled:pointer-events-none text-cyan-300 font-bold uppercase rounded-md cursor-pointer transition-all shrink-0"
-                >
+                <button disabled={currentSkillsPage >= totalSkillsPages} onClick={() => { playSfx(660); setSkillsPage(p => Math.min(totalSkillsPages, p + 1)); }} className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950 border border-cyan-500/50 hover:border-cyan-400 disabled:opacity-30 disabled:pointer-events-none text-cyan-300 font-bold uppercase rounded-md cursor-pointer transition-all shrink-0">
                   {t('can.next')} <ChevronRight className="w-3 h-3" />
                 </button>
               </div>
-
             </div>
           </div>
         )}

@@ -37,6 +37,22 @@ export interface InventoryItem {
     ionic_attack?: number;
     graviton_attack?: number;
   };
+  seed_data?: any;
+  seed_ships?: any;
+  raw_data?: any;
+  company?: string;
+  collection?: string;
+  size?: string;
+  engine?: string;
+  cargo?: number;
+  production?: number;
+  defense?: number;
+  speed?: number;
+  attack?: number;
+  ionAttack?: number;
+  laserAttack?: number;
+  plasmaAttack?: number;
+  gravitonAttack?: number;
 }
 
 const resolveImageUrl = (rawUrl?: string): string => {
@@ -145,7 +161,20 @@ export const useInventory = () => {
         userLicenses,
         userConsumables
       ] = await Promise.all([
-        safeQuery('user_ships', true),
+        (async () => {
+          try {
+            const { data: shipsData, error: shipsErr } = await supabase
+              .from('user_ships')
+              .select('*, seed_ships(*)')
+              .eq('user_id', user.id);
+            if (!shipsErr && shipsData && shipsData.length > 0) {
+              return shipsData;
+            }
+          } catch (e) {
+            console.warn("Error en user_ships con relación seed_ships:", e);
+          }
+          return await safeQuery('user_ships', true);
+        })(),
         safeQuery('seed_ships'),
         safeQuery('user_tools', true),
         safeQuery('seed_tools'),
@@ -175,31 +204,62 @@ export const useInventory = () => {
         );
       };
 
-      // Mapear Naves
-      (userShips || []).forEach((s: any) => {
-        const seed = (seedShips || []).find((ss: any) => ss.id === s.ship_id || ss.id === s.seed_id || ss.id === s.id_ship) || {};
-        const shipName = s.custom_name || s.name_ship || seed.name || seed.ship_name || seed.title || seed.id || `Nave #${s.id}`;
-        const realId = String(s.id);
-        const seedId = String(s.id_ship || s.ship_id || s.seed_id || seed.id || '');
+      // Mapear Naves con seed_ships completo
+      (userShips || []).forEach((ship: any) => {
+        const seedRel = ship.seed_ships;
+        const seedFound = (seedShips || []).find((ss: any) => ss.id === ship.ship_id || ss.id === ship.seed_id || ss.id === ship.id_ship) || {};
+        const seed = (seedRel && typeof seedRel === 'object' && Object.keys(seedRel).length > 0) ? seedRel : seedFound;
+        const shipName = seed.name || ship.seed_ships?.name || ship.name || ship.name_ship || ship.custom_name || `Nave #${ship.id}`;
+        const realId = String(ship.id);
+        const seedId = String(ship.id_ship || ship.ship_id || ship.seed_id || seed.id || '');
 
         combinedItems.push({
-          id: realId,
-          seed_id: seedId,
-          name: shipName,
-          fullname: shipName,
+          id: ship.id,
+          name: ship.seed_ships?.name || ship.name || shipName,
           category: 'Spaceships',
+          seed_ships: ship.seed_ships || seed,
+          ...seed,
+          ...ship,
+          seed_id: seedId,
+          fullname: shipName,
           type: 'Naves',
-          rarity: seed.rarity || 'COMMON',
-          faction: seed.company || seed.faction || 'NOVA',
-          level: s.current_level || s.level || 1,
-          stars: seed.stars || 1,
-          quantity: s.quantity || s.amount || 1,
+          rarity: seed.rarity || ship.rarity || 'COMMON',
+          faction: seed.company || seed.faction || ship.company || ship.faction || 'NOVA',
+          company: seed.company || ship.company || 'NOVA',
+          collection: seed.collection || ship.collection || 'ESTÁNDAR',
+          size: seed.size || ship.size || 'MEDIUM',
+          engine: seed.engine || ship.engine || 'WARP DRIVE CLASS I',
+          level: ship.current_level || ship.level || 1,
+          stars: seed.stars || ship.stars || 1,
+          quantity: ship.quantity || ship.amount || 1,
           unlocked: true,
-          favorite: Boolean(s.favorite),
+          favorite: Boolean(ship.favorite),
           is_in_flight: checkIsInFlight(realId, seedId, shipName),
-          avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || s.image_url),
-          description: seed.description || 'Nave espacial de combate e investigación.',
-          skills: seed.skills || []
+          avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || ship.image_url || ship.avatar_url),
+          description: seed.description || ship.description || 'Sin especificaciones tácticas archivadas.',
+          skills: seed.skills || ship.skills || [],
+          seed_data: seed,
+          raw_data: { ...seed, ...ship },
+          cargo: Number(seed.cargo ?? ship.cargo ?? 0),
+          production: Number(seed.production ?? ship.production ?? 0),
+          defense: Number(seed.defense ?? ship.defense ?? 0),
+          speed: Number(seed.speed ?? ship.speed ?? 0),
+          attack: Number(seed.attack ?? ship.attack ?? 0),
+          ionAttack: Number(seed.ion_attack ?? seed.ionAttack ?? ship.ion_attack ?? ship.ionAttack ?? 0),
+          laserAttack: Number(seed.laser_attack ?? seed.laserAttack ?? ship.laser_attack ?? ship.laserAttack ?? 0),
+          plasmaAttack: Number(seed.plasma_attack ?? seed.plasmaAttack ?? ship.plasma_attack ?? ship.plasmaAttack ?? 0),
+          gravitonAttack: Number(seed.graviton_attack ?? seed.gravitonAttack ?? ship.graviton_attack ?? ship.gravitonAttack ?? 0),
+          tactical_stats: {
+            hp: Number(seed.health ?? seed.hp ?? ship.health ?? ship.hp ?? 100),
+            shield: Number(seed.shield ?? ship.shield ?? 0),
+            defense: Number(seed.defense ?? ship.defense ?? 0),
+            speed_boost: Number(seed.speed ?? ship.speed ?? 0),
+            kinetic_attack: Number(seed.attack ?? ship.attack ?? 0),
+            laser_attack: Number(seed.laser_attack ?? seed.laserAttack ?? ship.laser_attack ?? ship.laserAttack ?? 0),
+            plasma_attack: Number(seed.plasma_attack ?? seed.plasmaAttack ?? ship.plasma_attack ?? ship.plasmaAttack ?? 0),
+            ionic_attack: Number(seed.ion_attack ?? seed.ionAttack ?? ship.ion_attack ?? ship.ionAttack ?? 0),
+            graviton_attack: Number(seed.graviton_attack ?? seed.gravitonAttack ?? ship.graviton_attack ?? ship.gravitonAttack ?? 0)
+          }
         });
       });
 
