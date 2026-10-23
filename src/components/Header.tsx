@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bell, Settings, User } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface HeaderProps {
   userProfile?: any;
@@ -67,6 +68,9 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenProfile
 }) => {
+  const { t, i18n } = useTranslation();
+  const currentLang = (i18n.language || 'es').startsWith('en') ? 'en' : 'es';
+
   const [openDropdown, setOpenDropdown] = useState<'MONEDA' | 'RECURSOS' | null>(null);
 
   const currencyRef = useRef<HTMLDivElement>(null);
@@ -117,13 +121,13 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   const tabs = [
-    { id: 'MAIN', label: 'MAIN' },
-    { id: 'CAN', label: 'C.A.N.' },
-    { id: 'EXPEDITIONS', label: 'EXPEDITION' },
-    { id: 'MARKET', label: 'MARKET' },
-    { id: 'PHANTOM', label: 'PHANTOM' },
-    { id: 'INVENTORY', label: 'INVENTORY' },
-    { id: 'MISSION', label: 'MISSION' },
+    { id: 'MAIN', label: t('nav.main') },
+    { id: 'CAN', label: t('nav.can') },
+    { id: 'EXPEDITIONS', label: t('nav.expedition') },
+    { id: 'MARKET', label: t('nav.market') },
+    { id: 'PHANTOM', label: t('nav.phantom') },
+    { id: 'INVENTORY', label: t('nav.inventory') },
+    { id: 'MISSION', label: t('nav.mission') },
   ];
 
   return (
@@ -199,7 +203,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'bg-black/60 text-amber-400 border-amber-900/60 hover:border-amber-500/80 hover:bg-amber-950/30'
             }`}
           >
-            Moneda
+            {t('nav.currency')}
           </button>
 
           {openDropdown === 'MONEDA' && (
@@ -226,7 +230,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'bg-black/60 text-cyan-300 border-cyan-900/60 hover:border-cyan-500/80 hover:bg-cyan-950/30'
             }`}
           >
-            Recursos
+            {t('nav.resources')}
           </button>
 
           {openDropdown === 'RECURSOS' && (
@@ -241,6 +245,37 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             </div>
           )}
+        </div>
+
+        {/* CONMUTADOR DE IDIOMA [ ES | EN ] */}
+        <div className="flex items-center border border-cyan-500/40 bg-black/70 rounded px-1 py-0.5 text-[7.5px] sm:text-[8.5px] font-mono font-bold tracking-wider">
+          <button
+            onClick={() => {
+              i18n.changeLanguage('es');
+              try { localStorage.setItem('gd_preferred_language', 'es'); } catch {}
+            }}
+            className={`px-1 py-0.5 rounded transition-all cursor-pointer ${
+              currentLang === 'es'
+                ? 'bg-cyan-500/30 text-cyan-300 font-black shadow-[0_0_6px_rgba(34,211,238,0.5)]'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            ES
+          </button>
+          <span className="text-cyan-500/40 px-0.5 select-none">|</span>
+          <button
+            onClick={() => {
+              i18n.changeLanguage('en');
+              try { localStorage.setItem('gd_preferred_language', 'en'); } catch {}
+            }}
+            className={`px-1 py-0.5 rounded transition-all cursor-pointer ${
+              currentLang === 'en'
+                ? 'bg-cyan-500/30 text-cyan-300 font-black shadow-[0_0_6px_rgba(34,211,238,0.5)]'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            EN
+          </button>
         </div>
 
       </div>

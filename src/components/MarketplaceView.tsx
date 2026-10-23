@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShoppingBag,
@@ -390,6 +391,8 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   const filteredListings = getFilteredAndSortedListings();
   const filteredMyInventory = getFilteredMyInventory();
 
+  const { t } = useTranslation();
+
   return (
     <GalaxyFrame className="w-full max-w-7xl mx-auto my-2 font-mono text-left select-none text-white" innerPadding="p-5">
       <div className="flex flex-col gap-4">
@@ -404,17 +407,17 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             <div className="text-left">
               <h1 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
                 <ShoppingBag className="w-4 h-4 text-cyan-400 animate-pulse" />
-                MARKETPLACE P2P
+                {t('market.title')}
               </h1>
             </div>
           </div>
 
           <div className="flex items-center gap-1 bg-black/60 p-1 border border-cyan-950 rounded-lg overflow-x-auto">
             {[
-              { id: 'MARKET', label: 'COMPRAR', icon: ShoppingBag },
-              { id: 'AUCTIONS', label: 'SUBASTAS EN VIVO', icon: Gavel },
-              { id: 'SELL_ITEM', label: 'PUBLICAR / VENDER', icon: PlusCircle },
-              { id: 'MY_LISTINGS', label: 'MIS PUBLICACIONES', icon: Tag }
+              { id: 'MARKET', label: t('market.buy'), icon: ShoppingBag },
+              { id: 'AUCTIONS', label: t('market.live_auctions'), icon: Gavel },
+              { id: 'SELL_ITEM', label: t('market.publish_sell'), icon: PlusCircle },
+              { id: 'MY_LISTINGS', label: t('market.my_listings'), icon: Tag }
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -442,11 +445,11 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
         <div className="w-full bg-[#05070a] border border-cyan-500/20 p-3 rounded-xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
           <div className="flex flex-wrap items-center gap-1 text-[8px] font-bold uppercase">
             {[
-              { id: 'ALL', label: 'TODAS' },
-              { id: 'COMMON', label: 'COMÚN' },
-              { id: 'RARE', label: 'RARA' },
-              { id: 'EPIC', label: 'ÉPICA' },
-              { id: 'LEGENDARY', label: 'LEGENDARIA' }
+              { id: 'ALL', label: t('market.rarities.all') },
+              { id: 'COMMON', label: t('market.rarities.common') },
+              { id: 'RARE', label: t('market.rarities.rare') },
+              { id: 'EPIC', label: t('market.rarities.epic') },
+              { id: 'LEGENDARY', label: t('market.rarities.legendary') }
             ].map((rar) => (
               <button
                 key={rar.id}
@@ -466,11 +469,11 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             {activeTab !== 'SELL_ITEM' && (
               <div className="flex items-center gap-1 bg-black p-0.5 border border-cyan-950 rounded text-[8px]">
                 <ArrowUpDown className="w-3 h-3 text-amber-400 ml-1" />
-                <span className="text-zinc-500 pl-1 font-bold">PRECIO:</span>
+                <span className="text-zinc-500 pl-1 font-bold">{t('market.price_label')}</span>
                 {[
-                  { id: 'NONE', label: 'DEF' },
-                  { id: 'LOW_TO_HIGH', label: 'MENOR A MAYOR ↑' },
-                  { id: 'HIGH_TO_LOW', label: 'MAYOR A MENOR ↓' }
+                  { id: 'NONE', label: t('market.sort_off') },
+                  { id: 'LOW_TO_HIGH', label: t('market.sort_asc') },
+                  { id: 'HIGH_TO_LOW', label: t('market.sort_desc') }
                 ].map((sortOpt) => (
                   <button
                     key={sortOpt.id}
@@ -489,7 +492,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
               <Search className="absolute left-2.5 top-2 w-3 h-3 text-cyan-500" />
               <input
                 type="text"
-                placeholder={activeTab === 'SELL_ITEM' ? "BUSCAR EN MI INVENTARIO..." : "BUSCAR ACTIVO..."}
+                placeholder={activeTab === 'SELL_ITEM' ? t('market.search_inventory_placeholder') : t('market.search_placeholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-black border border-cyan-950 rounded pl-7 pr-2.5 py-1 text-[8px] text-cyan-200 placeholder-zinc-600 outline-none uppercase font-mono focus:border-cyan-500 transition-colors"
@@ -502,20 +505,20 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
           <div className="w-full md:w-52 shrink-0 bg-[#05070a] border border-cyan-500/20 p-3 rounded-xl flex flex-col gap-2">
             <div className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5 px-1 border-b border-cyan-950 pb-2">
               <Filter className="w-3.5 h-3.5 text-cyan-400" />
-              <span>CATEGORÍAS</span>
+              <span>{t('market.categories_title')}</span>
             </div>
 
             <div className="flex flex-col gap-1 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
               {[
-                { id: 'ALL', label: 'TODOS', icon: ShoppingBag },
-                { id: 'SHIPS', label: 'NAVES', icon: Rocket },
-                { id: 'TOOLS', label: 'HERRAMIENTAS', icon: Wrench },
-                { id: 'STRUCTURES', label: 'ESTRUCTURAS / DEFENSA', icon: Building },
-                { id: 'TECH', label: 'TECNOLOGÍA', icon: Cpu },
-                { id: 'BLUEPRINTS', label: 'BLUEPRINTS', icon: Tag },
-                { id: 'LICENSES', label: 'LICENCIAS', icon: FileText },
-                { id: 'ASTROBOTS', label: 'ASTROBOTS', icon: Bot },
-                { id: 'CONSUMABLES', label: 'CONSUMIBLES / RECURSOS', icon: Package }
+                { id: 'ALL', label: t('market.cats.all'), icon: ShoppingBag },
+                { id: 'SHIPS', label: t('market.cats.ships'), icon: Rocket },
+                { id: 'TOOLS', label: t('market.cats.tools'), icon: Wrench },
+                { id: 'STRUCTURES', label: t('market.cats.structures_defense'), icon: Building },
+                { id: 'TECH', label: t('market.cats.technology'), icon: Cpu },
+                { id: 'BLUEPRINTS', label: t('market.cats.blueprints'), icon: Tag },
+                { id: 'LICENSES', label: t('market.cats.licenses'), icon: FileText },
+                { id: 'ASTROBOTS', label: t('market.cats.astrobots'), icon: Bot },
+                { id: 'CONSUMABLES', label: t('market.cats.consumables'), icon: Package }
               ].map((cat) => {
                 const isSelected = selectedCategory === cat.id;
                 const IconComp = cat.icon;
@@ -544,7 +547,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5 max-h-[440px] overflow-y-auto pr-1.5 custom-scrollbar">
               {filteredListings.length === 0 ? (
                 <div className="col-span-full p-12 text-center text-zinc-500 text-[10px] uppercase tracking-widest bg-[#05070a] border border-cyan-500/10 rounded-xl">
-                  {marketLoading ? 'CARGANDO PUBLICACIONES DE LA RED...' : 'NO HAY PUBLICACIONES REGISTRADAS'}
+                  {marketLoading ? t('market.loading_listings') : t('market.empty_listings')}
                 </div>
               ) : (
                 filteredListings.map((item) => (
@@ -555,7 +558,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                     <div className="flex justify-between items-center border-b border-cyan-950 pb-2">
                       {item.is_auction && (
                         <span className="px-2 py-0.5 rounded text-[7px] font-black uppercase bg-amber-950/80 text-amber-400 border border-amber-800 flex items-center gap-1">
-                          <Gavel className="w-3 h-3 text-amber-400" /> SUBASTA
+                          <Gavel className="w-3 h-3 text-amber-400" /> {t('market.card.auction_badge')}
                         </span>
                       )}
 
@@ -582,7 +585,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
                     <div className="bg-[#020305] border border-cyan-950 p-2 rounded-lg flex justify-between items-center text-[9px]">
                       <div className="flex flex-col text-left">
-                        <span className="text-[7.5px] text-zinc-500 uppercase">{item.is_auction ? 'PUJA ACTUAL / SALIDA' : 'PRECIO DIRECTO'}</span>
+                        <span className="text-[7.5px] text-zinc-500 uppercase">{item.is_auction ? t('market.card.current_bid') : t('market.card.direct_price')}</span>
                         <div className="flex items-center gap-1 font-black text-amber-400 text-sm">
                           <span>{item.price.toLocaleString()}</span>
                           <img src={GD_COIN_ASSET} alt="GD Coin" className="w-3.5 h-3.5 object-contain" />
@@ -595,21 +598,21 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                         onClick={() => handleCancelListing(item)}
                         className="w-full py-1.5 bg-red-950/60 hover:bg-red-900 border border-red-500/40 text-red-300 font-black text-[8.5px] uppercase rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1"
                       >
-                        <Unlock className="w-3 h-3" /> RETIRAR Y DESBLOQUEAR
+                        <Unlock className="w-3 h-3" /> {t('market.card.withdraw')}
                       </button>
                     ) : item.is_auction ? (
                       <button
                         onClick={() => handleBuyDirect(item)}
                         className="w-full py-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:brightness-110 text-white font-black text-[8.5px] uppercase rounded-lg shadow-[0_0_10px_rgba(245,158,11,0.3)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
                       >
-                        <Gavel className="w-3.5 h-3.5" /> PUJAR EN SUBASTA
+                        <Gavel className="w-3.5 h-3.5" /> {t('market.card.bid')}
                       </button>
                     ) : (
                       <button
                         onClick={() => handleBuyDirect(item)}
                         className="w-full py-1.5 bg-gradient-to-r from-cyan-600 to-teal-600 hover:brightness-110 text-white font-black text-[8.5px] uppercase rounded-lg shadow-[0_0_10px_rgba(6,182,212,0.3)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
                       >
-                        <ShoppingBag className="w-3.5 h-3.5" /> COMPRAR AHORA
+                        <ShoppingBag className="w-3.5 h-3.5" /> {t('market.card.buy_now')}
                       </button>
                     )}
                   </div>
@@ -620,11 +623,11 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5 max-h-[440px] overflow-y-auto pr-1.5 custom-scrollbar">
               {(inventoryLoading || isLocalLoading) ? (
                 <div className="col-span-full p-12 text-center text-cyan-500 text-[10px] uppercase tracking-widest bg-[#05070a] border border-cyan-500/10 rounded-xl">
-                  ESCANEAR ACTIVOS DEL JUGADOR...
+                  {t('market.scanning_assets')}
                 </div>
               ) : filteredMyInventory.length === 0 ? (
                 <div className="col-span-full p-12 text-center text-zinc-500 text-[10px] uppercase tracking-widest bg-[#05070a] border border-cyan-500/10 rounded-xl">
-                  NO TIENES ACTIVOS DISPONIBLES EN ESTA CATEGORÍA
+                  {t('market.no_assets_category')}
                 </div>
               ) : (
                 filteredMyInventory.map((item) => (
@@ -638,16 +641,16 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                   >
                     <div className="flex justify-between items-center border-b border-cyan-950 pb-2">
                       {item.is_in_flight ? (
-                        <span className="px-2 py-0.5 rounded text-[7px] font-black uppercase bg-red-950/80 text-red-400 border border-red-800 flex items-center gap-1">
-                          <Lock className="w-3 h-3 text-red-400" /> EN VUELO
+                        <span className="px-2 py-0.5 rounded text-[7px] font-black uppercase bg-red-950/80 text-red-400 border border-red-800 flex items-center gap-1" title={t('market.card.status_in_flight')}>
+                          <Lock className="w-3 h-3 text-red-400" /> {t('market.card.status_in_flight')}
                         </span>
                       ) : item.is_locked ? (
                         <span className="px-2 py-0.5 rounded text-[7px] font-black uppercase bg-purple-950/80 text-purple-400 border border-purple-800 flex items-center gap-1">
-                          <Lock className="w-3 h-3 text-purple-400" /> PUBLICADO
+                          <Lock className="w-3 h-3 text-purple-400" /> {t('market.card.status_listed')}
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded text-[7px] font-black uppercase bg-emerald-950/80 text-emerald-400 border border-emerald-800 flex items-center gap-1">
-                          <Unlock className="w-3 h-3 text-emerald-400" /> DISPONIBLE
+                          <Unlock className="w-3 h-3 text-emerald-400" /> {t('market.card.status_available')}
                         </span>
                       )}
 
@@ -669,7 +672,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
                     {item.is_locked ? (
                       <div className="bg-black/80 border border-zinc-800 p-2 rounded-lg text-center text-[8px] text-zinc-500 font-bold uppercase">
-                        {item.is_in_flight ? "ACTIVO EN MISIÓN - NO REUTILIZABLE" : "PUBLICACIÓN ACTIVA EN EL MERCADO"}
+                        {item.is_in_flight ? t('market.card.active_mission') : t('market.card.active_listing')}
                       </div>
                     ) : (
                       <button
@@ -680,7 +683,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                         }}
                         className="w-full py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-black text-[8.5px] uppercase rounded-lg shadow-[0_0_10px_rgba(16,185,129,0.3)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
                       >
-                        <PlusCircle className="w-3.5 h-3.5" /> VENDER / SUBASTAR
+                        <PlusCircle className="w-3.5 h-3.5" /> {t('market.card.sell_auction')}
                       </button>
                     )}
                   </div>
@@ -703,7 +706,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                   <div className="flex items-center gap-2">
                     <PlusCircle className="w-4 h-4 text-cyan-400" />
                     <h3 className="text-xs font-black text-white uppercase tracking-widest">
-                      CONFIGURAR COMERCIALIZACIÓN
+                      {t('market.modal.configure_title')}
                     </h3>
                   </div>
                   <button
@@ -724,7 +727,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                         : 'text-zinc-500 border-transparent hover:text-zinc-300'
                     }`}
                   >
-                    <ShoppingBag className="w-3.5 h-3.5" /> VENTA DIRECTA
+                    <ShoppingBag className="w-3.5 h-3.5" /> {t('market.modal.direct_sale')}
                   </button>
                   <button
                     type="button"
@@ -735,7 +738,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                         : 'text-zinc-500 border-transparent hover:text-zinc-300'
                     }`}
                   >
-                    <Gavel className="w-3.5 h-3.5" /> SUBASTA EN VIVO
+                    <Gavel className="w-3.5 h-3.5" /> {t('market.modal.live_auction')}
                   </button>
                 </div>
 
@@ -743,14 +746,14 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                   <img src={resolveImageUrl(selectedItemToList.image_url)} alt={selectedItemToList.title} className="w-12 h-12 object-contain" />
                   <div className="flex flex-col">
                     <span className="text-[10px] font-bold text-white uppercase">{selectedItemToList.title}</span>
-                    <span className="text-[8px] text-cyan-400 uppercase">CATEGORÍA: {selectedItemToList.category} | RAREZA: {selectedItemToList.rarity}</span>
+                    <span className="text-[8px] text-cyan-400 uppercase">{t('market.modal.category_label')}: {selectedItemToList.category} | {t('market.modal.rarity_label')}: {selectedItemToList.rarity}</span>
                   </div>
                 </div>
 
                 <form onSubmit={handleConfirmPublish} className="flex flex-col gap-3 text-[9px]">
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-1 text-zinc-400 font-bold uppercase">
-                      <span>{sellIsAuction ? 'PRECIO DE SALIDA / PUJA INICIAL' : 'PRECIO DE VENTA DIRECTA'} EN</span>
+                      <span>{sellIsAuction ? t('market.modal.price_auction') : t('market.modal.price_direct')} {t('market.modal.price_in')}</span>
                       <img src={GD_COIN_ASSET} alt="GD Coin" className="w-3.5 h-3.5 object-contain" />
                     </div>
                     <input
@@ -763,7 +766,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
                   {sellIsAuction && (
                     <div className="flex flex-col gap-1">
-                      <label className="text-zinc-400 font-bold uppercase">DURACIÓN DE LA SUBASTA</label>
+                      <label className="text-zinc-400 font-bold uppercase">{t('market.modal.auction_duration')}</label>
                       <div className="grid grid-cols-3 gap-2">
                         {(['12h', '24h', '48h'] as const).map((dur) => (
                           <button
@@ -784,10 +787,10 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                   )}
 
                   <div className="flex flex-col gap-1">
-                    <label className="text-zinc-400 font-bold uppercase">DESCRIPCIÓN DE OFERTA</label>
+                    <label className="text-zinc-400 font-bold uppercase">{t('market.modal.offer_description')}</label>
                     <textarea
                       rows={2}
-                      placeholder="Detalla las especificaciones tácticas de tu oferta..."
+                      placeholder={t('market.modal.offer_placeholder')}
                       value={sellDescription}
                       onChange={(e) => setSellDescription(e.target.value)}
                       className="bg-black border border-cyan-950 focus:border-cyan-500 rounded-lg p-2 text-cyan-200 outline-none font-sans text-[9px]"
@@ -803,7 +806,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                     }`}
                   >
                     <Lock className="w-3.5 h-3.5" />
-                    {sellIsAuction ? 'CONFIRMAR Y PUBLICAR SUBASTA' : 'CONFIRMAR Y PUBLICAR VENTA DIRECTA'}
+                    {sellIsAuction ? t('market.modal.publish_auction') : t('market.modal.publish_direct')}
                   </button>
                 </form>
               </motion.div>

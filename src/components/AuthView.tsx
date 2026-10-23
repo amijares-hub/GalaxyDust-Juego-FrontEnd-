@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, AlertCircle, RefreshCw, ShieldCheck, KeyRound, Calendar, CheckSquare, Square, MailCheck, ArrowRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { GalaxyFrame } from './CanView';
 
 export const AuthView: React.FC = () => {
+  const { t, i18n } = useTranslation();
+  const currentLang = (i18n.language || 'es').startsWith('en') ? 'en' : 'es';
+
   const {
     screen,
     state,
@@ -198,7 +202,40 @@ export const AuthView: React.FC = () => {
             alt="GalaxyDust Logo"
             className="h-6 sm:h-10 w-auto mb-0.5 sm:mb-1 object-contain drop-shadow-[0_0_15px_rgba(6,182,212,0.8)]"
           />
-          <h1 className="text-xs sm:text-base font-black uppercase tracking-[0.3em] text-white">GALAXYDUST</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xs sm:text-base font-black uppercase tracking-[0.3em] text-white">GALAXYDUST</h1>
+            <div className="flex items-center border border-cyan-500/40 bg-black/70 rounded px-1 py-0.5 text-[7px] sm:text-[8px] font-mono font-bold tracking-wider">
+              <button
+                type="button"
+                onClick={() => {
+                  i18n.changeLanguage('es');
+                  try { localStorage.setItem('gd_preferred_language', 'es'); } catch {}
+                }}
+                className={`px-1 py-0.2 rounded transition-all cursor-pointer ${
+                  currentLang === 'es'
+                    ? 'bg-cyan-500/30 text-cyan-300 font-black shadow-[0_0_6px_rgba(34,211,238,0.5)]'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                ES
+              </button>
+              <span className="text-cyan-500/40 px-0.5 select-none">|</span>
+              <button
+                type="button"
+                onClick={() => {
+                  i18n.changeLanguage('en');
+                  try { localStorage.setItem('gd_preferred_language', 'en'); } catch {}
+                }}
+                className={`px-1 py-0.2 rounded transition-all cursor-pointer ${
+                  currentLang === 'en'
+                    ? 'bg-cyan-500/30 text-cyan-300 font-black shadow-[0_0_6px_rgba(34,211,238,0.5)]'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                EN
+              </button>
+            </div>
+          </div>
         </div>
 
         <GalaxyFrame className="w-full rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(86dvh-3.5rem)]" innerPadding="p-2.5 sm:p-4">
@@ -260,7 +297,7 @@ export const AuthView: React.FC = () => {
                       onClick={() => handleTabChange('login')}
                       className={`w-full pb-1.5 text-[9.5px] sm:text-[10px] font-bold uppercase tracking-widest transition-colors cursor-pointer ${activeTab === 'login' ? 'text-cyan-400' : 'text-white/40 hover:text-white/70'}`}
                     >
-                      Iniciar Sesión
+                      {t('auth.login_tab')}
                     </button>
                   </div>
                   <div className="flex-1 text-center">
@@ -270,7 +307,7 @@ export const AuthView: React.FC = () => {
                       onClick={() => handleTabChange('register')}
                       className={`w-full pb-1.5 text-[9.5px] sm:text-[10px] font-bold uppercase tracking-widest transition-colors cursor-pointer ${activeTab === 'register' ? 'text-cyan-400' : 'text-white/40 hover:text-white/70'}`}
                     >
-                      Registro
+                      {t('auth.register_tab')}
                     </button>
                   </div>
                   <motion.div
@@ -283,7 +320,7 @@ export const AuthView: React.FC = () => {
 
                 <form onSubmit={handleFormSubmit} className="flex flex-col gap-2.5 text-left">
                   <div className="flex flex-col gap-0.5">
-                    <label className="text-[8.5px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium ml-1">Correo Electrónico</label>
+                    <label className="text-[8.5px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium ml-1">{t('auth.email_label')}</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"><Mail className="w-3.5 h-3.5" /></span>
                       <input
@@ -292,13 +329,13 @@ export const AuthView: React.FC = () => {
                         onChange={(e) => setEmail(e.target.value)} 
                         disabled={loading}
                         className="w-full bg-[#1A1C20] border border-white/5 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-white/20 focus:border-cyan-500/50 focus:bg-[#1C1E22] outline-none transition-all disabled:opacity-50"
-                        placeholder="comandante@galaxydust.io"
+                        placeholder={t('auth.email_placeholder')}
                       />
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-0.5">
-                    <label className="text-[8.5px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium ml-1">Clave de Seguridad</label>
+                    <label className="text-[8.5px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium ml-1">{t('auth.password_label')}</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"><Lock className="w-3.5 h-3.5" /></span>
                       <input
@@ -387,7 +424,7 @@ export const AuthView: React.FC = () => {
                         ) : (
                           <Square className="w-3.5 h-3.5 text-white/20" />
                         )}
-                        <span>RECUÉRDAME (MÁXIMO 7 DÍAS)</span>
+                        <span>{t('auth.remember_me')}</span>
                       </button>
                     </div>
                   )}
@@ -411,7 +448,7 @@ export const AuthView: React.FC = () => {
                     disabled={loading}
                     className="mt-1 w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold uppercase tracking-[0.15em] text-xs rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all active:scale-[0.98] disabled:opacity-70 flex items-center justify-center cursor-pointer"
                   >
-                    {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : (activeTab === 'login' ? 'INICIAR SESIÓN' : 'REGISTRAR FIRMA')}
+                    {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : (activeTab === 'login' ? t('auth.submit_login') : t('auth.submit_register'))}
                   </button>
                 </form>
               </motion.div>

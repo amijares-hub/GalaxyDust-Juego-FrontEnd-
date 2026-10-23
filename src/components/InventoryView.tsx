@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
@@ -164,6 +165,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 }) => {
   const { items: characters, loading: isLoading, error: loadError, refreshInventory, toggleFavorite: toggleFav } = useInventory();
   const { playSfx } = useAudioEngine();
+  const { t } = useTranslation();
 
   const [activeSidebarCategory, setActiveSidebarCategory] = useState<string>("All");
 
@@ -284,14 +286,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </button>
             <div className="text-left">
               <h2 className="text-base font-bold tracking-widest text-[#e8f1f5] uppercase font-sans">
-                INVENTORY
+                {t('inventory.title')}
               </h2>
             </div>
           </div>
 
           <div id="inventory-gal-power" className="flex items-center gap-3">
             <div className="bg-[#0b1016]/80 border border-cyan-600/30 rounded-xl px-3 py-1 flex flex-col items-center">
-              <span className="text-[7px] font-mono tracking-widest text-zinc-400 uppercase">GALACTIC POWER</span>
+              <span className="text-[7px] font-mono tracking-widest text-zinc-400 uppercase">{t('inventory.galactic_power')}</span>
               <span className="text-xs font-black text-emerald-400 tracking-wider">{playerPower.toLocaleString()} POW</span>
             </div>
           </div>
@@ -354,7 +356,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 {modsEnabled && <div className="w-1.5 h-1.5 bg-red-500 shadow-[0_0_8px_#ef4444]" />}
               </div>
               <span className={`text-[8px] font-mono tracking-widest uppercase ${modsEnabled ? 'text-red-400 font-bold' : 'text-zinc-300'}`}>
-                FLOTAS EN VUELO
+                {t('inventory.in_flight_filter')}
               </span>
             </button>
           </div>
@@ -363,7 +365,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <Search className="absolute left-2 top-1.5 w-3 h-3 text-cyan-500" />
             <input
               type="text"
-              placeholder="BUSCAR COMPAÑERO..."
+              placeholder={t('inventory.search_placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-black border border-cyan-900/60 rounded-lg pl-6 pr-2 py-0.5 text-[7.5px] font-mono tracking-wider text-cyan-100 placeholder-zinc-600 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-500/20 uppercase"
@@ -409,7 +411,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <>
                 <div className="flex items-center justify-between px-1 shrink-0">
                   <span className="text-[8px] font-mono text-cyan-400 uppercase tracking-widest">
-                    Compañeros Filtrados: {getFilteredCharacters.length} / {characters.length}
+                    {t('inventory.filtered_count')}: {getFilteredCharacters.length} / {characters.length}
                   </span>
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 </div>
@@ -421,14 +423,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   {isLoading ? (
                     <div className="col-span-2 md:col-span-5 flex flex-col items-center justify-center h-full gap-2.5 text-cyan-500 py-12">
                       <div className="w-7 h-7 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
-                      <span className="text-[8.5px] font-mono tracking-widest uppercase animate-pulse">ESTABLECIENDO ENLACE CON DATA CENTER...</span>
+                      <span className="text-[8.5px] font-mono tracking-widest uppercase animate-pulse">{t('inventory.loading')}</span>
                     </div>
                   ) : getFilteredCharacters.length === 0 ? (
                     <div className="col-span-2 md:col-span-5 flex items-center justify-center h-full text-zinc-500 text-[9px] font-mono uppercase tracking-widest py-12">
                       {loadError ? (
                         <span className="text-red-500 font-bold">{loadError}</span>
                       ) : (
-                        modsEnabled ? "NO HAY NAVES EN VUELO REGISTRADAS" : "NO HAY ACTIVOS DISPONIBLES EN ESTE SECTOR"
+                        modsEnabled ? t('inventory.empty_no_flight') : t('inventory.empty_no_assets')
                       )}
                     </div>
                   ) : (
@@ -525,7 +527,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         {getItemCategory(selectedChar).toUpperCase()} ASSET
                       </span>
                       <button onClick={(e) => handleToggleFavorite(selectedChar, e)} className="text-amber-400 hover:scale-110 transition-transform font-mono text-[9px] font-bold cursor-pointer">
-                        {selectedChar.favorite ? "★ FAVORITO" : "☆ FAVORITO"}
+                        {selectedChar.favorite ? t('inventory.detail.favorited') : t('inventory.detail.not_favorited')}
                       </button>
                     </div>
                     <h3 className="text-md font-black text-white tracking-widest mt-1 uppercase">{selectedChar.name}</h3>
@@ -538,7 +540,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     <div className="flex items-center gap-2">
                       <Lock className="w-4 h-4 text-red-400 animate-pulse shrink-0" />
                       <span className="font-bold uppercase tracking-wider">
-                        ACTIVO EN VUELO EN ESPACIO EXTERIOR. RESTRICCIÓN TÁCTICA DE EQUIPAMIENTO ACTIVA.
+                        {t('inventory.detail.in_flight_warning')}
                       </span>
                     </div>
                   </div>
@@ -546,9 +548,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                 {showSubModal === "fleet" ? (
                   <div className="relative z-10 space-y-4">
-                    <h4 className="text-[10px] text-cyan-400 font-mono tracking-widest uppercase border-b border-cyan-900/50 pb-2">Seleccionar Flota Operativa</h4>
+                    <h4 className="text-[10px] text-cyan-400 font-mono tracking-widest uppercase border-b border-cyan-900/50 pb-2">{t('inventory.detail.select_fleet')}</h4>
                     {fleets.length === 0 ? (
-                      <div className="text-[9px] text-zinc-500 font-mono uppercase py-8 text-center bg-black/40 rounded-xl border border-cyan-950">No hay flotas activas en este sector.</div>
+                      <div className="text-[9px] text-zinc-500 font-mono uppercase py-8 text-center bg-black/40 rounded-xl border border-cyan-950">{t('inventory.detail.no_fleets')}</div>
                     ) : (
                       <Scroller overflow="x" withButtons className="pb-2" gap="gap-3">
                         {fleets.map(f => (
@@ -595,14 +597,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                     <div className="md:col-span-8 flex flex-col justify-start gap-2.5 max-h-[340px] overflow-y-auto pr-2 custom-scrollbar">
                       <div className="bg-black/50 border border-cyan-950 p-2.5 rounded-xl">
-                        <span className="text-[7.5px] font-mono tracking-widest text-cyan-400 font-bold uppercase block mb-1">// DESCRIPCIÓN DEL ACTIVO</span>
+                        <span className="text-[7.5px] font-mono tracking-widest text-cyan-400 font-bold uppercase block mb-1">{t('inventory.detail.description')}</span>
                         <p className="text-[9px] font-sans text-zinc-300 leading-relaxed uppercase">{selectedChar.description || "Sin descripción disponible."}</p>
                       </div>
 
                       {getItemCategory(selectedChar) === 'Spaceships' ? (
                         <>
                           <div className="bg-black/40 border border-red-900/40 p-2.5 rounded-xl">
-                            <span className="text-[7.5px] text-red-400 font-bold tracking-widest uppercase block mb-1.5 border-b border-red-900/30 pb-1">Matriz Ofensiva</span>
+                            <span className="text-[7.5px] text-red-400 font-bold tracking-widest uppercase block mb-1.5 border-b border-red-900/30 pb-1">{t('inventory.detail.offensive_matrix')}</span>
                             <div className="grid grid-cols-2 gap-2 font-mono text-[8.5px]">
                               <div className="bg-black/60 border border-red-950/50 p-1.5 rounded-lg flex justify-between">
                                 <span className="text-zinc-500 text-[7px]">Kinetic Attack</span>
@@ -628,7 +630,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           </div>
 
                           <div className="bg-black/40 border border-cyan-900/40 p-2.5 rounded-xl">
-                            <span className="text-[7.5px] text-cyan-400 font-bold tracking-widest uppercase block mb-1.5 border-b border-cyan-900/30 pb-1">Blindaje y Cinemática</span>
+                            <span className="text-[7.5px] text-cyan-400 font-bold tracking-widest uppercase block mb-1.5 border-b border-cyan-900/30 pb-1">{t('inventory.detail.armor_cinematic')}</span>
                             <div className="grid grid-cols-2 gap-2 font-mono text-[8.5px]">
                               <div className="bg-black/60 border border-cyan-950/50 p-1.5 rounded-lg flex justify-between">
                                 <span className="text-zinc-500 text-[7px]">Hit Points</span>
@@ -651,7 +653,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         </>
                       ) : (
                         <div className="bg-black/40 border border-amber-900/40 p-2.5 rounded-xl font-mono text-[8.5px]">
-                          <span className="text-[7.5px] text-amber-400 font-bold tracking-widest uppercase block mb-1.5 border-b border-amber-900/30 pb-1">Ficha Táctica de Módulo</span>
+                          <span className="text-[7.5px] text-amber-400 font-bold tracking-widest uppercase block mb-1.5 border-b border-amber-900/30 pb-1">{t('inventory.detail.module_card')}</span>
                           <div className="grid grid-cols-2 gap-2">
                             <div className="bg-black/60 border border-amber-950/50 p-1.5 rounded-lg flex flex-col">
                               <span className="text-zinc-500 text-[7px]">Power Score</span>
@@ -716,7 +718,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   </div>
 
                   <Button variant="secondary" size="sm" onClick={() => setSelectedChar(null)} className="text-[8.5px] font-mono font-bold uppercase cursor-pointer">
-                    [CERRAR]
+                    {t('inventory.detail.close_btn')}
                   </Button>
                 </div>
               </motion.div>
@@ -738,7 +740,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
                     <h3 className="text-xs font-black text-white uppercase tracking-widest">
-                      ANÁLISIS DE HABILIDADES
+                      {t('inventory.detail.skills_title')}
                     </h3>
                   </div>
                   <button
@@ -760,10 +762,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <div className="flex flex-col items-center justify-center p-6 bg-black/80 rounded-xl border border-purple-900/50 relative overflow-hidden">
                     <Lock className="w-8 h-8 text-purple-400 mb-2 opacity-80" />
                     <span className="text-[12px] font-black text-purple-300 tracking-widest uppercase">
-                      [ SKILLS COMING SOON ]
+                      {t('inventory.detail.skills_coming_soon')}
                     </span>
                     <p className="text-[8px] text-zinc-500 mt-2 text-center uppercase">
-                      El módulo de habilidades avanzadas de combate y recolección está en desarrollo activo.
+                      {t('inventory.detail.skills_wip')}
                     </p>
                   </div>
                 </div>
@@ -773,7 +775,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     onClick={() => setShowSkillsPopup(false)}
                     className="w-full py-1.5 bg-purple-950 hover:bg-purple-900 border border-purple-500/50 text-purple-200 text-[9px] font-black uppercase rounded-xl transition-all cursor-pointer text-center"
                   >
-                    ACEPTAR
+                    {t('inventory.detail.accept')}
                   </button>
                 </div>
               </motion.div>

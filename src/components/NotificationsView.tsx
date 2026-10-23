@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
@@ -79,6 +80,7 @@ export const NotificationsView: React.FC<{
   triggerNotification?: (text: string, e?: any) => void;
   onBack: () => void;
 }> = ({ triggerNotification, onBack }) => {
+  const { t } = useTranslation();
   const {
     notifications,
     loading: isLoading,
@@ -206,9 +208,9 @@ export const NotificationsView: React.FC<{
             </button>
             <div className="text-left">
               <h2 className="text-lg font-bold tracking-widest text-[#e8f1f5] uppercase font-sans flex items-center gap-2">
-                COMUNICADOS OFICIALES
+                {t('notifications.title')}
                 <span className="text-[8px] bg-cyan-950 font-mono text-cyan-300 px-2 py-0.5 rounded-full border border-cyan-500/40">
-                  TAC-NET FEED
+                  {t('notifications.feed_badge')}
                 </span>
               </h2>
             </div>
@@ -221,7 +223,7 @@ export const NotificationsView: React.FC<{
                 className="px-3 py-1.5 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 rounded-xl text-[8.5px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-md"
               >
                 <CheckCheck className="w-3.5 h-3.5 text-cyan-400" />
-                Marcar todo leído ({unreadComunicadosCount})
+                {t('notifications.mark_all_read')} ({unreadComunicadosCount})
               </button>
             )}
 
@@ -231,7 +233,7 @@ export const NotificationsView: React.FC<{
                 className="px-3 py-1.5 bg-red-950/80 hover:bg-red-900 border border-red-500/50 text-red-300 hover:text-white rounded-xl text-[8.5px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-md"
               >
                 <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                Eliminar todo
+                {t('notifications.delete_all')}
               </button>
             )}
           </div>
@@ -241,12 +243,12 @@ export const NotificationsView: React.FC<{
         <div className="flex flex-wrap items-center justify-between gap-2 bg-[#0a0f14]/85 border border-cyan-900/35 px-3 py-1.5 rounded-xl mb-2.5 shrink-0 font-mono text-[8.5px]">
           <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar">
             {[
-              { id: "ALL", label: "TODOS" },
-              { id: "EXPEDITION", label: "EXPEDICIONES" },
-              { id: "MARKET", label: "MERCADO / PHANTOM" },
-              { id: "SOCIAL", label: "SOLICITUDES" },
-              { id: "DISCOVERY", label: "MAPEO SS" },
-              { id: "DESTRUCTION", label: "DESTRUCCIÓN" }
+              { id: "ALL", label: t('notifications.tabs.all') },
+              { id: "EXPEDITION", label: t('notifications.tabs.expedition') },
+              { id: "MARKET", label: t('notifications.tabs.market') },
+              { id: "SOCIAL", label: t('notifications.tabs.social') },
+              { id: "DISCOVERY", label: t('notifications.tabs.discovery') },
+              { id: "DESTRUCTION", label: t('notifications.tabs.destruction') }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -269,7 +271,7 @@ export const NotificationsView: React.FC<{
                 filterRead === "ALL" ? "text-cyan-400 font-bold" : "text-zinc-500 hover:text-zinc-300"
               }`}
             >
-              Ver Todas
+              {t('notifications.view_all')}
             </button>
             <span className="text-zinc-700">|</span>
             <button
@@ -278,7 +280,7 @@ export const NotificationsView: React.FC<{
                 filterRead === "UNREAD" ? "text-amber-400 font-bold" : "text-zinc-500 hover:text-zinc-300"
               }`}
             >
-              No Leídas
+              {t('notifications.unread')}
               {unreadComunicadosCount > 0 && (
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
               )}
@@ -292,13 +294,13 @@ export const NotificationsView: React.FC<{
             <div className="flex flex-col items-center justify-center h-full gap-3 text-cyan-500 py-16">
               <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
               <span className="text-[9px] font-mono tracking-widest uppercase animate-pulse">
-                SINCRO DE COMUNICADOS TÁCTICOS...
+                {t('notifications.loading')}
               </span>
             </div>
           ) : filteredNotifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-2 text-zinc-500 text-[9.5px] font-mono uppercase tracking-widest py-16">
               <Bell className="w-8 h-8 text-zinc-700 mb-1" />
-              <span>NO HAY COMUNICADOS OFICIALES REGISTRADOS</span>
+              <span>{t('notifications.empty')}</span>
             </div>
           ) : (
             filteredNotifications.map((n) => (
@@ -405,7 +407,7 @@ export const NotificationsView: React.FC<{
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-red-400 animate-pulse" />
                       <span className="text-[10px] font-black text-red-400 uppercase tracking-widest">
-                        SISTEMA DE ALERTA C.A.N.
+                        {t('notifications.modal_alert')}
                       </span>
                     </div>
                     <button
@@ -422,10 +424,10 @@ export const NotificationsView: React.FC<{
 
                   <div className="space-y-1">
                     <h3 className="text-sm font-black text-white uppercase tracking-widest">
-                      ¿PURGAR TODOS LOS COMUNICADOS?
+                      {t('notifications.modal_title')}
                     </h3>
                     <p className="text-[9.5px] text-zinc-300 leading-relaxed font-sans normal-case bg-black/60 p-3 rounded-xl border border-red-950/80">
-                      Esta acción eliminará de forma permanente <strong className="text-red-400">todos los comunicados</strong> registrados en tu canal. Esta operación no se puede revertir.
+                      {t('notifications.modal_desc')}
                     </p>
                   </div>
 
@@ -434,13 +436,13 @@ export const NotificationsView: React.FC<{
                       onClick={handleConfirmDeleteAll}
                       className="py-2.5 bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white text-[9px] font-black uppercase rounded-lg border border-red-400 shadow-[0_0_12px_rgba(239,68,68,0.4)] cursor-pointer active:scale-95 transition-all"
                     >
-                      CONFIRMAR PURGA
+                      {t('notifications.confirm_purge')}
                     </button>
                     <button
                       onClick={() => setShowDeleteConfirmModal(false)}
                       className="py-2.5 bg-black border border-zinc-800 text-zinc-400 hover:border-zinc-700 text-[9px] font-bold uppercase rounded-lg hover:text-white cursor-pointer transition-all"
                     >
-                      CANCELAR
+                      {t('notifications.cancel')}
                     </button>
                   </div>
                 </div>

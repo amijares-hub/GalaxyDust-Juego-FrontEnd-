@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, Settings, X, Bell, Lock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { ExpeditionsView } from '../components/ExpeditionsView';
 import { MarketplaceView } from '../components/MarketplaceView';
@@ -90,38 +91,40 @@ const addNotifiedExpeditionId = (userId: string, expId: string) => {
   }
 };
 
-const cards: SectorCard[] = [
-  { 
-    id: "expedition", 
-    title: "EXPEDITION", 
-    description: "Venture into the unknown, explore, farm, and dominate the galaxy.", 
-    imageSrc: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20(Ambientes%20)/13.jpg", 
-    targetWindow: "expeditions" 
-  },
-  { 
-    id: "alliance", 
-    title: "ALLIANCE", 
-    description: "Coordinate your power. Expand your dominion.", 
-    imageSrc: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20(Ambientes%20)/Alliance%20depot.jpg", 
-    targetWindow: "alliance" 
-  },
-  { 
-    id: "market", 
-    title: "MARKET", 
-    description: "Acquire cargo bundles, speedups, and imperial fleet supplies.", 
-    imageSrc: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20(Ambientes%20)/17.jpg", 
-    targetTab: "marketplace" 
-  },
-  { 
-    id: "phantom", 
-    title: "PHANTOM STATION", 
-    description: "Exchange void crystals, blueprints, and rare synaptic upgrades.", 
-    imageSrc: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Phatom%20Station/Skin%20Original/image%20(18).png", 
-    targetTab: "phantom" 
-  }
-];
-
 export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
+  const { t } = useTranslation();
+
+  const cards: SectorCard[] = useMemo(() => [
+    { 
+      id: "expedition", 
+      title: t('hub.expedition_title'), 
+      description: t('hub.expedition_desc'), 
+      imageSrc: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20(Ambientes%20)/13.jpg", 
+      targetWindow: "expeditions" 
+    },
+    { 
+      id: "alliance", 
+      title: t('hub.alliance_title'), 
+      description: t('hub.alliance_desc'), 
+      imageSrc: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20(Ambientes%20)/Alliance%20depot.jpg", 
+      targetWindow: "alliance" 
+    },
+    { 
+      id: "market", 
+      title: t('hub.market_title'), 
+      description: t('hub.market_desc'), 
+      imageSrc: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20(Ambientes%20)/17.jpg", 
+      targetTab: "marketplace" 
+    },
+    { 
+      id: "phantom", 
+      title: t('hub.phantom_title'), 
+      description: t('hub.phantom_desc'), 
+      imageSrc: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Phatom%20Station/Skin%20Original/image%20(18).png", 
+      targetTab: "phantom" 
+    }
+  ], [t]);
+
   const [activeTab, setActiveTab] = useState<"home" | "marketplace" | "phantom" | "can" | "inventory" | "mission">("home");
   const [activeWindow, setActiveWindow] = useState<"home" | "expeditions" | "alliance" | "profile" | "settings">("home");
 
@@ -619,7 +622,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                               {!isLocked && (
                                 <div className="mt-2 flex items-center gap-1 text-cyan-400 group-hover:text-cyan-200 transition-colors">
                                   <div className="h-[1px] flex-1 bg-cyan-500/40 group-hover:bg-cyan-400/70 transition-colors" />
-                                  <span className="text-[6.5px] sm:text-[7.5px] font-black uppercase tracking-widest">ACCEDER</span>
+                                  <span className="text-[6.5px] sm:text-[7.5px] font-black uppercase tracking-widest">{t('hub.access')}</span>
                                   <div className="h-[1px] w-3 bg-cyan-500/40 group-hover:bg-cyan-400/70 transition-colors" />
                                 </div>
                               )}
@@ -636,7 +639,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                                 className="bg-black/90 border border-cyan-500/40 rounded-lg px-3 py-2 flex flex-col items-center gap-1.5 shadow-[0_0_20px_rgba(6,182,212,0.25)] backdrop-blur-md"
                               >
                                 <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
-                                <span className="text-[7.5px] sm:text-[8.5px] font-black text-cyan-300 tracking-widest uppercase">COMING SOON</span>
+                                <span className="text-[7.5px] sm:text-[8.5px] font-black text-cyan-300 tracking-widest uppercase">{t('hub.coming_soon')}</span>
                               </motion.div>
                             </div>
                           )}

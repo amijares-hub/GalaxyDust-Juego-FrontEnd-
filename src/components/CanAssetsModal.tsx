@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, ShieldAlert, Sparkles, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { GalaxyFrame } from './CanView';
@@ -34,6 +35,7 @@ export const CanAssetsModal: React.FC<CanAssetsModalProps> = ({
   onRefresh,
   triggerNotification
 }) => {
+  const { t } = useTranslation();
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   if (!isOpen || !category) return null;
@@ -105,7 +107,7 @@ export const CanAssetsModal: React.FC<CanAssetsModalProps> = ({
           <div className="flex items-center gap-2 sm:gap-3">
             <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400 animate-pulse shrink-0" />
             <h2 className="text-xs sm:text-sm font-black text-white uppercase tracking-widest truncate">
-              GESTIÓN DE {category.toUpperCase()} ({activeCount} / {filteredAssets.length} ACTIVOS)
+              {t('can.assets_modal.manage_title', { category: category.toUpperCase(), active: activeCount, total: filteredAssets.length })}
             </h2>
           </div>
           <button
@@ -120,7 +122,7 @@ export const CanAssetsModal: React.FC<CanAssetsModalProps> = ({
         <div className="p-2 sm:p-4 flex-1 min-h-0 overflow-x-hidden overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 custom-scrollbar">
           {filteredAssets.length === 0 ? (
             <div className="col-span-full py-12 text-center text-zinc-500 text-xs uppercase tracking-widest">
-              NO DISPONER DE {category.toUpperCase()} EN TU INVENTARIO C.A.N.
+              {t('can.assets_modal.empty', { category: category.toUpperCase() })}
             </div>
           ) : (
             filteredAssets.map((asset) => {
@@ -149,10 +151,10 @@ export const CanAssetsModal: React.FC<CanAssetsModalProps> = ({
                     </div>
                     <div className="flex flex-col text-left overflow-hidden">
                       <span className="text-[9px] sm:text-[10px] font-black text-white uppercase truncate">
-                        {asset.name} {asset.level ? `(NIVEL ${asset.level})` : ''}
+                        {asset.name} {asset.level ? `(${t('can.assets_modal.level')} ${asset.level})` : ''}
                       </span>
                       <span className="text-[7.5px] sm:text-[8px] text-cyan-400 font-mono">
-                        EFECTO: +{asset.effect_bonus || 0}%
+                        {t('can.assets_modal.effect')}: +{asset.effect_bonus || 0}%
                       </span>
                     </div>
                   </div>
@@ -166,7 +168,7 @@ export const CanAssetsModal: React.FC<CanAssetsModalProps> = ({
                         : 'bg-emerald-950/80 text-emerald-300 border-emerald-800 hover:bg-emerald-900'
                     }`}
                   >
-                    {isLoading ? '...' : asset.is_equipped ? 'DESEQUIPAR' : 'EQUIPAR'}
+                    {isLoading ? '...' : asset.is_equipped ? t('can.assets_modal.unequip') : t('can.assets_modal.equip')}
                   </button>
                 </div>
               );
@@ -178,13 +180,13 @@ export const CanAssetsModal: React.FC<CanAssetsModalProps> = ({
         <div className="bg-[#05070a] border-t border-cyan-950 p-2.5 sm:p-3 flex justify-between items-center text-[7.5px] sm:text-[8.5px] text-zinc-400 shrink-0">
           <span className="flex items-center gap-1">
             <ShieldAlert className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400 shrink-0" />
-            <span className="truncate">LOS CAMBIOS APLICAN AL INSTANTE</span>
+            <span className="truncate">{t('can.assets_modal.instant_notice')}</span>
           </span>
           <button
             onClick={onClose}
             className="px-3 py-1 sm:px-4 sm:py-1.5 bg-cyan-950 border border-cyan-500/50 hover:border-cyan-400 text-cyan-300 font-bold uppercase rounded-lg cursor-pointer shrink-0 ml-2"
           >
-            CERRAR
+            {t('can.assets_modal.close')}
           </button>
         </div>
 

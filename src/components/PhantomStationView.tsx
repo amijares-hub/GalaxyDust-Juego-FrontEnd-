@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ShoppingBag, Clock, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAudioEngine } from '../hooks/useAudioEngine';
@@ -73,6 +74,7 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
   onBack,
   triggerNotification
 }) => {
+  const { t } = useTranslation();
   const { playSfx } = useAudioEngine();
   const [refreshCountdown, setRefreshCountdown] = useState<string>('03:00:00');
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
@@ -258,23 +260,23 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
                 className="p-1.5 bg-black/80 hover:bg-cyan-950 border border-cyan-500/40 text-cyan-300 rounded-lg transition-all cursor-pointer backdrop-blur-md flex items-center gap-1 text-[8px] font-bold uppercase shadow-lg"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
-                <span>VOLVER</span>
+                <span>{t('phantom.back_btn')}</span>
               </button>
             </div>
 
             <div className="relative z-20 flex flex-col gap-1 mt-auto text-left">
               <h1 className="text-base lg:text-lg font-black text-white uppercase tracking-widest drop-shadow-[0_0_12px_rgba(6,182,212,0.6)]">
-                PHANTOM STATION
+                {t('phantom.title')}
               </h1>
 
               <p className="text-[7.5px] text-zinc-300 font-sans normal-case leading-tight">
-                Estación espacial descentralizada para la adquisición de blueprints, prototipos de combate y tecnología coloidal.
+                {t('phantom.subtitle')}
               </p>
 
               <div className="flex items-center gap-1.5 mt-0.5 bg-black/80 border border-cyan-500/40 px-2 py-0.5 rounded-lg backdrop-blur-md w-fit">
                 <Clock className="w-3 h-3 text-cyan-400 animate-pulse shrink-0" />
                 <div className="flex items-center gap-1 text-[7px] font-mono uppercase">
-                  <span className="text-zinc-400">REFRESCO EN:</span>
+                  <span className="text-zinc-400">{t('phantom.refresh_label')}</span>
                   <span className="text-amber-400 font-black tracking-wider">{refreshCountdown}</span>
                 </div>
               </div>
@@ -286,7 +288,7 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
             {loading ? (
               <div className="flex flex-col items-center justify-center my-auto text-cyan-400 font-mono text-xs gap-2 py-12">
                 <RefreshCw className="animate-spin w-5 h-5" />
-                <span>Conectando con la Estación Phantom...</span>
+                <span>{t('phantom.loading')}</span>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 w-full h-full p-1">
@@ -339,7 +341,7 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
                     </div>
 
                     <div className="bg-[#020305] border border-cyan-950 p-1 rounded flex justify-between items-center text-[7.5px]">
-                      <span className="text-[6.5px] text-zinc-500 uppercase font-bold">PRECIO</span>
+                      <span className="text-[6.5px] text-zinc-500 uppercase font-bold">{t('phantom.price_label')}</span>
                       <div className="flex items-center gap-1">
                         <span className="text-[9.5px] font-black text-cyan-300">
                           {(bp.priceValue || 0).toLocaleString()}
@@ -362,7 +364,7 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
                       ) : (
                         <>
                           <ShoppingBag className="w-3 h-3" />
-                          <span>ADQUIRIR ({(bp.priceValue || 0).toLocaleString()}</span>
+                          <span>{t('phantom.acquire_btn')} ({(bp.priceValue || 0).toLocaleString()}</span>
                           <img
                             src={isGD ? GD_COIN_ASSET : PHANTOM_COIN_ASSET}
                             alt={bp.currencyType}

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Smartphone, RotateCw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface LandscapeGuardProps {
   children: React.ReactNode;
 }
 
 export const LandscapeGuard: React.FC<LandscapeGuardProps> = ({ children }) => {
+  const { t } = useTranslation();
   const [isPortrait, setIsPortrait] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(orientation: portrait)').matches || window.innerHeight > window.innerWidth;
@@ -77,11 +79,11 @@ export const LandscapeGuard: React.FC<LandscapeGuardProps> = ({ children }) => {
           </div>
 
           <h1 className="text-sm sm:text-base md:text-lg font-black tracking-widest text-cyan-400 uppercase mb-2 drop-shadow-[0_0_12px_rgba(6,182,212,0.6)]">
-            ACCESO RESTRINGIDO // ROTACIÓN REQUERIDA
+            {t('system.rotation_required')}
           </h1>
 
           <p className="text-xs text-zinc-400 max-w-sm uppercase leading-relaxed tracking-wider mb-6">
-            Gira tu dispositivo a posición horizontal (Landscape) para calibrar los sistemas tácticos de la nave.
+            {t('system.rotation_hint')}
           </p>
 
           <button

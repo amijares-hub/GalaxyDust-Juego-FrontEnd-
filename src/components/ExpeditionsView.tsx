@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CornerUpLeft, X, Search, Lock, MapPin, Wrench, Bot, FileText, Package, Clock, 
@@ -192,6 +193,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   onBack,
   triggerNotification
 }) => {
+  const { t } = useTranslation();
   const { playSfx } = useAudioEngine();
 
   const [currentStep, setCurrentStep] = useState<SelectionStep>('GC');
@@ -1355,7 +1357,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 className="px-4 py-1.5 bg-gradient-to-r from-amber-600 via-orange-500 to-amber-500 hover:from-amber-500 hover:to-orange-400 disabled:opacity-40 border border-amber-300/80 text-white text-[9.5px] font-black uppercase tracking-widest rounded-lg shadow-[0_0_15px_rgba(245,158,11,0.4)] cursor-pointer transition-all active:scale-95 flex items-center gap-1.5"
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-200 animate-pulse" />
-                <span>CLAIM ALL</span>
+                <span>{t('expeditions.claim_all')}</span>
               </button>
               <button onClick={onBack} className="p-1 text-zinc-400 hover:text-white cursor-pointer"><X className="w-4 h-4" /></button>
             </div>
@@ -1678,7 +1680,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                         >
                           <div className="flex flex-col gap-1.5">
                             <span className="text-[8px] font-black text-amber-400 uppercase tracking-widest flex items-center gap-1">
-                              <Pickaxe className="w-3 h-3 text-amber-400" /> RECURSOS EXTRAÍDOS EN TIEMPO REAL
+                              <Pickaxe className="w-3 h-3 text-amber-400" /> {t('expeditions.realtime_resources')}
                             </span>
                             <div className="grid grid-cols-3 gap-2 font-mono text-[8.5px] text-center">
                               <div className="bg-black/60 border border-cyan-950 p-2 rounded flex flex-col">
@@ -1686,7 +1688,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                                 {canMetal ? (
                                   <span className="text-cyan-300 font-black text-[10px]">+{liveMetal.toLocaleString()}</span>
                                 ) : (
-                                  <span className="text-red-500 font-black text-[7px] uppercase mt-1">NO COMPATIBLE</span>
+                                  <span className="text-red-500 font-black text-[7px] uppercase mt-1">{t('expeditions.not_compatible')}</span>
                                 )}
                               </div>
                               <div className="bg-black/60 border border-cyan-950 p-2 rounded flex flex-col">
@@ -1694,7 +1696,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                                 {canCrystal ? (
                                   <span className="text-purple-300 font-black text-[10px]">+{liveCrystal.toLocaleString()}</span>
                                 ) : (
-                                  <span className="text-red-500 font-black text-[7px] uppercase mt-1">NO COMPATIBLE</span>
+                                  <span className="text-red-500 font-black text-[7px] uppercase mt-1">{t('expeditions.not_compatible')}</span>
                                 )}
                               </div>
                               <div className="bg-black/60 border border-cyan-950 p-2 rounded flex flex-col">
@@ -1702,7 +1704,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                                 {canMineDarkMatter ? (
                                   <span className="text-emerald-400 font-black text-[10px]">+{liveDarkMatter.toLocaleString()}</span>
                                 ) : (
-                                  <span className="text-red-500 font-black text-[7px] uppercase mt-1">NO COMPATIBLE</span>
+                                  <span className="text-red-500 font-black text-[7px] uppercase mt-1">{t('expeditions.not_compatible')}</span>
                                 )}
                               </div>
                             </div>
@@ -1710,12 +1712,12 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
                           <div className="flex flex-col gap-1.5">
                             <span className="text-[8px] font-black text-cyan-400 uppercase tracking-widest flex items-center gap-1">
-                              <Layers className="w-3 h-3 text-cyan-400" /> ACTIVOS Y EQUIPAMIENTO EN FLOTA ({deployedAssets.length})
+                              <Layers className="w-3 h-3 text-cyan-400" /> {t('expeditions.fleet_assets')} ({deployedAssets.length})
                             </span>
 
                             {deployedAssets.length === 0 ? (
                               <span className="text-[7.5px] text-zinc-600 uppercase italic p-2 bg-black/40 rounded">
-                                SIN ACTIVOS DETALLADOS EN REGISTRO
+                                {t('expeditions.no_detailed_assets')}
                               </span>
                             ) : (
                               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
@@ -1754,7 +1756,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
           {isRewardSummaryOpen && currentRewardDrop && (
             <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 font-mono">
               <div className="w-full max-w-sm bg-[#080b0e] border border-cyan-500/40 rounded-xl p-5 text-center space-y-4">
-                <h3 className="text-xs font-black text-white uppercase tracking-widest">BOTÍN RECLAMADO CON ÉXITO</h3>
+                <h3 className="text-xs font-black text-white uppercase tracking-widest">{t('expeditions.loot_claimed')}</h3>
                 <div className="p-3 bg-black/60 border border-cyan-950 rounded-lg text-[9px] text-cyan-300 font-bold">
                   {currentRewardDrop.name}
                 </div>
@@ -1762,7 +1764,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                   onClick={handleAcceptRewardsClose}
                   className="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-[9px] uppercase rounded-lg cursor-pointer"
                 >
-                  ENTENDIDO
+                  {t('expeditions.understood')}
                 </button>
               </div>
             </div>
@@ -2011,9 +2013,9 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                   {currentStep === 'PLANETA' && (
                     dbPlanets.length === 0 ? (
                       <div className="p-3 bg-cyan-950/20 border border-cyan-900/50 rounded-xl text-center space-y-2">
-                        <p className="text-[8px] text-zinc-400 uppercase">Sin planetas registrados en este sistema.</p>
+                        <p className="text-[8px] text-zinc-400 uppercase">{t('expeditions.no_planets')}</p>
                         <button onClick={() => { playSfx(880); setIsAdrift(true); setIsDispatchPanelActive(true); }} className="w-full py-2 bg-gradient-to-r from-cyan-600 to-teal-600 text-white font-black text-[8.5px] uppercase rounded-lg shadow cursor-pointer">
-                          CONFIGURAR FLOTA EN DERIVA
+                          {t('expeditions.config_adrift')}
                         </button>
                       </div>
                     ) : (
@@ -2036,7 +2038,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                               <span className="text-[9.5px] font-extrabold text-white uppercase">{planet.name}</span>
                               <span className="text-[7.5px] bg-cyan-950 text-cyan-400 px-1.5 py-0.5 rounded font-bold uppercase">{planet.type}</span>
                             </div>
-                            <p className="text-[7.5px] text-zinc-400">⏱️ Tiempo: {planet.duration_hours || 2}h | ⚠️ Riesgo: {planet.risk_factor || 15}%</p>
+                            <p className="text-[7.5px] text-zinc-400">⏱️ {t('expeditions.time')}: {planet.duration_hours || 2}h | ⚠️ {t('expeditions.risk')}: {planet.risk_factor || 15}%</p>
                           </div>
                         );
                       })
@@ -2046,7 +2048,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               </div>
 
               <div className="p-2 border-t border-cyan-950 bg-black/60 rounded-lg text-[8.5px] text-zinc-500 font-bold uppercase">
-                <span>RUTA: {formatBreadcrumbText()}</span>
+                <span>{t('expeditions.breadcrumb_route')}: {formatBreadcrumbText()}</span>
               </div>
             </div>
 
@@ -2105,18 +2107,18 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               <div className="mt-auto space-y-2">
                  <div className="bg-[#020508] p-2 rounded-lg border border-cyan-900/50 flex flex-col gap-1 text-[7px] font-mono">
                    <div className="flex items-center justify-between mb-0.5">
-                     <span className="text-cyan-400 font-bold uppercase">Rango Estimado de Extracción:</span>
+                     <span className="text-cyan-400 font-bold uppercase">{t('expeditions.estimated_extraction_range')}</span>
                      {isSoloMetal && (
-                       <span className="text-[6px] bg-amber-950 text-amber-400 border border-amber-800 px-1 py-0.5 rounded font-black uppercase">SOLO METAL</span>
+                       <span className="text-[6px] bg-amber-950 text-amber-400 border border-amber-800 px-1 py-0.5 rounded font-black uppercase">{t('expeditions.metal_only')}</span>
                      )}
                      {isSoloCrystal && (
-                       <span className="text-[6px] bg-purple-950 text-purple-400 border border-purple-800 px-1 py-0.5 rounded font-black uppercase">SOLO CRISTAL</span>
+                       <span className="text-[6px] bg-purple-950 text-purple-400 border border-purple-800 px-1 py-0.5 rounded font-black uppercase">{t('expeditions.crystal_only')}</span>
                      )}
                    </div>
                    <div className="flex justify-between items-center">
                      <span className="text-zinc-400">Metal:</span>
                      {isSoloCrystal ? (
-                       <span className="text-red-500 font-black text-[6px] uppercase tracking-wide">DESACTIVADO POR TOOL</span>
+                       <span className="text-red-500 font-black text-[6px] uppercase tracking-wide">{t('expeditions.disabled_tool')}</span>
                      ) : (
                        <span className="text-cyan-300 font-bold">[{dynamicMiningRanges.minMetal.toLocaleString()} ~ {dynamicMiningRanges.maxMetal.toLocaleString()}]</span>
                      )}
@@ -2124,7 +2126,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                    <div className="flex justify-between items-center">
                      <span className="text-zinc-400">Cristal:</span>
                      {isSoloMetal ? (
-                       <span className="text-red-500 font-black text-[6px] uppercase tracking-wide">DESACTIVADO POR TOOL</span>
+                       <span className="text-red-500 font-black text-[6px] uppercase tracking-wide">{t('expeditions.disabled_tool')}</span>
                      ) : (
                        <span className="text-purple-300 font-bold">[{dynamicMiningRanges.minCrystal.toLocaleString()} ~ {dynamicMiningRanges.maxCrystal.toLocaleString()}]</span>
                      )}
@@ -2135,7 +2137,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                   onClick={handleOpenJourneyModal}
                   className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-teal-600 text-white font-black text-[10px] uppercase rounded-lg border border-cyan-400 shadow-lg cursor-pointer hover:brightness-110 active:scale-95 transition-all"
                 >
-                  {selectedPlanet ? "CONFIRMAR MINADO" : "CONFIRMAR RECONOCIMIENTO"} ({totalExpeditionProbability}%)
+                  {selectedPlanet ? t('expeditions.confirm_mining') : t('expeditions.confirm_recon')} ({totalExpeditionProbability}%)
                 </button>
               </div>
             </div>
@@ -2242,7 +2244,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                           <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
                             <span className="text-[8px] font-black text-white truncate">{asset.name}</span>
                             {isInFlight ? (
-                              <span className="text-[6.5px] text-red-400 font-mono font-black uppercase">EN VUELO</span>
+                              <span className="text-[6.5px] text-red-400 font-mono font-black uppercase">{t('expeditions.in_flight')}</span>
                             ) : effectVal !== 0 ? (
                               <span className={`text-[6.5px] font-mono font-bold ${effectVal > 0 ? 'text-cyan-400' : 'text-red-400'}`}>
                                 {effectVal > 0 ? `+${effectVal.toFixed(1)}%` : `${effectVal.toFixed(1)}%`}
@@ -2261,7 +2263,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               <div className="border border-cyan-500/40 bg-black/60 rounded-xl p-2 flex flex-col gap-1.5 shrink-0">
                 <div className="flex justify-between items-center px-1">
                   <span className="text-[8.5px] font-black text-amber-400 uppercase tracking-wider">
-                    ACTIVOS SELECCIONADOS PARA DESPLIEGUE ({selectedAssets.length + (selectedFleet ? 1 : 0)})
+                    {t('expeditions.selected_assets_title')} ({selectedAssets.length + (selectedFleet ? 1 : 0)})
                   </span>
                   {(selectedAssets.length > 0 || selectedFleet) && (
                     <button
@@ -2272,7 +2274,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                       }}
                       className="text-[7.5px] text-red-400 hover:text-red-300 font-bold uppercase flex items-center gap-1 cursor-pointer"
                     >
-                      <Trash2 className="w-2.5 h-2.5" /> LIMPIAR SELECCIÓN
+                      <Trash2 className="w-2.5 h-2.5" /> {t('expeditions.clean_selection')}
                     </button>
                   )}
                 </div>
@@ -2288,14 +2290,14 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                       </div>
                       <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
                         <span className="text-[8px] font-black text-white truncate">{selectedFleet.name}</span>
-                        <span className="text-[6.5px] text-purple-300 font-mono font-bold">FLOTA EQUIPADA</span>
+                        <span className="text-[6.5px] text-purple-300 font-mono font-bold">{t('expeditions.fleet_equipped')}</span>
                       </div>
                     </div>
                   )}
 
                   {selectedAssets.length === 0 && !selectedFleet ? (
                     <div className="col-span-full py-4 text-center text-zinc-600 text-[8px] uppercase italic">
-                      HAZ CLIC EN LOS ACTIVOS DE ARRIBA PARA AÑADIRLOS A ESTA EXPEDICIÓN
+                      {t('expeditions.click_to_add_hint')}
                     </div>
                   ) : (
                     selectedAssets.map(asset => {
@@ -2333,17 +2335,17 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 <div className="bg-[#020509] border border-cyan-500/30 p-3 rounded-xl flex flex-wrap items-center justify-between gap-3 font-mono mt-3">
                   <div className="flex items-center gap-2 text-xs text-cyan-400 font-black uppercase tracking-widest">
                     <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
-                    <span>ATRIBUTOS COMBINADOS DE FLOTA ({selectedAssets.length})</span>
+                    <span>{t('expeditions.combined_attributes')} ({selectedAssets.length})</span>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 text-[9px] font-bold">
                     <div className="bg-black/70 border border-red-500/40 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
-                      <span className="text-zinc-500 uppercase">⚔️ ATAQUE:</span>
+                      <span className="text-zinc-500 uppercase">⚔️ {t('expeditions.attack')}:</span>
                       <span className="text-red-400 font-black">{fleetStats.attack.toLocaleString()}</span>
                     </div>
 
                     <div className="bg-black/70 border border-blue-500/40 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
-                      <span className="text-zinc-500 uppercase">🛡️ DEFENSA:</span>
+                      <span className="text-zinc-500 uppercase">🛡️ {t('expeditions.defense')}:</span>
                       <span className="text-blue-400 font-black">{fleetStats.defense.toLocaleString()}</span>
                     </div>
 
@@ -2382,11 +2384,11 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-4 font-mono">
             <div className="w-full max-w-md bg-[#080b0e] border-2 border-cyan-500/80 rounded-2xl p-6 text-center space-y-4 shadow-[0_0_35px_rgba(6,182,212,0.3)]">
               <h3 className="text-sm font-black text-white uppercase tracking-widest pt-2">
-                HERRAMIENTA (TOOL) REQUERIDA
+                {t('expeditions.tool_required_title')}
               </h3>
               
               <p className="text-[9.5px] text-zinc-300 leading-relaxed font-sans normal-case bg-black/50 p-3 rounded-xl border border-cyan-950">
-                Para desplegar esta expedición en el clúster es obligatorio equipar al menos una <strong className="text-cyan-400">Herramienta (Tool)</strong> de extracción en la flota.
+                {t('expeditions.tool_requirement')}
               </p>
 
               <div className="grid grid-cols-2 gap-2.5 pt-1">
@@ -2398,7 +2400,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                   }}
                   className="py-2.5 bg-gradient-to-r from-cyan-600 to-teal-600 text-white text-[9px] font-black uppercase rounded-lg border border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.3)] cursor-pointer hover:brightness-110 active:scale-95 transition-all"
                 >
-                  SELECCIONAR TOOL
+                  {t('expeditions.select_tool')}
                 </button>
                 <button
                   onClick={() => {
@@ -2407,7 +2409,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                   }}
                   className="py-2.5 bg-black border border-zinc-800 text-zinc-400 text-[9px] font-bold uppercase rounded-lg hover:text-white cursor-pointer"
                 >
-                  ENTENDIDO
+                  {t('expeditions.understood')}
                 </button>
               </div>
             </div>
@@ -2417,7 +2419,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         {isStartJourneyOpen && (
           <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 font-mono">
             <div className="w-full max-w-md bg-[#080b0e] border border-cyan-500/40 rounded-2xl p-6 text-center space-y-4">
-              <h3 className="text-lg font-black text-white uppercase">¿INICIAR EXPEDICIÓN EN STAR CLUSTER?</h3>
+              <h3 className="text-lg font-black text-white uppercase">{t('expeditions.launch_title')}</h3>
               <p className="text-xs text-amber-400 font-bold">
                 {selectedPlanet ? "MODIFICADOR NETO:" : "PROBABILIDAD ESTIMADA:"} {totalExpeditionProbability}%
               </p>
@@ -2429,8 +2431,8 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               )}
 
               <div className="grid grid-cols-2 gap-3 pt-2">
-                <button onClick={executeLaunchTransaction} disabled={loading} className="py-2.5 bg-cyan-950 border border-cyan-500 text-cyan-300 text-[10px] font-black uppercase rounded-lg hover:bg-cyan-900 cursor-pointer">CONFIRMAR VIAJE</button>
-                <button onClick={() => { playSfx(440); setIsStartJourneyOpen(false); }} className="py-2.5 bg-black border border-zinc-800 text-zinc-500 text-[10px] font-black uppercase rounded-lg hover:bg-zinc-900 cursor-pointer">CANCELAR</button>
+                <button onClick={executeLaunchTransaction} disabled={loading} className="py-2.5 bg-cyan-950 border border-cyan-500 text-cyan-300 text-[10px] font-black uppercase rounded-lg hover:bg-cyan-900 cursor-pointer">{t('expeditions.confirm_journey')}</button>
+                <button onClick={() => { playSfx(440); setIsStartJourneyOpen(false); }} className="py-2.5 bg-black border border-zinc-800 text-zinc-500 text-[10px] font-black uppercase rounded-lg hover:bg-zinc-900 cursor-pointer">{t('expeditions.cancel')}</button>
               </div>
             </div>
           </div>
@@ -2441,7 +2443,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
             <div className="w-[480px] bg-[#080b0e] border border-cyan-500/40 rounded-xl flex flex-col overflow-hidden shadow-2xl h-[320px]">
               <div className="w-full grid grid-cols-3 bg-[#05070a] border-b border-cyan-950 text-center text-[10px] font-black uppercase">
                 <button onClick={() => setActiveRewardTab('ITEMS')} className={`py-2.5 ${activeRewardTab === 'ITEMS' ? 'bg-[#0a0f14] text-cyan-400' : 'text-zinc-500'}`}>ITEMS (1)</button>
-                <button onClick={() => setActiveRewardTab('CURRENCIES')} className={`py-2.5 ${activeRewardTab === 'CURRENCIES' ? 'bg-cyan-500 text-black font-black' : 'text-zinc-500'}`}>RECURSOS</button>
+                <button onClick={() => setActiveRewardTab('CURRENCIES')} className={`py-2.5 ${activeRewardTab === 'CURRENCIES' ? 'bg-cyan-500 text-black font-black' : 'text-zinc-500'}`}>{t('expeditions.resources')}</button>
                 <button onClick={() => setActiveRewardTab('LTD_CUR')} className={`py-2.5 ${activeRewardTab === 'LTD_CUR' ? 'bg-[#0a0f14] text-cyan-400' : 'text-zinc-500'}`}>LTD</button>
               </div>
               <div className="flex-1 p-6 flex items-center justify-center bg-black/40">
@@ -2449,11 +2451,11 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                   <div className="w-80 border border-cyan-500/40 bg-[#05070a] rounded-xl flex flex-col items-center p-4 text-center gap-3">
                     <span className="text-[10px] font-black text-cyan-400 uppercase">{currentRewardDrop ? currentRewardDrop.rarity : 'RARE'}</span>
                     <div className="text-4xl">{currentRewardDrop ? currentRewardDrop.icon : '💎'}</div>
-                    <span className="text-[10px] font-bold text-white uppercase">{currentRewardDrop ? currentRewardDrop.name : 'BOTÍN OBTENIDO'}</span>
+                    <span className="text-[10px] font-bold text-white uppercase">{currentRewardDrop ? currentRewardDrop.name : t('expeditions.loot_obtained')}</span>
                   </div>
                 )}
               </div>
-              <button onClick={handleAcceptRewardsClose} className="w-full py-2.5 bg-cyan-950 hover:bg-cyan-900 border-t border-cyan-950 text-cyan-300 text-[11px] font-black uppercase cursor-pointer">ACEPTAR</button>
+              <button onClick={handleAcceptRewardsClose} className="w-full py-2.5 bg-cyan-950 hover:bg-cyan-900 border-t border-cyan-950 text-cyan-300 text-[11px] font-black uppercase cursor-pointer">{t('expeditions.accept')}</button>
             </div>
           </div>
         )}

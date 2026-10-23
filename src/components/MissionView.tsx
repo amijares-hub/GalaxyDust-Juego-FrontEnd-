@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Target, CheckCircle2, Clock, Lock, Sparkles, ChevronLeft } from 'lucide-react';
 import { GalaxyFrame } from './CanView';
@@ -28,6 +29,7 @@ export const MissionView: React.FC<MissionViewProps> = ({
   triggerNotification,
   onBack
 }) => {
+  const { t } = useTranslation();
   const { playSfx } = useAudioEngine();
   const [activeMissionType, setActiveMissionType] = useState<MissionType>('DAILY');
 
@@ -78,10 +80,10 @@ export const MissionView: React.FC<MissionViewProps> = ({
           <Target className="w-7 h-7 text-cyan-400 animate-pulse shrink-0" />
           <div>
             <span className="text-[9px] font-mono text-cyan-400 tracking-widest block font-bold uppercase">
-              SISTEMA DE PROGRESIVIDAD Y RECOMPENSAS
+              {t('missions.header_subtitle')}
             </span>
             <h2 className="text-lg font-black tracking-widest text-white uppercase">
-              MISSION CENTER
+              {t('missions.title')}
             </h2>
           </div>
         </div>
@@ -132,13 +134,13 @@ export const MissionView: React.FC<MissionViewProps> = ({
               </div>
               <div className="space-y-1">
                 <span className="px-3 py-0.5 bg-amber-500/20 border border-amber-400/80 text-amber-300 rounded-full font-mono text-[8.5px] font-black uppercase tracking-widest inline-block mb-1 shadow-[0_0_10px_rgba(245,158,11,0.3)]">
-                  🔒 MÓDULO EN DESARROLLO
+                  {t('missions.module_wip')}
                 </span>
                 <h3 className="text-sm font-black text-white uppercase tracking-widest">
-                  MISIONES DE CATEGORÍA [{activeMissionType}]
+                  {t('missions.category_locked_title')} [{activeMissionType}]
                 </h3>
                 <p className="text-[9px] text-zinc-400 font-sans normal-case max-w-md mx-auto pt-1 leading-relaxed">
-                  Los objetivos semanales, eventos especiales y directivas de clan se habilitarán en la próxima sincronización del firmware C.A.N.
+                  {t('missions.locked_description')}
                 </p>
               </div>
             </motion.div>
@@ -152,7 +154,7 @@ export const MissionView: React.FC<MissionViewProps> = ({
             >
               {missions.filter(m => m.type === activeMissionType).length === 0 ? (
                 <div className="col-span-2 p-12 text-center text-zinc-600 text-[10px] uppercase tracking-widest bg-black/40 border border-cyan-950 rounded-xl">
-                  NO HAY MISIONES DISPONIBLES EN ESTA CATEGORÍA
+                  {t('missions.empty')}
                 </div>
               ) : (
                 missions.filter(m => m.type === activeMissionType).map((mission) => {
@@ -180,7 +182,7 @@ export const MissionView: React.FC<MissionViewProps> = ({
                       <div className="flex justify-end mt-1">
                         {mission.claimed ? (
                           <span className="text-[8.5px] font-bold text-zinc-500 uppercase flex items-center gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> RECLAMADO
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> {t('missions.claimed')}
                           </span>
                         ) : isComplete ? (
                           <button
@@ -188,11 +190,11 @@ export const MissionView: React.FC<MissionViewProps> = ({
                             className="px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white text-[8.5px] font-black uppercase rounded shadow-[0_0_10px_rgba(16,185,129,0.4)] cursor-pointer transition-all animate-pulse flex items-center gap-1.5"
                           >
                             <Sparkles className="w-3.5 h-3.5" />
-                            <span>RECLAMAR RECOMPENSA</span>
+                            <span>{t('missions.claim_btn')}</span>
                           </button>
                         ) : (
                           <span className="text-[8px] text-zinc-500 uppercase font-bold flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-zinc-500" /> EN PROGRESO
+                            <Clock className="w-3.5 h-3.5 text-zinc-500" /> {t('missions.in_progress')}
                           </span>
                         )}
                       </div>

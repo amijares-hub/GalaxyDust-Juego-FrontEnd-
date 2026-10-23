@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   User, Swords, CheckCircle2, Lock, ArrowLeft, X, Edit3, Award, Check, LogOut
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { usePlayerProfile } from '../hooks/usePlayerProfile';
 import { useAudioEngine } from '../hooks/useAudioEngine';
@@ -62,6 +63,7 @@ const GAME_BADGES = [
 ];
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotification, onProfileUpdate }) => {
+  const { t } = useTranslation();
   const { playSfx } = useAudioEngine();
   const { profile: hookProfile } = usePlayerProfile();
 
@@ -282,7 +284,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
               </button>
             )}
             <h1 className="text-sm font-black tracking-widest text-white uppercase flex items-center gap-2">
-              <User className="w-4 h-4 text-cyan-400" /> PERFIL DE COMANDO IMPERIAL
+              <User className="w-4 h-4 text-cyan-400" /> {t('profile.title')}
             </h1>
           </div>
         </div>
@@ -325,13 +327,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
                   className="ml-2 px-3 py-1 bg-red-950/70 hover:bg-red-900/90 border border-red-500/60 hover:border-red-400 text-red-300 text-[8.5px] font-mono font-black uppercase tracking-wider rounded-lg shadow-[0_0_10px_rgba(239,68,68,0.2)] transition-all cursor-pointer flex items-center gap-1.5"
                 >
                   <LogOut className="w-3 h-3 text-red-400" />
-                  <span>CERRAR SESIÓN</span>
+                  <span>{t('profile.logout')}</span>
                 </button>
               </div>
 
               <div className="w-full max-w-xs space-y-1">
                 <div className="flex justify-between text-[7.5px] text-zinc-400 font-mono">
-                  <span>PUNTOS DE EXPERIENCIA (EP)</span>
+                  <span>{t('profile.exp')}</span>
                   <span className="text-cyan-400 font-bold">{profileData.ep} / {profileData.max_ep}</span>
                 </div>
                 <div className="w-full h-1.5 bg-neutral-900 rounded-full overflow-hidden p-0.5 border border-cyan-950">
@@ -351,24 +353,29 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
               onClick={handleOpenBadgeModal}
               className="relative z-10 px-2.5 py-1 bg-gradient-to-r from-blue-600 to-cyan-600 border border-cyan-400/80 text-white text-[8px] font-black uppercase rounded cursor-pointer hover:brightness-110 active:scale-95 transition-all"
             >
-              CAMBIAR
+              {t('profile.change_badge')}
             </button>
           </div>
         </div>
 
         {/* PESTAÑAS SUB-MENÚ */}
         <div className="w-full grid grid-cols-4 gap-1.5 bg-black/60 p-1 rounded-lg border border-cyan-950 text-[9px] font-bold text-center uppercase">
-          {(['STATS', 'PVP-PVE', 'ECONOMY', 'ACHIEVEMENTS'] as const).map((tab) => (
+          {([
+            { id: 'STATS', label: t('profile.tab_stats') },
+            { id: 'PVP-PVE', label: t('profile.tab_pvp') },
+            { id: 'ECONOMY', label: t('profile.tab_economy') },
+            { id: 'ACHIEVEMENTS', label: t('profile.tab_achievements') }
+          ] as const).map((tab) => (
             <button
-              key={tab}
-              onClick={() => { playSfx(880); setActiveTab(tab); }}
+              key={tab.id}
+              onClick={() => { playSfx(880); setActiveTab(tab.id as any); }}
               className={`py-2 rounded transition-all cursor-pointer border ${
-                activeTab === tab
+                activeTab === tab.id
                   ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black shadow-md'
                   : 'bg-black/40 text-zinc-400 border-transparent hover:text-white'
               }`}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -378,24 +385,24 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="bg-[#050910] border border-cyan-500/30 p-4 rounded-xl flex flex-col justify-between gap-2 shadow-lg">
-                <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider">DOMINACIÓN ACTIVA</span>
+                <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider">{t('profile.stat_domination')}</span>
                 <div className="text-2xl font-black text-white font-mono">{assetCounts.discoveredStars}</div>
-                <span className="text-[7.5px] text-zinc-500 uppercase">Estrellas / Sectores Descubiertos</span>
+                <span className="text-[7.5px] text-zinc-500 uppercase">{t('profile.stat_stars')}</span>
               </div>
 
               <div className="bg-[#050910] border border-cyan-500/30 p-4 rounded-xl flex flex-col justify-between gap-2 shadow-lg">
-                <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider">EXPEDICIONES</span>
+                <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider">{t('profile.stat_expeditions')}</span>
                 <div className="flex justify-between items-baseline font-mono">
                   <span className="text-2xl font-black text-white">{expeditionStats.completed}</span>
-                  <span className="text-[9px] text-amber-400 font-bold">{expeditionStats.active} EN VUELO</span>
+                  <span className="text-[9px] text-amber-400 font-bold">{expeditionStats.active} {t('profile.stat_in_flight')}</span>
                 </div>
-                <span className="text-[7.5px] text-zinc-500 uppercase">Completadas con éxito</span>
+                <span className="text-[7.5px] text-zinc-500 uppercase">{t('profile.stat_completed')}</span>
               </div>
 
               <div className="bg-[#050910] border border-cyan-500/30 p-4 rounded-xl flex flex-col justify-between gap-2 shadow-lg">
-                <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider">PODER TOTAL</span>
+                <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider">{t('profile.stat_power')}</span>
                 <div className="text-2xl font-black text-cyan-300 font-mono">{profileData.power_score.toLocaleString()} POW</div>
-                <span className="text-[7.5px] text-zinc-500 uppercase">Score acumulado de armada</span>
+                <span className="text-[7.5px] text-zinc-500 uppercase">{t('profile.stat_score')}</span>
               </div>
             </div>
           </div>
