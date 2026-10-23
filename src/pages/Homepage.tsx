@@ -393,8 +393,8 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
   }, [refreshNotifications]);
 
   return (
-    <main 
-      className="w-full min-h-dvh bg-black flex flex-col items-stretch overflow-hidden bg-cover bg-center bg-no-repeat bg-fixed font-sans select-none text-white relative"
+    <div 
+      className="game-viewport-lock w-full h-full bg-black flex flex-col items-stretch overflow-hidden bg-cover bg-center bg-no-repeat bg-fixed font-sans select-none text-white relative"
       style={{ backgroundImage: `url('${GAME_ASSETS.background}')` }}
     >
       <div className="fixed inset-0 bg-black/55 backdrop-blur-[1px] z-0 pointer-events-none" />
@@ -462,6 +462,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           mana: resources.mana,
           wood: resources.wood
         }}
+        utcTime={utcTime}
         activeTab={
           activeTab === 'marketplace' ? 'MARKET' :
           activeTab === 'phantom' ? 'PHANTOM' :
@@ -489,15 +490,9 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         onOpenProfile={() => { setActiveTab('home'); setActiveWindow('profile'); }}
       />
 
-      <div className="w-full px-6 pt-2 flex justify-start items-center z-20 pointer-events-none">
-        <div className="flex items-center gap-2 font-mono text-[10px] text-cyan-400/80 font-bold tracking-widest uppercase">
-          <span>{utcTime}</span>
-        </div>
-      </div>
-
       {/* BOTONES ACCESO RÁPIDO Y POPUPS */}
       <div 
-        className="fixed top-10 sm:top-12 flex flex-col items-center gap-1.5 sm:gap-2 z-30 font-mono"
+        className="fixed top-14 sm:top-16 flex flex-col items-center gap-1.5 sm:gap-2 z-30 font-mono"
         style={{ right: 'max(6px, env(safe-area-inset-right))' }}
       >
         <button 
@@ -543,7 +538,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       </div>
 
       {/* ÁREA DE CONTENIDO */}
-      <div className="w-full flex-1 overflow-hidden px-0 py-0 z-10 flex flex-col items-stretch min-h-0">
+      <main className="flex-1 min-h-0 w-full overflow-hidden relative flex flex-col items-stretch">
         <AnimatePresence mode="wait">
           {activeTab === "home" && (
             activeWindow === "home" ? (
@@ -553,12 +548,10 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.97 }}
                 transition={{ duration: 0.35, ease: 'easeOut' }}
-                className="w-full h-full flex items-stretch justify-center"
+                className="w-full h-full max-h-full flex flex-col justify-between p-2 sm:p-3 overflow-hidden"
               >
                 {/* ── GRID TÁCTICO AAA: 4 tarjetas viewport-fit, sin scroll ── */}
-                <div className="w-full grid grid-cols-4 gap-2 sm:gap-3 px-2 sm:px-4 py-1"
-                  style={{ height: 'calc(100dvh - 7rem)' }}
-                >
+                <div className="flex-1 grid grid-cols-4 gap-2.5 max-h-[calc(100%-1.75rem)] items-stretch w-full">
                   {cards.map((card, idx) => {
                     const isLocked = card.id === 'alliance';
                     const sectorLabels = ['SEC-01', 'SEC-02', 'SEC-03', 'SEC-04'];
@@ -648,6 +641,17 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                     );
                   })}
                 </div>
+
+                {/* HUD Footer Status Bar */}
+                <div className="h-6 shrink-0 flex justify-between items-center px-1 font-mono text-[8px] sm:text-[8.5px] text-cyan-400/80 uppercase border-t border-cyan-900/30">
+                  <span className="flex items-center gap-1.5 font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#10b981]" />
+                    {t('hub.status_online')}
+                  </span>
+                  <span className="font-bold tracking-widest text-zinc-400">
+                    {t('hub.sector_label')}
+                  </span>
+                </div>
               </motion.div>
             ) : activeWindow === "expeditions" ? (
               <ExpeditionsView initialView="selection" triggerNotification={handleTriggerNotification} />
@@ -678,7 +682,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           {activeTab === "phantom" && <PhantomStationView onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />}
           {activeTab === "inventory" && <InventoryView playerGems={resources.crystal} setPlayerGems={(v) => setResources(p => ({ ...p, crystal: typeof v === 'function' ? v(p.crystal) : v }))} playerPower={power} setPlayerPower={setPower} playerGold={currencies.gd_coin} setPlayerGold={(v) => setCurrencies(p => ({ ...p, gd_coin: typeof v === 'function' ? v(p.gd_coin) : v }))} onBack={() => { setActiveTab("home"); setActiveWindow("home"); }} triggerNotification={handleTriggerNotification} />}
         </AnimatePresence>
-      </div>
+      </main>
 
       {/* VENTANA POPUP 1: EXPEDITIONS IN FLIGHT */}
       <AnimatePresence>
@@ -719,7 +723,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       </AnimatePresence>
 
       <ChatSystem userAllianceName={user.allianceName} triggerNotification={handleTriggerNotification} />
-    </main>
+    </div>
   );
 };
 

@@ -494,8 +494,8 @@ export const CanView: React.FC<CanViewProps> = ({ triggerNotification }) => {
   };
 
   return (
-    <GalaxyFrame className="w-full max-w-7xl mx-auto font-mono text-left select-none backdrop-blur-md relative overflow-x-hidden text-white" innerPadding="p-5">
-      <div className="space-y-3.5">
+    <GalaxyFrame className="w-full max-w-7xl mx-auto h-full max-h-full font-mono text-left select-none backdrop-blur-md relative overflow-hidden text-white flex flex-col min-h-0" innerPadding="p-3 sm:p-4 h-full flex flex-col justify-between overflow-y-auto custom-scrollbar">
+      <div className="space-y-2.5 flex-1 min-h-0 flex flex-col justify-between">
         
         {/* HEADER DE C.A.N. STATION */}
         <div className="flex justify-between items-center border-b border-cyan-900/50 pb-2.5 gap-2 relative z-20">

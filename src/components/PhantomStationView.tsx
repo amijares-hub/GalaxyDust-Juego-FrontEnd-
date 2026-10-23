@@ -238,9 +238,9 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
   };
 
   return (
-    <div className="w-full flex-1 overflow-y-auto min-h-0 py-0.5">
-      <GalaxyFrame className="w-full max-w-7xl mx-auto font-mono text-left select-none text-white" innerPadding="p-2 sm:p-4">
-        <div className="w-full flex flex-col lg:flex-row gap-2 items-stretch">
+    <div className="w-full h-full max-h-full flex flex-col overflow-hidden">
+      <GalaxyFrame className="w-full max-w-7xl mx-auto h-full max-h-full flex flex-col min-h-0 font-mono text-left select-none text-white" innerPadding="p-2 sm:p-3 h-full flex flex-col min-h-0">
+        <div className="w-full flex flex-col lg:flex-row gap-2 items-stretch flex-1 min-h-0 overflow-hidden">
           
           {/* HERO POSTER — oculto en landscape móvil para ganar espacio vertical */}
           <div className="hidden sm:flex w-full lg:w-3/12 shrink-0 relative rounded-xl overflow-hidden hud-panel hud-corners flex-col justify-between p-2.5 min-h-[160px] lg:min-h-[260px] shadow-2xl group">
@@ -284,14 +284,14 @@ export const PhantomStationView: React.FC<PhantomStationViewProps> = ({
           </div>
 
           {/* GRID DE CARDS RESISTENTE A FALLOS */}
-          <div className="flex-1 w-full lg:w-9/12 hud-panel p-2 rounded-xl flex flex-col justify-between min-h-0 overflow-y-auto">
+          <div className="flex-1 w-full lg:w-9/12 hud-panel p-2 rounded-xl flex flex-col min-h-0 overflow-hidden">
             {loading ? (
               <div className="flex flex-col items-center justify-center my-auto text-cyan-400 font-mono text-xs gap-2 py-12">
                 <RefreshCw className="animate-spin w-5 h-5" />
                 <span>{t('phantom.loading')}</span>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 w-full h-full p-1">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 w-full flex-1 min-h-0 overflow-y-auto custom-scrollbar p-1">
               {blueprints.map((bp) => {
                 const isGD = String(bp.currencyType || '').includes('GD');
                 const rarityUpper = String(bp.rarity || 'COMMON').toUpperCase();

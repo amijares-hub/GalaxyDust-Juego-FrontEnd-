@@ -10,6 +10,7 @@ interface HeaderProps {
   onOpenNotifications?: () => void;
   onOpenSettings?: () => void;
   onOpenProfile?: () => void;
+  utcTime?: string;
 }
 
 // 🖼️ HELPER: Garantiza que la URL del avatar sea siempre pública y funcional
@@ -66,7 +67,8 @@ export const Header: React.FC<HeaderProps> = ({
   unreadNotificationsCount = 0,
   onOpenNotifications,
   onOpenSettings,
-  onOpenProfile
+  onOpenProfile,
+  utcTime
 }) => {
   const { t, i18n } = useTranslation();
   const currentLang = (i18n.language || 'es').startsWith('en') ? 'en' : 'es';
@@ -132,20 +134,20 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header
-      className="w-full h-8 sm:h-9 bg-[#05080c]/98 border-b border-cyan-500/40 flex items-center justify-between gap-1 shrink-0 select-none z-50 font-mono backdrop-blur-md sticky top-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)]"
+      className="w-full h-11 sm:h-12 bg-[#05080c]/98 border-b border-cyan-500/40 flex items-center justify-between gap-1.5 sm:gap-2 shrink-0 select-none z-50 font-mono backdrop-blur-md sticky top-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)]"
       style={{
-        paddingLeft: 'max(8px, env(safe-area-inset-left))',
-        paddingRight: 'max(8px, env(safe-area-inset-right))',
+        paddingLeft: 'max(10px, env(safe-area-inset-left))',
+        paddingRight: 'max(10px, env(safe-area-inset-right))',
       }}
     >
       
-      {/* 1. PERFIL / AVATAR */}
+      {/* 1. PERFIL DEL COMANDANTE (IZQUIERDA) */}
       <div
-        className="flex items-center gap-1.5 shrink-0 cursor-pointer group"
+        className="flex items-center gap-2 shrink-0 cursor-pointer group"
         onClick={() => onOpenProfile && onOpenProfile()}
         title="Ver Perfil"
       >
-        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-black border border-cyan-400/80 group-hover:border-cyan-300 flex items-center justify-center text-cyan-300 font-bold shadow-[0_0_8px_rgba(34,211,238,0.3)] transition-all overflow-hidden">
+        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-black border-2 border-cyan-400 group-hover:border-cyan-300 flex items-center justify-center text-cyan-300 font-bold shadow-[0_0_10px_rgba(34,211,238,0.5)] transition-all overflow-hidden shrink-0">
           <img
             src={resolveAvatarUrl(userProfile?.avatar_url)}
             alt="Piloto Avatar"
@@ -159,29 +161,31 @@ export const Header: React.FC<HeaderProps> = ({
           />
         </div>
         <div className="flex flex-col text-left leading-tight">
-          <span className="text-[8px] sm:text-[9.5px] font-black text-white group-hover:text-cyan-200 uppercase tracking-wider truncate max-w-[65px] sm:max-w-[110px]">
+          <span className="text-xs sm:text-sm font-bold font-mono tracking-wider text-white group-hover:text-cyan-200 uppercase truncate max-w-[85px] sm:max-w-[140px]">
             {userProfile?.username || 'COMANDANTE'}
           </span>
-          <span className="text-[6.5px] sm:text-[7.5px] font-mono font-bold text-cyan-400 uppercase">
-            LVL {userProfile?.level || 1}
-          </span>
+          <div className="flex items-center gap-1.5 text-[10px] text-cyan-400 font-mono font-bold">
+            <span>LVL {userProfile?.level || 1}</span>
+            {utcTime && (
+              <span className="text-zinc-500 hidden md:inline">| {utcTime}</span>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* 2. PESTAÑAS NAVEGACIÓN */}
-      <div className="flex-1 flex items-center overflow-x-auto no-scrollbar whitespace-nowrap gap-1 px-1 min-w-0 h-full">
+      {/* 2. PESTAÑAS DE NAVEGACIÓN CENTRALES */}
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 px-1 shrink min-w-0 h-full flex-1">
         {tabs.map(tab => {
-          // 🎯 VERIFICACIÓN ROBUSTA DE PESTAÑA ACTIVA
           const isActive = isTabActive(activeTab, tab.id);
 
           return (
             <button
               key={tab.id}
               onClick={() => onSelectTab && onSelectTab(tab.id)}
-              className={`px-2 py-0.5 rounded font-bold text-[9px] sm:text-[10px] tracking-wider uppercase transition-all cursor-pointer whitespace-nowrap border shrink-0 ${
+              className={`text-[11px] sm:text-xs font-bold tracking-wider px-2.5 sm:px-3 py-1.5 rounded-sm uppercase transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 isActive
-                  ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.3)] font-black'
-                  : 'bg-black/50 text-zinc-400 border-transparent hover:text-white hover:bg-cyan-950/30'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.4)] font-black'
+                  : 'bg-black/50 text-zinc-400 border border-transparent hover:text-white hover:bg-cyan-950/40 hover:border-cyan-800/40'
               }`}
             >
               {tab.label}
@@ -190,14 +194,14 @@ export const Header: React.FC<HeaderProps> = ({
         })}
       </div>
 
-      {/* 3. DESPLEGABLES DERECHA */}
-      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+      {/* 3. BALANCES Y SELECTOR DE IDIOMA (DERECHA) */}
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         
         {/* DROPDOWN MONEDA */}
         <div className="relative" ref={currencyRef}>
           <button
             onClick={() => toggleDropdown('MONEDA')}
-            className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded text-[8px] sm:text-[9.5px] font-bold uppercase tracking-wider transition-all cursor-pointer border ${
+            className={`px-2.5 py-1 rounded text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer border ${
               openDropdown === 'MONEDA'
                 ? 'bg-amber-950/90 text-amber-300 border-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.3)]'
                 : 'bg-black/60 text-amber-400 border-amber-900/60 hover:border-amber-500/80 hover:bg-amber-950/30'
@@ -224,7 +228,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="relative" ref={resourceRef}>
           <button
             onClick={() => toggleDropdown('RECURSOS')}
-            className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded text-[8px] sm:text-[9.5px] font-bold uppercase tracking-wider transition-all cursor-pointer border ${
+            className={`px-2.5 py-1 rounded text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer border ${
               openDropdown === 'RECURSOS'
                 ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.3)]'
                 : 'bg-black/60 text-cyan-300 border-cyan-900/60 hover:border-cyan-500/80 hover:bg-cyan-950/30'
@@ -248,13 +252,13 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* CONMUTADOR DE IDIOMA [ ES | EN ] */}
-        <div className="flex items-center border border-cyan-500/40 bg-black/70 rounded px-1 py-0.5 text-[7.5px] sm:text-[8.5px] font-mono font-bold tracking-wider">
+        <div className="flex items-center border border-cyan-500/40 bg-black/80 rounded px-1.5 py-1 text-xs font-mono font-bold tracking-wider">
           <button
             onClick={() => {
               i18n.changeLanguage('es');
               try { localStorage.setItem('gd_preferred_language', 'es'); } catch {}
             }}
-            className={`px-1 py-0.5 rounded transition-all cursor-pointer ${
+            className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
               currentLang === 'es'
                 ? 'bg-cyan-500/30 text-cyan-300 font-black shadow-[0_0_6px_rgba(34,211,238,0.5)]'
                 : 'text-zinc-500 hover:text-zinc-300'
@@ -262,13 +266,13 @@ export const Header: React.FC<HeaderProps> = ({
           >
             ES
           </button>
-          <span className="text-cyan-500/40 px-0.5 select-none">|</span>
+          <span className="text-cyan-500/40 px-1 select-none">|</span>
           <button
             onClick={() => {
               i18n.changeLanguage('en');
               try { localStorage.setItem('gd_preferred_language', 'en'); } catch {}
             }}
-            className={`px-1 py-0.5 rounded transition-all cursor-pointer ${
+            className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
               currentLang === 'en'
                 ? 'bg-cyan-500/30 text-cyan-300 font-black shadow-[0_0_6px_rgba(34,211,238,0.5)]'
                 : 'text-zinc-500 hover:text-zinc-300'

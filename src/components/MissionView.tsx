@@ -64,9 +64,9 @@ export const MissionView: React.FC<MissionViewProps> = ({
   const isCurrentTabLocked = LOCKED_MISSION_TYPES.has(activeMissionType);
 
   return (
-    <GalaxyFrame className="w-full max-w-7xl mx-auto my-2 font-mono text-left space-y-6 backdrop-blur-md relative overflow-hidden text-white" innerPadding="p-5 sm:p-8">
+    <GalaxyFrame className="w-full max-w-7xl mx-auto h-full max-h-full font-mono text-left backdrop-blur-md relative overflow-hidden text-white flex flex-col min-h-0" innerPadding="p-3 sm:p-4 h-full flex flex-col min-h-0">
       {/* HEADER */}
-      <div className="flex justify-between items-center border-b border-cyan-900/50 pb-4">
+      <div className="flex justify-between items-center border-b border-cyan-900/50 pb-2.5 mb-1.5 shrink-0">
         <div className="flex items-center gap-3">
           {onBack && (
             <button
@@ -119,7 +119,7 @@ export const MissionView: React.FC<MissionViewProps> = ({
       </div>
 
       {/* LISTA DE MISIONES / OVERLAY LOCK PARA CATEGORÍAS EN DESARROLLO */}
-      <div className="relative min-h-[320px] flex flex-col justify-center">
+      <div className="relative flex-1 min-h-0 flex flex-col justify-center">
         <AnimatePresence mode="wait">
           {isCurrentTabLocked ? (
             <motion.div
@@ -127,7 +127,7 @@ export const MissionView: React.FC<MissionViewProps> = ({
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
-              className="w-full py-16 px-6 bg-black/70 border border-cyan-950/80 rounded-2xl text-center space-y-3 flex flex-col items-center justify-center backdrop-blur-sm shadow-2xl"
+              className="w-full py-12 px-6 bg-black/70 border border-cyan-950/80 rounded-2xl text-center space-y-3 flex flex-col items-center justify-center backdrop-blur-sm shadow-2xl"
             >
               <div className="w-12 h-12 rounded-2xl bg-cyan-950/60 border border-cyan-500/60 flex items-center justify-center text-cyan-300 shadow-[0_0_20px_rgba(6,182,212,0.3)]">
                 <Lock className="w-6 h-6 text-amber-400 animate-pulse" />
@@ -150,7 +150,7 @@ export const MissionView: React.FC<MissionViewProps> = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-1 custom-scrollbar w-full"
+              className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar w-full"
             >
               {missions.filter(m => m.type === activeMissionType).length === 0 ? (
                 <div className="col-span-2 p-12 text-center text-zinc-600 text-[10px] uppercase tracking-widest bg-black/40 border border-cyan-950 rounded-xl">

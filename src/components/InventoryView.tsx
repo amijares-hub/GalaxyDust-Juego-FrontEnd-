@@ -272,8 +272,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   ];
 
   return (
-    <GalaxyFrame className="w-full max-w-6xl mx-auto my-2 font-mono text-left select-none text-white h-[calc(100vh-10rem)] max-h-[510px]" innerPadding="p-3 sm:p-4">
-      <div id="swgoh-inventory-screen" className="relative w-full h-full flex flex-col justify-between overflow-hidden">
+    <GalaxyFrame className="w-full max-w-6xl mx-auto h-full max-h-full font-mono text-left select-none text-white flex flex-col min-h-0" innerPadding="p-2 sm:p-3 h-full flex flex-col min-h-0">
+      <div id="swgoh-inventory-screen" className="relative w-full h-full flex flex-col justify-between overflow-hidden flex-1 min-h-0">
         
         {/* HEADER COMPACTO */}
         <div className="flex flex-col md:flex-row items-center justify-between border-b border-cyan-800/25 pb-1.5 mb-1.5 gap-2 relative shrink-0">

@@ -394,9 +394,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   const { t } = useTranslation();
 
   return (
-    <GalaxyFrame className="w-full max-w-7xl mx-auto my-2 font-mono text-left select-none text-white" innerPadding="p-5">
-      <div className="flex flex-col gap-4">
-        <div className="w-full bg-[#05070a] border border-cyan-500/30 p-3.5 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
+    <GalaxyFrame className="w-full max-w-7xl mx-auto h-full max-h-full font-mono text-left select-none text-white flex flex-col min-h-0" innerPadding="p-2 sm:p-3 h-full flex flex-col min-h-0">
+      <div className="flex flex-col gap-2 h-full min-h-0 flex-1 overflow-hidden">
+        <div className="w-full bg-[#05070a] border border-cyan-500/30 p-2.5 sm:p-3 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-2 shrink-0">
           <div className="flex items-center gap-2.5">
             <button
               onClick={onBack}
@@ -501,14 +501,14 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
           </div>
         </div>
 
-        <div className="w-full flex flex-col md:flex-row gap-3.5 items-start">
-          <div className="w-full md:w-52 shrink-0 bg-[#05070a] border border-cyan-500/20 p-3 rounded-xl flex flex-col gap-2">
-            <div className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5 px-1 border-b border-cyan-950 pb-2">
+        <div className="w-full flex flex-col md:flex-row gap-2.5 items-stretch flex-1 min-h-0 overflow-hidden">
+          <div className="w-full md:w-52 shrink-0 bg-[#05070a] border border-cyan-500/20 p-2.5 rounded-xl flex flex-col gap-1.5 h-full overflow-hidden">
+            <div className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5 px-1 border-b border-cyan-950 pb-1.5 shrink-0">
               <Filter className="w-3.5 h-3.5 text-cyan-400" />
               <span>{t('market.categories_title')}</span>
             </div>
 
-            <div className="flex flex-col gap-1 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
+            <div className="flex flex-col gap-1 flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar">
               {[
                 { id: 'ALL', label: t('market.cats.all'), icon: ShoppingBag },
                 { id: 'SHIPS', label: t('market.cats.ships'), icon: Rocket },
@@ -544,7 +544,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
           </div>
 
           {activeTab !== 'SELL_ITEM' ? (
-            <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5 max-h-[440px] overflow-y-auto pr-1.5 custom-scrollbar">
+            <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-2.5 h-full overflow-y-auto pr-1.5 custom-scrollbar min-h-0">
               {filteredListings.length === 0 ? (
                 <div className="col-span-full p-12 text-center text-zinc-500 text-[10px] uppercase tracking-widest bg-[#05070a] border border-cyan-500/10 rounded-xl">
                   {marketLoading ? t('market.loading_listings') : t('market.empty_listings')}
@@ -620,7 +620,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
               )}
             </div>
           ) : (
-            <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5 max-h-[440px] overflow-y-auto pr-1.5 custom-scrollbar">
+            <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-2.5 h-full overflow-y-auto pr-1.5 custom-scrollbar min-h-0">
               {(inventoryLoading || isLocalLoading) ? (
                 <div className="col-span-full p-12 text-center text-cyan-500 text-[10px] uppercase tracking-widest bg-[#05070a] border border-cyan-500/10 rounded-xl">
                   {t('market.scanning_assets')}
