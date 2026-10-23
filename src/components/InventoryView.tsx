@@ -142,6 +142,117 @@ const matchInventoryCategory = (item: InventoryItem, selectedSidebarKey: string)
   return determinedCategory.toLowerCase() === selectedSidebarKey.toLowerCase();
 };
 
+interface AssetCardProps {
+  asset: {
+    id: string;
+    name: string;
+    image: string;
+    rarity?: 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY' | 'EXCLUSIVE';
+    quantity: number;
+    category?: string;
+    power?: number;
+    isInFlight?: boolean;
+    unlocked?: boolean;
+    level?: number;
+    favorite?: boolean;
+  };
+  isSelected?: boolean;
+  onClick?: () => void;
+}
+
+export const AssetCard: React.FC<AssetCardProps> = ({ asset, isSelected, onClick }) => {
+  // Esquema de color según rareza
+  const rarity = (asset.rarity?.toUpperCase() || 'COMMON') as 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY' | 'EXCLUSIVE';
+  const rarityStyles: Record<string, string> = {
+    COMMON: 'border-slate-500/40 text-slate-300 shadow-cyan-950/20',
+    RARE: 'border-cyan-500/50 text-cyan-400 shadow-cyan-500/20',
+    EPIC: 'border-purple-500/60 text-purple-400 shadow-purple-500/30',
+    LEGENDARY: 'border-amber-500/70 text-amber-400 shadow-amber-500/30',
+    EXCLUSIVE: 'border-rose-500/70 text-rose-400 shadow-rose-500/30',
+  };
+  const activeStyle = rarityStyles[rarity] || rarityStyles.COMMON;
+
+  return (
+    <div
+      onClick={onClick}
+      className={`
+        group relative aspect-[3/4] rounded-md overflow-hidden cursor-pointer select-none
+        bg-gradient-to-b from-[#0b1320] via-[#05080e] to-[#020408]
+        border transition-all duration-200 transform-gpu
+        hover:scale-[1.03] hover:z-10
+        ${isSelected ? 'border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.5)] ring-1 ring-cyan-400' : activeStyle}
+        hud-corners
+      `}
+    >
+      {/* 1. Header de la Tarjeta: Categoría y Cantidad */}
+      <div className="absolute top-0 inset-x-0 p-1.5 flex items-center justify-between z-10 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+        <span className="text-[8px] font-mono tracking-wider uppercase text-cyan-400/80 font-bold truncate max-w-[65%]">
+          {asset.category || 'ASSET'}
+        </span>
+        <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-black/90 border border-cyan-500/40 text-cyan-300 shadow">
+          x{asset.quantity || 1}
+        </span>
+      </div>
+
+      {/* 2. Visual del Activo: Imagen con Resplandor Holográfico */}
+      <div className="w-full h-full p-2 flex items-center justify-center relative overflow-hidden">
+        {/* Resplandor radial de fondo */}
+        <div className="absolute inset-0 bg-radial from-cyan-500/10 via-transparent to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
+        
+        <img
+          src={asset.image || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200'}
+          alt={asset.name}
+          className={`w-full h-full object-contain filter drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)] group-hover:scale-110 group-hover:drop-shadow-[0_0_12px_rgba(6,182,212,0.4)] transition-all duration-300 ${asset.unlocked === false ? "grayscale opacity-50 brightness-50" : ""}`}
+          loading="lazy"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
+          }}
+        />
+
+        {asset.isInFlight && (
+          <div className="absolute top-7 left-1.5 px-1 py-0.5 rounded bg-red-950/90 border border-red-500 text-red-400 font-mono font-black text-[6.5px] z-20 uppercase tracking-widest animate-pulse">
+            EN VUELO
+          </div>
+        )}
+
+        {asset.level && asset.level > 1 && (
+          <div className="absolute top-7 right-1.5 px-1 py-0.5 rounded bg-black/80 border border-amber-500/50 text-amber-300 font-mono font-black text-[7px] z-20">
+            LVL {asset.level}
+          </div>
+        )}
+
+        {asset.unlocked === false && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-20">
+            <Lock className="w-5 h-5 text-cyan-400 drop-shadow-[0_0_8px_cyan]" />
+          </div>
+        )}
+      </div>
+
+      {/* 3. Pie de la Tarjeta: Nombre y Rareza */}
+      <div className="absolute bottom-0 inset-x-0 p-1.5 z-10 bg-gradient-to-t from-[#020408] via-[#05080e]/95 to-transparent border-t border-cyan-500/15">
+        <p className="text-[10px] sm:text-[11px] font-mono font-bold text-white truncate group-hover:text-cyan-300 transition-colors flex items-center justify-between">
+          <span className="truncate">{asset.name}</span>
+          {asset.favorite && <span className="text-amber-400 text-[9px] shrink-0">★</span>}
+        </p>
+        <div className="flex items-center justify-between mt-0.5">
+          <span className="text-[8px] font-mono tracking-widest uppercase font-semibold text-cyan-400/70 truncate">
+            {asset.rarity || 'STANDARD'}
+          </span>
+          {asset.power ? (
+            <span className="text-[8px] font-mono text-amber-400 font-bold shrink-0">
+              ⚡ {asset.power} POW
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Línea de escaneo láser en hover */}
+      <div className="absolute top-0 inset-x-0 h-[1px] bg-cyan-400 opacity-0 group-hover:opacity-100 group-hover:animate-pulse pointer-events-none transition-opacity" />
+    </div>
+  );
+};
+
 interface InventoryViewProps {
   playerGems: number;
   setPlayerGems: React.Dispatch<React.SetStateAction<number>>;
@@ -417,14 +528,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <FleetManager characters={characters} triggerNotification={triggerNotification} />
           </div>
         ) : (
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 content-start custom-scrollbar">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1.5 p-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 gap-2.5 content-start custom-scrollbar">
             {isLoading ? (
-              <div className="col-span-3 sm:col-span-4 md:col-span-5 flex flex-col items-center justify-center h-full gap-2 text-cyan-500 py-12">
+              <div className="col-span-3 sm:col-span-4 md:col-span-5 xl:col-span-6 flex flex-col items-center justify-center h-full gap-2 text-cyan-500 py-12">
                 <div className="w-7 h-7 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
                 <span className="text-[9px] font-mono tracking-widest uppercase animate-pulse">{t('inventory.loading')}</span>
               </div>
             ) : getFilteredCharacters.length === 0 ? (
-              <div className="col-span-3 sm:col-span-4 md:col-span-5 flex items-center justify-center h-full text-zinc-500 text-[9px] font-mono uppercase tracking-widest py-12">
+              <div className="col-span-3 sm:col-span-4 md:col-span-5 xl:col-span-6 flex items-center justify-center h-full text-zinc-500 text-[9px] font-mono uppercase tracking-widest py-12">
                 {loadError ? (
                   <span className="text-red-500 font-bold">{loadError}</span>
                 ) : (
@@ -434,62 +545,27 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             ) : (
               getFilteredCharacters.map((char, idx) => {
                 const uniqueKey = `${char.category || 'asset'}-${char.id}-${idx}`;
+                const isSelected = selectedChar?.id === char.id;
+                const power = char.power || (char as any).combat_power || (char as any).galactic_power || undefined;
                 return (
-                  <div
+                  <AssetCard
                     key={uniqueKey}
+                    isSelected={isSelected}
                     onClick={() => { playSfx(char.sound); setSelectedChar(char); }}
-                    className="aspect-[4/3] relative rounded bg-black/50 border border-cyan-500/30 hover:border-cyan-400 group transition-all p-1 flex flex-col justify-between overflow-hidden cursor-pointer shadow-md"
-                  >
-                    {/* Badge de cantidad superior derecho */}
-                    {char.unlocked && (
-                      <div className="absolute top-1 right-1 px-1 py-0.2 rounded bg-black/80 border border-cyan-500/40 text-[9px] font-mono text-cyan-300 z-20">
-                        x{char.quantity || 1}
-                      </div>
-                    )}
-
-                    {/* Badge de nivel */}
-                    {char.level > 1 && (
-                      <div className="absolute bottom-6 left-1 px-1 py-0.2 rounded bg-black/80 border border-amber-500/40 text-[8px] font-mono text-amber-300 z-20">
-                        LVL {char.level}
-                      </div>
-                    )}
-
-                    {/* Badge de vuelo */}
-                    {char.is_in_flight && (
-                      <div className="absolute top-1 left-1 px-1 py-0.2 rounded bg-red-950/90 border border-red-500 text-red-400 font-mono font-black text-[6.5px] z-20 uppercase tracking-widest animate-pulse">
-                        EN VUELO
-                      </div>
-                    )}
-
-                    {/* Imagen del activo centrada */}
-                    <div className="w-full h-full flex items-center justify-center overflow-hidden">
-                      <img
-                        src={resolveImageUrl(char.avatar_url || (char as any).image_url)}
-                        alt={char.name}
-                        className={`w-full h-full object-contain group-hover:scale-105 transition-transform duration-300 ${!char.unlocked ? "grayscale opacity-50 brightness-50" : ""}`}
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.onerror = null;
-                          target.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
-                        }}
-                      />
-                    </div>
-
-                    {!char.unlocked && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-20">
-                        <Lock className="w-4 h-4 text-cyan-400 drop-shadow-[0_0_8px_cyan]" />
-                      </div>
-                    )}
-
-                    {/* Pie de tarjeta con gradiente y nombre */}
-                    <div className="w-full bg-gradient-to-t from-black via-black/80 to-transparent pt-1 px-0.5 text-center shrink-0 z-10">
-                      <div className="truncate text-[8.5px] text-[#e8f1f5] font-extrabold uppercase flex items-center justify-center gap-0.5">
-                        <span className="truncate">{char.name}</span>
-                        {char.favorite && <span className="text-amber-400 text-[8px] shrink-0">★</span>}
-                      </div>
-                    </div>
-                  </div>
+                    asset={{
+                      id: char.id,
+                      name: char.name,
+                      image: resolveImageUrl(char.avatar_url || (char as any).image_url),
+                      rarity: (char.rarity?.toUpperCase() || 'COMMON') as any,
+                      quantity: char.quantity || 1,
+                      category: getItemCategory(char),
+                      power,
+                      isInFlight: char.is_in_flight,
+                      unlocked: char.unlocked,
+                      level: char.level,
+                      favorite: char.favorite,
+                    }}
+                  />
                 );
               })
             )}
