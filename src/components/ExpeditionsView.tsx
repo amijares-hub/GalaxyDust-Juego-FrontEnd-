@@ -2219,130 +2219,135 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               </div>
             </div>
 
-            {/* Columna Derecha (Catálogo y Flota Activa) */}
-            <div className="col-span-8 sm:col-span-9 h-full flex flex-col min-h-0 overflow-hidden bg-[#05080c]/60 border border-cyan-500/20 p-2 rounded">
-              {/* Buscador */}
-              <div className="shrink-0 mb-1 flex items-center justify-between gap-2 bg-[#020508] p-1.5 rounded border border-cyan-950">
-                <span className="text-[8.5px] sm:text-[9px] font-black text-cyan-400 uppercase tracking-wider truncate">
-                  DISPONIBLES: {currentLeftCategory.toUpperCase()} ({filteredInventory.length})
-                </span>
+            {/* Columna Derecha (Catálogo y Flota Activa - Split 50/50) */}
+            <div className="col-span-8 sm:col-span-9 h-full min-h-0 flex flex-col gap-2 overflow-hidden p-2 bg-[#05080c]/70 border border-cyan-500/30 rounded-xl">
+              
+              {/* ── PARTE SUPERIOR (48% DEL ALTO): CATÁLOGO DE ACTIVOS DISPONIBLES ── */}
+              <div className="h-[48%] min-h-0 flex flex-col bg-[#03060a]/80 border border-cyan-900/50 rounded-lg p-2 overflow-hidden">
+                {/* Cabecera y Buscador */}
+                <div className="shrink-0 flex items-center justify-between pb-1.5 mb-1.5 border-b border-cyan-950">
+                  <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider truncate">
+                    {t('expedition.available_ships', `DISPONIBLES: ${currentLeftCategory.toUpperCase()}`)} ({filteredInventory.length})
+                  </span>
+                  {currentLeftCategory !== 'Fleets' && (
+                    <div className="relative w-44">
+                      <Search className="absolute left-2 top-1.5 w-3 h-3 text-cyan-500" />
+                      <input
+                        type="text"
+                        placeholder="BUSCAR POR NOMBRE..."
+                        value={assetSearchQuery}
+                        onChange={(e) => setAssetSearchQuery(e.target.value)}
+                        className="w-full h-6 text-[10px] bg-black/70 border border-cyan-500/30 pl-6 pr-6 rounded font-mono text-cyan-100 placeholder-zinc-500 focus:outline-none focus:border-cyan-400 uppercase"
+                      />
+                      {assetSearchQuery && (
+                        <button onClick={() => setAssetSearchQuery('')} className="absolute right-1.5 top-1.5 text-zinc-500 hover:text-white">
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-                {currentLeftCategory !== 'Fleets' && (
-                  <div className="relative w-40 sm:w-52">
-                    <Search className="absolute left-2 top-1.5 w-3 h-3 text-cyan-500" />
-                    <input
-                      type="text"
-                      placeholder="BUSCAR POR NOMBRE..."
-                      value={assetSearchQuery}
-                      onChange={(e) => setAssetSearchQuery(e.target.value)}
-                      className="w-full bg-[#0a0f14] border border-cyan-900 rounded pl-6 pr-2 py-0.5 text-[8px] text-cyan-200 placeholder-zinc-600 outline-none uppercase font-mono focus:border-cyan-500 transition-colors"
-                    />
-                    {assetSearchQuery && (
-                      <button onClick={() => setAssetSearchQuery('')} className="absolute right-1.5 top-1 text-zinc-500 hover:text-white">
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Grilla de Naves Disponibles (Aquí y SOLO aquí ocurre el scroll vertical con inercia) */}
-              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 grid grid-cols-2 md:grid-cols-4 gap-1.5 custom-scrollbar bg-black/40 border border-cyan-950/60 p-1.5 rounded-lg">
-                {currentLeftCategory === 'Fleets' ? (
-                  fleets.length === 0 ? (
-                    <div className="col-span-full p-4 text-center text-zinc-600 text-[8.5px] uppercase tracking-widest">
-                      NO HAY FLOTAS REGISTRADAS EN TU PERFIL
+                {/* Grilla con scroll interno fluido (2 o 3 filas visibles a la vez) */}
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 grid grid-cols-2 md:grid-cols-4 gap-1.5 custom-scrollbar content-start">
+                  {currentLeftCategory === 'Fleets' ? (
+                    fleets.length === 0 ? (
+                      <div className="col-span-full p-4 text-center text-zinc-600 text-[8.5px] uppercase tracking-widest font-mono">
+                        NO HAY FLOTAS REGISTRADAS EN TU PERFIL
+                      </div>
+                    ) : (
+                      fleets.map(fleet => {
+                        const isSelected = selectedFleet?.id === fleet.id;
+                        return (
+                          <div
+                            key={fleet.id}
+                            onClick={() => {
+                              playSfx(880);
+                              setSelectedFleet(isSelected ? null : fleet);
+                            }}
+                            className={`p-2 rounded-lg border cursor-pointer flex flex-col justify-between transition-all ${
+                              isSelected ? 'bg-cyan-950/90 border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.3)]' : 'bg-[#050910] border-cyan-950 hover:border-cyan-800'
+                            }`}
+                          >
+                            <span className="text-[8.5px] font-black text-white uppercase truncate">{fleet.name}</span>
+                            <span className="text-[7px] text-cyan-400 font-mono mt-1">PODER: {fleet.total_power_score} POW</span>
+                          </div>
+                        );
+                      })
+                    )
+                  ) : filteredInventory.length === 0 ? (
+                    <div className="col-span-full p-4 text-center text-zinc-600 text-[8.5px] uppercase tracking-widest font-mono">
+                      {assetSearchQuery ? `SIN COINCIDENCIAS PARA "${assetSearchQuery.toUpperCase()}"` : `SIN ACTIVOS EN [${currentLeftCategory.toUpperCase()}]`}
                     </div>
                   ) : (
-                    fleets.map(fleet => {
-                      const isSelected = selectedFleet?.id === fleet.id;
+                    filteredInventory.map(asset => {
+                      const isSelected = selectedAssets.some(a => a.id === asset.id);
+                      
+                      const isShip = isShipAsset(asset.type);
+                      const isTool = isToolAsset(asset.type);
+                      const isInFlight = busyAssetIds.has(asset.id) || 
+                        (asset.seed_id && (
+                          (isShip && busyShipIds.has(asset.seed_id)) || 
+                          (isTool && busyToolIds.has(asset.seed_id))
+                        ));
+
+                      const effectVal = asset.effect || 0;
+
                       return (
                         <div
-                          key={fleet.id}
+                          key={asset.id}
                           onClick={() => {
-                            playSfx(880);
-                            setSelectedFleet(isSelected ? null : fleet);
+                            if (!isInFlight) toggleAssetSelection(asset);
                           }}
-                          className={`p-2 rounded-lg border cursor-pointer flex flex-col justify-between transition-all ${
-                            isSelected ? 'bg-cyan-950/90 border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.3)]' : 'bg-[#050910] border-cyan-950 hover:border-cyan-800'
+                          className={`p-1.5 rounded-lg border flex items-center gap-2 transition-all relative ${
+                            isInFlight 
+                              ? 'bg-red-950/20 border-red-900/60 opacity-50 pointer-events-none' 
+                              : isSelected 
+                              ? 'bg-cyan-950/80 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.3)] cursor-pointer' 
+                              : 'bg-[#050910] border-cyan-950 hover:border-cyan-800 cursor-pointer'
                           }`}
                         >
-                          <span className="text-[8.5px] font-black text-white uppercase truncate">{fleet.name}</span>
-                          <span className="text-[7px] text-cyan-400 font-mono mt-1">PODER: {fleet.total_power_score} POW</span>
+                          <div className="w-8 h-8 rounded bg-black border border-cyan-950 shrink-0 overflow-hidden relative">
+                            <img src={asset.image_url} className={`w-full h-full object-cover ${isInFlight ? 'grayscale' : ''}`} alt={asset.name} />
+                            {isSelected && !isInFlight && (
+                              <div className="absolute inset-0 bg-cyan-500/30 flex items-center justify-center">
+                                <Check className="w-3.5 h-3.5 text-cyan-300 stroke-[3]" />
+                              </div>
+                            )}
+                            {isInFlight && (
+                              <div className="absolute inset-0 bg-red-900/40 flex items-center justify-center backdrop-blur-[1px]">
+                                <span className="text-[5px] text-white font-black uppercase text-center leading-tight shadow-black drop-shadow-md">
+                                  EN MISIÓN
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
+                            <span className="text-[8px] font-black text-white truncate">{asset.name}</span>
+                            {isInFlight ? (
+                              <span className="text-[6.5px] text-red-400 font-mono font-black uppercase">{t('expeditions.in_flight')}</span>
+                            ) : effectVal !== 0 ? (
+                              <span className={`text-[6.5px] font-mono font-bold ${effectVal > 0 ? 'text-cyan-400' : 'text-red-400'}`}>
+                                {effectVal > 0 ? `+${effectVal.toFixed(1)}%` : `${effectVal.toFixed(1)}%`}
+                              </span>
+                            ) : (
+                              <span className="text-[6.5px] text-zinc-500 font-mono uppercase">{asset.rarity}</span>
+                            )}
+                          </div>
                         </div>
                       );
                     })
-                  )
-                ) : filteredInventory.length === 0 ? (
-                  <div className="col-span-full p-4 text-center text-zinc-600 text-[8.5px] uppercase tracking-widest">
-                    {assetSearchQuery ? `SIN COINCIDENCIAS PARA "${assetSearchQuery.toUpperCase()}"` : `SIN ACTIVOS EN [${currentLeftCategory.toUpperCase()}]`}
-                  </div>
-                ) : (
-                  filteredInventory.map(asset => {
-                    const isSelected = selectedAssets.some(a => a.id === asset.id);
-                    
-                    const isShip = isShipAsset(asset.type);
-                    const isTool = isToolAsset(asset.type);
-                    const isInFlight = busyAssetIds.has(asset.id) || 
-                      (asset.seed_id && (
-                        (isShip && busyShipIds.has(asset.seed_id)) || 
-                        (isTool && busyToolIds.has(asset.seed_id))
-                      ));
-
-                    const effectVal = asset.effect || 0;
-
-                    return (
-                      <div
-                        key={asset.id}
-                        onClick={() => {
-                          if (!isInFlight) toggleAssetSelection(asset);
-                        }}
-                        className={`p-1.5 rounded-lg border flex items-center gap-2 transition-all relative ${
-                          isInFlight 
-                            ? 'bg-red-950/20 border-red-900/60 opacity-50 pointer-events-none' 
-                            : isSelected 
-                            ? 'bg-cyan-950/80 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.3)] cursor-pointer' 
-                            : 'bg-[#050910] border-cyan-950 hover:border-cyan-800 cursor-pointer'
-                        }`}
-                      >
-                        <div className="w-8 h-8 rounded bg-black border border-cyan-950 shrink-0 overflow-hidden relative">
-                          <img src={asset.image_url} className={`w-full h-full object-cover ${isInFlight ? 'grayscale' : ''}`} alt={asset.name} />
-                          {isSelected && !isInFlight && (
-                            <div className="absolute inset-0 bg-cyan-500/30 flex items-center justify-center">
-                              <Check className="w-3.5 h-3.5 text-cyan-300 stroke-[3]" />
-                            </div>
-                          )}
-                          {isInFlight && (
-                            <div className="absolute inset-0 bg-red-900/40 flex items-center justify-center backdrop-blur-[1px]">
-                              <span className="text-[5px] text-white font-black uppercase text-center leading-tight shadow-black drop-shadow-md">
-                                EN MISIÓN
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
-                          <span className="text-[8px] font-black text-white truncate">{asset.name}</span>
-                          {isInFlight ? (
-                            <span className="text-[6.5px] text-red-400 font-mono font-black uppercase">{t('expeditions.in_flight')}</span>
-                          ) : effectVal !== 0 ? (
-                            <span className={`text-[6.5px] font-mono font-bold ${effectVal > 0 ? 'text-cyan-400' : 'text-red-400'}`}>
-                              {effectVal > 0 ? `+${effectVal.toFixed(1)}%` : `${effectVal.toFixed(1)}%`}
-                            </span>
-                          ) : (
-                            <span className="text-[6.5px] text-zinc-500 font-mono uppercase">{asset.rarity}</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
+                  )}
+                </div>
               </div>
 
-              {/* Activos Seleccionados / Atributos */}
-              <div className="shrink-0 max-h-[110px] overflow-y-auto border-t border-cyan-500/20 mt-1 pt-1 bg-black/50 rounded p-1.5 custom-scrollbar">
-                <div className="flex justify-between items-center px-1 mb-1">
-                  <span className="text-[8px] font-black text-amber-400 uppercase tracking-wider">
-                    {t('expeditions.selected_assets_title')} ({selectedAssets.length + (selectedFleet ? 1 : 0)})
+              {/* ── PARTE INFERIOR (52% DEL ALTO): DESPLIEGUE, CONSOLIDADO DE STATS Y CONFIRMACIÓN ── */}
+              <div className="h-[52%] min-h-0 flex flex-col justify-between bg-[#03060a]/90 border border-cyan-900/50 rounded-lg p-2 overflow-hidden">
+                
+                {/* 1. Header de Selección y Botón Limpiar */}
+                <div className="shrink-0 flex items-center justify-between pb-1 border-b border-cyan-950">
+                  <span className="text-[10px] font-mono font-bold text-amber-400 uppercase tracking-wider">
+                    {t('expeditions.selected_assets_title', 'ACTIVOS SELECCIONADOS PARA DESPLIEGUE')} ({selectedAssets.length + (selectedFleet ? 1 : 0)})
                   </span>
                   {(selectedAssets.length > 0 || selectedFleet) && (
                     <button
@@ -2351,69 +2356,76 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                         setSelectedAssets([]);
                         setSelectedFleet(null);
                       }}
-                      className="text-[7.5px] text-red-400 hover:text-red-300 font-bold uppercase flex items-center gap-1 cursor-pointer"
+                      className="text-[9px] font-mono text-red-400 hover:text-red-300 font-bold uppercase cursor-pointer flex items-center gap-1"
                     >
-                      <Trash2 className="w-2.5 h-2.5" /> {t('expeditions.clean_selection')}
+                      <Trash2 className="w-2.5 h-2.5" /> [🗑 {t('expeditions.clean_selection', 'LIMPIAR SELECCIÓN')}]
                     </button>
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                  {selectedFleet && (
-                    <div
-                      onClick={() => { playSfx(440); setSelectedFleet(null); }}
-                      className="p-1 rounded border border-purple-500/60 bg-purple-950/40 cursor-pointer flex items-center gap-1.5 hover:border-purple-400 transition-all"
-                    >
-                      <div className="w-7 h-7 rounded bg-purple-900/60 border border-purple-800 shrink-0 flex items-center justify-center font-black text-purple-200 text-[9px]">
-                        FLT
-                      </div>
-                      <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
-                        <span className="text-[7.5px] font-black text-white truncate">{selectedFleet.name}</span>
-                        <span className="text-[6px] text-purple-300 font-mono font-bold">{t('expeditions.fleet_equipped')}</span>
-                      </div>
-                    </div>
-                  )}
-
+                {/* 2. Bandeja de Naves Seleccionadas (Scroll horizontal si hay muchas) */}
+                <div className="flex-1 min-h-0 my-1 overflow-x-auto no-scrollbar flex items-center gap-2 py-1">
                   {selectedAssets.length === 0 && !selectedFleet ? (
-                    <div className="col-span-full py-2 text-center text-zinc-600 text-[8px] uppercase italic">
-                      {t('expeditions.click_to_add_hint')}
+                    <div className="w-full h-full flex items-center justify-center text-[9px] font-mono text-zinc-500 uppercase tracking-widest border border-dashed border-cyan-950 rounded p-2 text-center">
+                      {t('expeditions.click_to_add_hint', 'HAZ CLIC EN LOS ACTIVOS DE ARRIBA PARA AÑADIRLOS A ESTA EXPEDICIÓN')}
                     </div>
                   ) : (
-                    selectedAssets.map(asset => {
-                      const effectVal = asset.effect || 0;
-                      return (
+                    <>
+                      {selectedFleet && (
                         <div
-                          key={`selected-${asset.id}`}
-                          onClick={() => toggleAssetSelection(asset)}
-                          className="p-1 rounded border border-cyan-500/60 bg-cyan-950/60 cursor-pointer flex items-center gap-1.5 hover:border-cyan-300 transition-all relative group"
+                          onClick={() => { playSfx(440); setSelectedFleet(null); }}
+                          className="w-[120px] sm:w-[135px] shrink-0 h-full max-h-[75px] bg-[#05080c] border border-purple-500/60 rounded p-1.5 flex items-center gap-2 relative group cursor-pointer hover:border-purple-400 transition-all"
                         >
-                          <div className="w-7 h-7 rounded bg-black border border-cyan-900 shrink-0 overflow-hidden">
-                            <img src={asset.image_url} className="w-full h-full object-cover" alt={asset.name} />
+                          <div className="w-8 h-8 rounded bg-purple-900/60 border border-purple-800 shrink-0 flex items-center justify-center font-black text-purple-200 text-[10px]">
+                            FLT
                           </div>
                           <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
-                            <span className="text-[7.5px] font-black text-white truncate">{asset.name}</span>
-                            {effectVal !== 0 ? (
-                              <span className={`text-[6px] font-mono font-bold ${effectVal > 0 ? 'text-cyan-300' : 'text-red-300'}`}>
-                                {effectVal > 0 ? `+${effectVal.toFixed(1)}%` : `${effectVal.toFixed(1)}%`}
-                              </span>
-                            ) : (
-                              <span className="text-[6px] text-cyan-400/70 font-mono uppercase">{asset.type}</span>
-                            )}
+                            <span className="text-[8px] font-black text-white truncate">{selectedFleet.name}</span>
+                            <span className="text-[6.5px] text-purple-300 font-mono font-bold">{t('expeditions.fleet_equipped')}</span>
                           </div>
                           <div className="absolute -top-1 -right-1 bg-red-950 border border-red-500 text-red-300 rounded-full w-3.5 h-3.5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                             <X className="w-2 h-2" />
                           </div>
                         </div>
-                      );
-                    })
+                      )}
+
+                      {selectedAssets.map(asset => {
+                        const effectVal = asset.effect || 0;
+                        return (
+                          <div
+                            key={`selected-${asset.id}`}
+                            onClick={() => toggleAssetSelection(asset)}
+                            className="w-[120px] sm:w-[135px] shrink-0 h-full max-h-[75px] bg-[#05080c] border border-cyan-500/50 rounded p-1.5 flex items-center gap-2 relative group cursor-pointer hover:border-cyan-300 transition-all"
+                          >
+                            <div className="w-8 h-8 rounded bg-black border border-cyan-900 shrink-0 overflow-hidden">
+                              <img src={asset.image_url} className="w-full h-full object-cover" alt={asset.name} />
+                            </div>
+                            <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
+                              <span className="text-[8px] font-black text-white truncate">{asset.name}</span>
+                              {effectVal !== 0 ? (
+                                <span className={`text-[6.5px] font-mono font-bold ${effectVal > 0 ? 'text-cyan-300' : 'text-red-300'}`}>
+                                  {effectVal > 0 ? `+${effectVal.toFixed(1)}%` : `${effectVal.toFixed(1)}%`}
+                                </span>
+                              ) : (
+                                <span className="text-[6.5px] text-cyan-400/70 font-mono uppercase">{asset.type}</span>
+                              )}
+                            </div>
+                            <div className="absolute -top-1 -right-1 bg-red-950 border border-red-500 text-red-300 rounded-full w-3.5 h-3.5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <X className="w-2 h-2" />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
                   )}
                 </div>
 
+                {/* 3. Consolidado Táctico de Stats (Ofensiva, Cinemática, Logística) */}
                 {selectedAssets && selectedAssets.length > 0 && (
-                  <div className="shrink-0 w-full py-1.5 px-2 bg-[#020509]/95 border-t border-cyan-500/25 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar font-mono text-[8px] sm:text-[9px] select-none mt-1.5">
+                  <div className="shrink-0 w-full py-1 px-1.5 bg-[#020509]/95 border border-cyan-500/25 rounded flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar font-mono text-[8px] sm:text-[9px] select-none my-0.5">
                     
                     {/* GRUPO 1: MATRIZ OFENSIVA (Rojos / Neón) */}
-                    <div className="flex items-center gap-1.5 shrink-0 bg-red-950/30 border border-red-500/30 px-2 py-0.5 rounded">
+                    <div className="flex items-center gap-1.5 shrink-0 bg-red-950/30 border border-red-500/30 px-1.5 py-0.5 rounded">
                       <span className="text-red-400 font-bold uppercase tracking-wider text-[7.5px] border-r border-red-900/60 pr-1.5">
                         OFENSIVA
                       </span>
@@ -2443,7 +2455,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                     </div>
 
                     {/* GRUPO 2: BLINDAJE Y CINEMÁTICA (Azul / Cian / Violeta) */}
-                    <div className="flex items-center gap-1.5 shrink-0 bg-cyan-950/30 border border-cyan-500/30 px-2 py-0.5 rounded">
+                    <div className="flex items-center gap-1.5 shrink-0 bg-cyan-950/30 border border-cyan-500/30 px-1.5 py-0.5 rounded">
                       <span className="text-cyan-400 font-bold uppercase tracking-wider text-[7.5px] border-r border-cyan-900/60 pr-1.5">
                         CINEMÁTICA
                       </span>
@@ -2462,7 +2474,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                     </div>
 
                     {/* GRUPO 3: LOGÍSTICA Y EXTRACCIÓN (Ámbar / Esmeralda) */}
-                    <div className="flex items-center gap-1.5 shrink-0 bg-amber-950/30 border border-amber-500/30 px-2 py-0.5 rounded">
+                    <div className="flex items-center gap-1.5 shrink-0 bg-amber-950/30 border border-amber-500/30 px-1.5 py-0.5 rounded">
                       <span className="text-amber-400 font-bold uppercase tracking-wider text-[7.5px] border-r border-amber-900/60 pr-1.5">
                         LOGÍSTICA
                       </span>
@@ -2478,16 +2490,17 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
 
                   </div>
                 )}
-              </div>
 
-              {/* Eficiencia / Probabilidad Footer */}
-              <div className="p-1.5 bg-[#020508] border border-cyan-950 rounded flex justify-between items-center text-[8px] sm:text-[9px] shrink-0 mt-1">
-                <span className="text-zinc-400 font-bold uppercase truncate">
-                  {selectedPlanet ? "EFICIENCIA DE EXTRACCIÓN:" : "PROBABILIDAD DESCUBRIMIENTO SS:"}
-                </span>
-                <span className={`font-black ${totalExpeditionProbability >= 0 ? 'text-amber-400' : 'text-red-400'}`}>
-                  {totalExpeditionProbability}%
-                </span>
+                {/* 4. Pie: Probabilidad de Descubrimiento SS y Acciones */}
+                <div className="shrink-0 pt-1 border-t border-cyan-950 flex items-center justify-between text-[8px] sm:text-[9px] font-mono">
+                  <span className="text-zinc-400 font-bold uppercase truncate">
+                    {selectedPlanet ? "EFICIENCIA DE EXTRACCIÓN:" : "PROBABILIDAD DESCUBRIMIENTO SS:"}
+                  </span>
+                  <span className={`font-black ${totalExpeditionProbability >= 0 ? 'text-amber-400' : 'text-red-400'}`}>
+                    {totalExpeditionProbability}%
+                  </span>
+                </div>
+
               </div>
             </div>
           </div>
