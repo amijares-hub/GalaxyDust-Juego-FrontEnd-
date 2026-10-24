@@ -25,15 +25,15 @@ export const useNotifications = () => {
       // 🎯 Consulta unificada de logs de expedición y notificaciones de sistema
       const { data, error } = await supabase
         .from('user_notifications')
-        .select('notification_id, title, message, category, box_type, is_read, created_at')
+        .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (!error && data) {
         const formatted: NotificationRecord[] = data.map((item: any) => ({
-          notification_id: item.id?.toString(),
+          notification_id: (item.notification_id || item.id || Math.random()).toString(),
           category: item.category || item.event_type || 'EXPEDITION',
-          box_type: item.box_type || 'EXPEDITION',
+          box_type: item.box_type || item.category || 'EXPEDITION',
           title: item.title || 'INFORME DE EXPEDICIÓN',
           message: item.message || 'Misión completada con éxito.',
           is_read: Boolean(item.is_read),
@@ -44,7 +44,7 @@ export const useNotifications = () => {
         setUnreadCount(formatted.filter(n => !n.is_read).length);
       }
     } catch (err) {
-      console.error("Error al cargar comunicaciones:", err);
+      console.warn("[NOTIFICATIONS] Error recuperable al cargar comunicaciones:", err);
     } finally {
       setLoading(false);
     }

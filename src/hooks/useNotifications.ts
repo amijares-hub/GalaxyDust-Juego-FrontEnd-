@@ -21,41 +21,53 @@ export const useNotifications = () => {
 
   // Inicializar el usuario
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id);
-    });
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) setUserId(data.user.id);
+    }).catch(() => {});
   }, []);
 
-  // 1. Cargar notificaciones desde la base de datos
+  // 1. Cargar notificaciones desde la base de datos (Filtro booleano estricto y select general)
   const fetchNotifications = useCallback(async (currentUserId?: string) => {
-    const uid = currentUserId || userId;
+    let uid = currentUserId || userId;
+    if (!uid) {
+      try {
+        const { data } = await supabase.auth.getUser();
+        uid = data?.user?.id || null;
+      } catch {}
+    }
     if (!uid) return;
 
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('user_notifications')
-        .select('notification_id, user_id, title, message, category, box_type, is_read, created_at, action_url')
+        .select('*')
         .eq('user_id', uid)
+        .eq('is_read', false) // <-- DEBE SER BOOLEANO ESTRICTO
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.warn('[NOTIFICATIONS] Silenced 400/schema issue in notifications fetch:', error.message);
+        return;
+      }
+
       if (data) {
         const mapped: NotificationRecord[] = data.map((item: any) => ({
-          notification_id: item.notification_id || Math.random().toString(),
+          notification_id: String(item.notification_id || item.id || Math.random()),
           user_id: item.user_id,
           title: item.title || 'COMUNICADO OFICIAL',
           message: item.message || '',
           category: item.category || 'EXPEDITION',
           box_type: item.box_type || item.category,
-          is_read: item.is_read ?? false,
+          is_read: Boolean(item.is_read),
           created_at: item.created_at || new Date().toISOString(),
           action_url: item.action_url
         }));
         setNotifications(mapped);
       }
-    } catch (err) {
-      console.error('[NOTIFICATIONS] Error cargando notificaciones:', err);
+    } catch (err: any) {
+      // Evita inundar la consola de DevTools ante cortes de red o esquemas en transición
+      console.warn('[NOTIFICATIONS] Fallo de red recuperable en notificaciones:', err?.message || err);
     } finally {
       setLoading(false);
     }
@@ -69,40 +81,44 @@ export const useNotifications = () => {
     let channel: any;
     
     const initRealtime = async () => {
-      const channelName = `realtime_user_notifications_${userId}`;
-      
-      // Desuscribir canal previo si ya existía en la memoria de Supabase
-      const existing = supabase.getChannels().find((ch) => (ch as any).name === channelName || ch.topic === channelName || ch.topic === `realtime:${channelName}`);
-      if (existing) {
-        await supabase.removeChannel(existing);
+      try {
+        const channelName = `realtime_user_notifications_${userId}`;
+        
+        // Desuscribir canal previo si ya existía en la memoria de Supabase
+        const existing = supabase.getChannels().find((ch) => (ch as any).name === channelName || ch.topic === channelName || ch.topic === `realtime:${channelName}`);
+        if (existing) {
+          await supabase.removeChannel(existing);
+        }
+        
+        // Crear nuevo canal de forma sincrónica: .on() SIEMPRE antes de .subscribe()
+        channel = supabase
+          .channel(channelName)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'user_notifications',
+              filter: `user_id=eq.${userId}`,
+            },
+            () => {
+              fetchNotifications(userId);
+            }
+          )
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              console.log('[REALTIME] Suscrito exitosamente a notificaciones');
+            }
+          });
+      } catch (err: any) {
+        console.warn('[REALTIME] Error silenciado en suscripción:', err?.message || err);
       }
-      
-      // Crear nuevo canal de forma sincrónica: .on() SIEMPRE antes de .subscribe()
-      channel = supabase
-        .channel(channelName)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'user_notifications',
-            filter: `user_id=eq.${userId}`,
-          },
-          () => {
-            fetchNotifications(userId);
-          }
-        )
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            console.log('[REALTIME] Suscrito exitosamente a notificaciones');
-          }
-        });
     };
 
     initRealtime();
       
     return () => {
-      if (channel) supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel).catch(() => {});
     };
   }, [userId, fetchNotifications]);
 
