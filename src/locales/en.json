@@ -346,7 +346,22 @@
     "master_vol": "MASTER VOLUME",
     "bgm_vol": "MUSIC / AMBIENCE (BGM)",
     "sfx_vol": "SOUND EFFECTS (SFX)",
+    "tutorial_title": "TACTICAL BRIEFING (TUTORIAL)",
+    "tutorial_subtitle": "REVIEW COMMAND PROTOCOLS AND GAME SYSTEMS",
     "close": "CLOSE",
     "saved": "SETTINGS SAVED"
+  },
+  "tutorial": {
+    "header": "TACTICAL BRIEFING // STEP",
+    "step1_title": "ALPHA COMMAND MAINFRAME",
+    "step1_desc": "The Main Hub is your bridge to all sectors: Expeditions, Market, and Phantom Station. Monitor your fleet status at all times.",
+    "step2_title": "C.A.N. ACTION NODE",
+    "step2_desc": "The core of your production. Equip structures, research tech, and forge badges to maximize hourly resource yield and galactic power.",
+    "step3_title": "FLEET & ARSENAL MANAGEMENT",
+    "step3_desc": "Inspect combat ships equipped with 19 tactical stats. Audit kinetic, laser, and plasma damage profiles alongside shield matrices before launching.",
+    "step4_title": "EXPEDICIONES & DEEP SCAN",
+    "step4_desc": "Deploy fleet squadrons based on combined firepower and cargo capacity. Chart unknown clusters and discover unmapped stars.",
+    "step5_title": "P2P MARKETPLACE & PHANTOM",
+    "step5_desc": "Trade cargo packages with fellow commanders in live auctions or spend Void Crystals at Phantom Station for classified blueprints."
   }
 }

@@ -111,29 +111,45 @@ export const useNotifications = () => {
     return notifications.filter(n => !n.is_read && isOfficialComunicado(n)).length;
   }, [notifications]);
 
-  // 3. Métodos auxiliares
+  // 3. Métodos auxiliares protegidos
   const markAsRead = async (notificationId: string) => {
     if (!userId) return;
-    await supabase.from('user_notifications').update({ is_read: true }).eq('notification_id', notificationId).eq('user_id', userId);
-    fetchNotifications(userId);
+    try {
+      await supabase.from('user_notifications').update({ is_read: true }).eq('notification_id', notificationId).eq('user_id', userId);
+      fetchNotifications(userId);
+    } catch (err) {
+      console.warn('[NOTIFICATIONS] Error en markAsRead:', err);
+    }
   };
 
   const markAllAsRead = async () => {
     if (!userId) return;
-    await supabase.from('user_notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false);
-    fetchNotifications(userId);
+    try {
+      await supabase.from('user_notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false);
+      fetchNotifications(userId);
+    } catch (err) {
+      console.warn('[NOTIFICATIONS] Error en markAllAsRead:', err);
+    }
   };
   
   const deleteNotification = async (notificationId: string) => {
     if (!userId) return;
-    await supabase.from('user_notifications').delete().eq('notification_id', notificationId).eq('user_id', userId);
-    fetchNotifications(userId);
+    try {
+      await supabase.from('user_notifications').delete().eq('notification_id', notificationId).eq('user_id', userId);
+      fetchNotifications(userId);
+    } catch (err) {
+      console.warn('[NOTIFICATIONS] Error en deleteNotification:', err);
+    }
   };
 
   const deleteAllNotifications = async () => {
     if (!userId) return;
-    await supabase.from('user_notifications').delete().eq('user_id', userId);
-    fetchNotifications(userId);
+    try {
+      await supabase.from('user_notifications').delete().eq('user_id', userId);
+      fetchNotifications(userId);
+    } catch (err) {
+      console.warn('[NOTIFICATIONS] Error en deleteAllNotifications:', err);
+    }
   };
 
   return {

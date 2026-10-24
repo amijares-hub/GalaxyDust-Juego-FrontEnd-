@@ -6,6 +6,39 @@ export interface AudioSettings {
   sfx: number;    // 0 - 100
 }
 
+let sharedAudioCtx: AudioContext | null = null;
+
+export function getSharedAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  if (!sharedAudioCtx) {
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    if (Ctx) {
+      sharedAudioCtx = new Ctx();
+    }
+  }
+  return sharedAudioCtx;
+}
+
+export const unlockAudioContext = () => {
+  try {
+    const ctx = getSharedAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+  } catch {}
+};
+
+// Desbloqueo pasivo global al primer gesto táctil o clic
+if (typeof window !== 'undefined') {
+  const handleFirstInteraction = () => {
+    unlockAudioContext();
+    window.removeEventListener('click', handleFirstInteraction);
+    window.removeEventListener('touchstart', handleFirstInteraction);
+  };
+  window.addEventListener('click', handleFirstInteraction, { once: true, passive: true });
+  window.addEventListener('touchstart', handleFirstInteraction, { once: true, passive: true });
+}
+
 export function getAudioSettings(): AudioSettings {
   try {
     const master = localStorage.getItem('gd_audio_master');
@@ -13,11 +46,11 @@ export function getAudioSettings(): AudioSettings {
     const sfx = localStorage.getItem('gd_audio_sfx');
     return {
       master: master !== null ? Math.max(0, Math.min(100, Number(master))) : 80,
-      bgm: bgm !== null ? Math.max(0, Math.min(100, Number(bgm))) : 50,
+      bgm: bgm !== null ? Math.max(0, Math.min(100, Number(bgm))) : 40,
       sfx: sfx !== null ? Math.max(0, Math.min(100, Number(sfx))) : 80,
     };
   } catch {
-    return { master: 80, bgm: 50, sfx: 80 };
+    return { master: 80, bgm: 40, sfx: 80 };
   }
 }
 
@@ -44,8 +77,11 @@ export function useAudioEngine() {
         audio.volume = Math.min(1, Math.max(0, 0.25 * factor));
         audio.play().catch(() => {});
       } else {
-        const Ctx = window.AudioContext || (window as any).webkitAudioContext;
-        const ctx = new Ctx();
+        const ctx = getSharedAudioContext();
+        if (!ctx) return;
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
@@ -61,5 +97,6 @@ export function useAudioEngine() {
     } catch (_) {}
   }, []);
 
-  return { playSfx, getAudioSettings, saveAudioSettings };
+  return { playSfx, getAudioSettings, saveAudioSettings, unlockAudioContext };
 }
+

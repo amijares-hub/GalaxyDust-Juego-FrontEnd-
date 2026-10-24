@@ -346,7 +346,22 @@
     "master_vol": "VOLUMEN GENERAL",
     "bgm_vol": "MÚSICA / AMBIENTE (BGM)",
     "sfx_vol": "EFECTOS DE SONIDO (SFX)",
+    "tutorial_title": "INSTRUCCIÓN TÁCTICA (TUTORIAL)",
+    "tutorial_subtitle": "REPASA LOS PROTOCOLOS DE MANDO Y SISTEMAS DEL JUEGO",
     "close": "CERRAR",
     "saved": "CONFIGURACIÓN GUARDADA"
+  },
+  "tutorial": {
+    "header": "INSTRUCCIÓN TÁCTICA // PASO",
+    "step1_title": "CENTRO DE COMANDO ALFA",
+    "step1_desc": "Desde el Main Hub accedes a todos los sectores imperiales: Expediciones, Mercado y Estación Phantom. Mantén tu nave lista en todo momento.",
+    "step2_title": "NODO DE ACCIÓN C.A.N.",
+    "step2_desc": "El corazón de tu producción. Equipa estructuras, investiga tecnologías y forja insignias para multiplicar tu extracción horaria de recursos y tu poder galáctico.",
+    "step3_title": "GESTIÓN DE ARSENAL Y NAVES",
+    "step3_desc": "Tu inventario alberga naves de combate con 19 estadísticas reales. Revisa sus módulos de daño cinético, láser, plasma y escudos antes de entrar en combate.",
+    "step4_title": "EXPEDICIONES Y EXPLORACIÓN",
+    "step4_desc": "Despliega escuadrones seleccionando naves que sumen potencia de fuego y capacidad de bodega. Descubre estrellas y sistemas inexplorados.",
+    "step5_title": "MERCADO P2P Y PHANTOM",
+    "step5_desc": "Comercia cargamentos con otros comandantes en subastas vivas o canjea Cristales del Vacío en la Estación Phantom por planos experimentales."
   }
 }

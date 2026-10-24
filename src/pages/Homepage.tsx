@@ -13,6 +13,7 @@ import { ProfileView } from '../components/ProfileView';
 import { NotificationsView, isOfficialComunicado } from '../components/NotificationsView';
 import { MissionView } from '../components/MissionView';
 import { SettingsModal } from '../components/SettingsModal';
+import { TutorialOverlay } from '../components/tutorial/TutorialOverlay';
 import { ChatSystem } from '../components/ChatSystem';
 import { Header } from '../components/Header';
 import { miningService } from '../services/miningService';
@@ -132,6 +133,13 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
   const [showFlightsModal, setShowFlightsModal] = useState<boolean>(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+  const [showTutorial, setShowTutorial] = useState<boolean>(() => {
+    try {
+      return !localStorage.getItem('gd_tutorial_completed');
+    } catch {
+      return false;
+    }
+  });
 
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string>(user.avatarUrl || '');
   const [utcTime, setUtcTime] = useState<string>(miningService.getFormattedUtcTime());
@@ -729,7 +737,17 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       <SettingsModal 
         isOpen={showSettingsModal} 
         onClose={() => setShowSettingsModal(false)} 
-        triggerNotification={handleTriggerNotification} 
+        triggerNotification={handleTriggerNotification}
+        onOpenTutorial={() => {
+          setShowSettingsModal(false);
+          setShowTutorial(true);
+        }}
+      />
+
+      {/* TUTORIAL INTERACTIVO SCI-FI */}
+      <TutorialOverlay
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
       />
 
       <ChatSystem userAllianceName={user.allianceName} triggerNotification={handleTriggerNotification} />

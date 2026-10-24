@@ -8,9 +8,10 @@ interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   triggerNotification?: (text: string) => void;
+  onOpenTutorial?: () => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, triggerNotification }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, triggerNotification, onOpenTutorial }) => {
   const { t, i18n } = useTranslation();
   const { playSfx } = useAudioEngine();
   const [audio, setAudio] = useState<AudioSettings>({ master: 80, bgm: 50, sfx: 80 });
@@ -188,6 +189,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                     className="w-full accent-amber-400 h-1.5 bg-black/80 rounded-lg cursor-pointer"
                   />
                 </div>
+              </div>
+
+              {/* 3. INSTRUCCIÓN TÁCTICA (TUTORIAL) */}
+              <div className="p-3 bg-[#080d14] border border-cyan-500/30 rounded-xl flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-mono text-cyan-300 font-bold uppercase block">
+                    {t('settings.tutorial_title', 'INSTRUCCIÓN TÁCTICA (TUTORIAL)')}
+                  </span>
+                  <span className="text-[8px] text-zinc-500 uppercase">
+                    {t('settings.tutorial_subtitle', 'REPASA LOS PROTOCOLOS DE MANDO Y SISTEMAS DEL JUEGO')}
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    playSfx(880);
+                    onClose();
+                    if (onOpenTutorial) onOpenTutorial();
+                  }}
+                  className="px-3 py-1.5 bg-cyan-950 hover:bg-cyan-900 border border-cyan-400 text-cyan-200 text-[9px] font-bold uppercase rounded shadow cursor-pointer transition-colors"
+                >
+                  [ 🚀 INICIAR TUTORIAL ]
+                </button>
               </div>
 
             </div>
