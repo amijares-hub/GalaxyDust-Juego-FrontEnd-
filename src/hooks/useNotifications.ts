@@ -20,22 +20,16 @@ export const useNotifications = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const isFetchingRef = useRef(false);
 
-  // Inicializar el usuario activo una sola vez
+  // Obtener sesión activa una sola vez
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) setUserId(data.user.id);
     }).catch(() => {});
   }, []);
 
-  // 1. Cargar notificaciones sin forzar tipo en PostgREST (previene Error 400 de tipo de dato)
+  // 1. Carga protegida sin parámetros conflictivos en PostgREST
   const fetchNotifications = useCallback(async (currentUserId?: string) => {
-    let uid = currentUserId || userId;
-    if (!uid) {
-      try {
-        const { data } = await supabase.auth.getUser();
-        uid = data?.user?.id || null;
-      } catch {}
-    }
+    const uid = currentUserId || userId;
     if (!uid || isFetchingRef.current) return;
 
     try {
@@ -46,7 +40,8 @@ export const useNotifications = () => {
         .from('user_notifications')
         .select('*')
         .eq('user_id', uid)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50); // Límite defensivo para evitar sobrecarga de red
 
       if (error) {
         console.warn('[NOTIFICATIONS] Consulta silenciada:', error.message);
@@ -54,13 +49,13 @@ export const useNotifications = () => {
       }
 
       if (data) {
-        // Filtrado en memoria: soporta boolean (false), integer (0), o string ('0')
-        const unreadList = data.filter((item: any) => {
+        // Filtrado en memoria: soporta boolean (false), integer (0) o string ('0')
+        const unreadOnly = data.filter((item: any) => {
           const val = item.is_read;
           return val === false || val === 0 || val === '0' || val === null || val === undefined;
         });
 
-        const mapped: NotificationRecord[] = unreadList.map((item: any) => ({
+        const mapped: NotificationRecord[] = unreadOnly.map((item: any) => ({
           notification_id: String(item.id || item.notification_id || Math.random()),
           user_id: item.user_id,
           title: item.title || 'COMUNICADO OFICIAL',
@@ -82,59 +77,48 @@ export const useNotifications = () => {
     }
   }, [userId]);
 
-  // 2. Suscripción Realtime blindada (evita MaxListenersExceeded y fugas de memoria)
+  // 2. Suscripción única al canal Realtime
   useEffect(() => {
     if (!userId) return;
 
     fetchNotifications(userId);
     let channel: any = null;
 
-    const initRealtime = async () => {
-      try {
-        const channelName = `realtime_user_notifications_${userId}`;
+    const channelName = `realtime_user_notifications_${userId}`;
+    const existing = supabase.getChannels().find(
+      (ch) => (ch as any).name === channelName || ch.topic === channelName || ch.topic === `realtime:${channelName}`
+    );
+    if (existing) {
+      supabase.removeChannel(existing);
+    }
 
-        const existing = supabase.getChannels().find(
-          (ch) => (ch as any).name === channelName || ch.topic === channelName || ch.topic === `realtime:${channelName}`
-        );
-        if (existing) {
-          await supabase.removeChannel(existing);
+    channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          fetchNotifications(userId);
         }
-
-        channel = supabase
-          .channel(channelName)
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'user_notifications',
-              filter: `user_id=eq.${userId}`,
-            },
-            () => {
-              fetchNotifications(userId);
-            }
-          )
-          .subscribe();
-      } catch (err: any) {
-        console.warn('[REALTIME] Error silenciado en canal de notificaciones:', err?.message || err);
-      }
-    };
-
-    initRealtime();
+      )
+      .subscribe();
 
     return () => {
       if (channel) {
         supabase.removeChannel(channel).catch(() => {});
       }
     };
-  }, [userId]); // Depende únicamente de userId para no re-suscribirse en bucle
+  }, [userId, fetchNotifications]);
 
-  // Conteo de comunicados oficiales no leídos
   const unreadCount = useMemo(() => {
     return notifications.filter(n => !n.is_read && isOfficialComunicado(n)).length;
   }, [notifications]);
 
-  // 3. Métodos de actualización y borrado tolerantes a id / notification_id
   const markAsRead = async (notificationId: string) => {
     if (!userId) return;
     try {

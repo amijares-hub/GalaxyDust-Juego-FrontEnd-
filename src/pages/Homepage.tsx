@@ -179,58 +179,58 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 5500);
 
-    // 2. Evaluar filtro de Comunicados Oficiales
-    const mockRecord: any = {
-      title: typeof payloadOrExpId === 'object' && payloadOrExpId?.title ? payloadOrExpId.title : 'COMUNICADO OFICIAL',
-      message: text,
-      category: typeof payloadOrExpId === 'object' && payloadOrExpId?.category ? payloadOrExpId.category : 'EXPEDITION',
-      box_type: typeof payloadOrExpId === 'object' && payloadOrExpId?.box_type ? payloadOrExpId.box_type : ''
-    };
+    // 2. Separar notificaciones de UI vs Logs de Expedición
+    // Toasts de selección de inventario o avisos generales solo actualizan la interfaz visual y nunca realizan INSERT en BD
+    const rawExpId = typeof payloadOrExpId === 'string'
+      ? payloadOrExpId
+      : payloadOrExpId && typeof payloadOrExpId === 'object'
+      ? (payloadOrExpId.expedition_id || payloadOrExpId.expId)
+      : null;
 
-    // Si no cumple el filtro estricto de Comunicados Oficiales, termina aquí (sin persistir en BD ni alterar campana)
-    if (!isOfficialComunicado(mockRecord)) {
+    const validExpId = isValidUUID(rawExpId) ? rawExpId : null;
+
+    // Si no cuenta con un expedition_id válido, concluye la ejecución sin persistir en BD
+    if (!validExpId) {
       return;
     }
 
-    // 3. Persistir en Supabase únicamente si es un Comunicado Oficial
+    // 3. Persistir en Supabase expedition_logs únicamente ante eventos con expedition_id verificado
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) return;
 
-      let validExpId: string | null = null;
-      let rewardsPayload: any = {};
+      const { data: existingLog } = await supabase
+        .from('expedition_logs')
+        .select('id')
+        .eq('user_id', authUser.id)
+        .eq('expedition_id', validExpId)
+        .maybeSingle();
 
-      if (typeof payloadOrExpId === 'string' && isValidUUID(payloadOrExpId)) {
-        validExpId = payloadOrExpId;
-      } else if (payloadOrExpId && typeof payloadOrExpId === 'object') {
-        if (isValidUUID(payloadOrExpId.expId)) validExpId = payloadOrExpId.expId;
-        if (payloadOrExpId.rewards) rewardsPayload = payloadOrExpId.rewards;
-      }
+      if (existingLog) return;
 
-      if (validExpId) {
-        const { data: existingLog } = await supabase
-          .from('expedition_logs')
-          .select('id')
-          .eq('user_id', authUser.id)
-          .eq('expedition_id', validExpId)
-          .maybeSingle();
-
-        if (existingLog) return;
-      }
+      const title = typeof payloadOrExpId === 'object' && payloadOrExpId?.title
+        ? payloadOrExpId.title
+        : 'COMUNICADO OFICIAL';
+      const eventType = typeof payloadOrExpId === 'object' && (payloadOrExpId?.event_type || payloadOrExpId?.category)
+        ? (payloadOrExpId.event_type || payloadOrExpId.category)
+        : 'EXPEDITION';
+      const rewardsPayload = typeof payloadOrExpId === 'object' && payloadOrExpId?.rewards
+        ? payloadOrExpId.rewards
+        : {};
 
       await supabase.from('expedition_logs').insert([{
         user_id: authUser.id,
         expedition_id: validExpId,
-        event_type: mockRecord.category,
-        title: mockRecord.title,
+        event_type: eventType,
+        title: title,
         message: text,
         rewards_looted: rewardsPayload,
         is_read: false
       }]);
 
       refreshNotifications();
-    } catch (err) {
-      console.error("Error al persistir comunicado oficial:", err);
+    } catch (err: any) {
+      console.warn("[NOTIFICATIONS] Error al persistir comunicado oficial:", err?.message || err);
     }
   };
 
