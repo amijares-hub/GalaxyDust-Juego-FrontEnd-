@@ -66,18 +66,39 @@ export const AuthView: React.FC = () => {
     generateCaptcha();
   }, [activeTab]);
 
-  // 🛡️ Detección en AuthView al montar: comprueba si la URL contiene indicios de recuperación
+  // 🛡️ Detección e intercambio de sesión robusta al montar AuthView
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const hasResetIndicator =
-      window.location.hash.includes('reset-password') ||
-      window.location.hash.includes('type=recovery') ||
-      window.location.search.includes('code=') ||
-      showNewPasswordModal === true;
+    const initRecoverySession = async () => {
+      if (typeof window === 'undefined') return;
 
-    if (hasResetIndicator) {
-      setScreen('reset_password');
-    }
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const hash = window.location.hash;
+
+      // Flujo PKCE: Supabase envía ?code=... — requiere intercambio explícito
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!error) {
+          setScreen('reset_password');
+        }
+        // Limpiar el código de la URL para evitar re-procesamiento
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
+
+      // Flujo implícito: hash contiene #access_token=... o #type=recovery
+      if (hash.includes('type=recovery') || hash.includes('access_token')) {
+        setScreen('reset_password');
+        return;
+      }
+
+      // Fallback: showNewPasswordModal activado desde useSasoriAuth (must_reset_password)
+      if (showNewPasswordModal) {
+        setScreen('reset_password');
+      }
+    };
+
+    initRecoverySession();
   }, [showNewPasswordModal, setScreen]);
 
   // Temporizador regresivo de 10 segundos tras registro exitoso

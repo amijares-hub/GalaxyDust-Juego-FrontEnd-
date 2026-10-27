@@ -403,8 +403,9 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     setSuccessMessage(null);
     try {
       const cleanEmail = email.trim();
+      const redirectUrl = typeof window !== 'undefined' ? window.location.origin : '';
       const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: `${window.location.origin}/#reset-password`,
+        redirectTo: redirectUrl,
       });
       if (error) throw error;
       setState('idle');
@@ -423,10 +424,19 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
+      // 🛡️ Verificar sesión activa ANTES de llamar updateUser
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setState('error');
+        setErrorMessage('No se detectó una sesión de recuperación activa. Por favor solicita un nuevo enlace desde el login.');
+        return false;
+      }
+
       const { data, error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
 
-      const activeUserId = data?.user?.id || user?.id;
+      // Usar session.user.id como fuente de verdad garantizada
+      const activeUserId = data?.user?.id || session.user.id;
       if (activeUserId) {
         const { error: pErr } = await supabase
           .from('user_profiles')
@@ -447,6 +457,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
       setState('connected');
       setSuccessMessage('CONTRASEÑA ACTUALIZADA CON ÉXITO');
 
+      // Limpiar URL solo DESPUÉS del éxito
       if (typeof window !== 'undefined') {
         window.history.replaceState({}, document.title, window.location.pathname);
       }
