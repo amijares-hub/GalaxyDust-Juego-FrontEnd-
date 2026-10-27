@@ -5,13 +5,11 @@ import {
   Volume2,
   VolumeX,
   BookOpen,
-  Sliders,
-  Download
+  Sliders
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAudioEngine } from '../hooks/useAudioEngine';
 import { GalaxyFrame } from './CanView';
-import { APP_DOWNLOADS } from '../constants/downloads';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -179,42 +177,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </button>
                 </div>
               )}
-
-              {/* SECCIÓN 4: DESCARGA DE CLIENTES NATIVOS */}
-              <div className="bg-[#05080c] border border-cyan-950 p-3 rounded-xl flex items-center justify-between">
-                <div>
-                  <span className="text-[9px] font-black tracking-wider uppercase text-cyan-300 block">
-                    CLIENTE NATIVO OFICIAL ({APP_DOWNLOADS.version})
-                  </span>
-                  <span className="text-[7.5px] text-zinc-500 uppercase">
-                    Instaladores oficiales para PC (.exe) y Android (.apk)
-                  </span>
-                </div>
-                <div className="flex gap-1.5">
-                  <a
-                    href={APP_DOWNLOADS.windows.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => playSfx(660)}
-                    className="px-2.5 py-1 bg-cyan-950/70 hover:bg-cyan-900 border border-cyan-500/50 text-cyan-300 text-[8px] font-black uppercase rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow"
-                    title="Descargar instalador para Windows"
-                  >
-                    <Download className="w-3 h-3" />
-                    <span>PC</span>
-                  </a>
-                  <a
-                    href={APP_DOWNLOADS.android.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => playSfx(660)}
-                    className="px-2.5 py-1 bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-300 text-[8px] font-black uppercase rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow"
-                    title="Descargar APK para Android"
-                  >
-                    <Download className="w-3 h-3" />
-                    <span>APK</span>
-                  </a>
-                </div>
-              </div>
 
               {/* Pie de modal */}
               <div className="pt-2 border-t border-cyan-950 flex justify-end">
