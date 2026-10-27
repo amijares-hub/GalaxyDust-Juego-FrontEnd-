@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MessageSquare, Send, X, Globe, Shield, ShoppingBag,
@@ -51,6 +51,11 @@ const resolveAvatarUrl = (url?: string | null): string => {
   return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Avatares%20de%20Comandantes/${fileName}`;
 };
 
+const getStartOfTodayUtc = (): number => {
+  const now = new Date();
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0);
+};
+
 export const ChatSystem: React.FC<ChatSystemProps> = ({
   userAllianceName = 'NO ALLIANCE',
   triggerNotification
@@ -68,6 +73,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
   const [unreadCount, setUnreadCount] = useState(0);
 
   const lastSentTimeRef = useRef<number>(0);
+  const isSendingRef = useRef<boolean>(false);
 
   const [activeDmPartner, setActiveDmPartner] = useState<DmPartner | null>(null);
   const [recentDmPartners, setRecentDmPartners] = useState<DmPartner[]>([]);
@@ -82,17 +88,18 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data?.user) {
-        setCurrentUserId(data.user.id);
-        checkActiveCombat(data.user.id);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setCurrentUserId(session.user.id);
+        checkActiveCombat(session.user.id);
       }
     });
   }, []);
 
   const fetchAllUserProfiles = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       const newMap: Record<string, UserProfileData> = {};
 
       if (user) {
@@ -201,7 +208,10 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
 
       unsubscribeFn = chatService.subscribeToChannel(channelId, (newMsg) => {
         if (isSubscribed) {
-          setMessages((prev) => [...prev.slice(-99), newMsg]);
+          setMessages((prev) => {
+            if (prev.some((m) => String(m.id) === String(newMsg.id))) return prev;
+            return [...prev.slice(-99), newMsg];
+          });
           if (!isOpen && newMsg.user_id !== currentUserId) {
             setUnreadCount((prev) => prev + 1);
           }
@@ -225,29 +235,35 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSendingRef.current) return;
     if (!inputContent.trim()) return;
 
     const now = Date.now();
-    if (now - lastSentTimeRef.current < 1200) {
+    if (now - lastSentTimeRef.current < 1000) {
       if (triggerNotification) triggerNotification('⚠️ CANAL SATURADO. ESPERA UN SEGUNDO.');
       return;
     }
-    lastSentTimeRef.current = now;
 
     if (activeChannel === 'PRIVADO' && !activeDmPartner) {
       if (triggerNotification) triggerNotification('⚠️ SELECCIONA UN PILOTO PARA TRANSMITIR');
       return;
     }
 
+    const textToSend = inputContent.trim();
+    setInputContent('');
+    setShowEmojiPicker(false);
+    isSendingRef.current = true;
+    lastSentTimeRef.current = now;
+
     try {
       const sentMsg = await chatService.sendMessage(
-        channelId, inputContent, 'TEXT', null, activeChannel === 'PRIVADO' && activeDmPartner ? activeDmPartner.id : null
+        channelId, textToSend, 'TEXT', null, activeChannel === 'PRIVADO' && activeDmPartner ? activeDmPartner.id : null
       );
-      setMessages((prev) => prev.some((m) => m.id === sentMsg.id) ? prev : [...prev.slice(-99), sentMsg]);
-      setInputContent('');
-      setShowEmojiPicker(false);
+      setMessages((prev) => prev.some((m) => String(m.id) === String(sentMsg.id)) ? prev : [...prev.slice(-99), sentMsg]);
     } catch (err: any) {
       if (triggerNotification) triggerNotification(err.message || 'Error al transmitir');
+    } finally {
+      isSendingRef.current = false;
     }
   };
 
@@ -296,13 +312,23 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
 
   const handleAddEmoji = (emoji: string) => setInputContent((prev) => prev + emoji);
 
-  const filteredMessages = messages.filter((m) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    const userProf = profilesMap[m.user_id] || (m.user_name ? profilesMap[m.user_name.toLowerCase()] : undefined);
-    const nameToFilter = userProf?.username || m.user_name;
-    return m.content.toLowerCase().includes(q) || nameToFilter.toLowerCase().includes(q);
-  });
+  const filteredMessages = useMemo(() => {
+    const startOfTodayUtc = getStartOfTodayUtc();
+
+    return messages.filter((m) => {
+      // Filtro de canal global: mensajes de hoy desde las 00:00 UTC
+      if (activeChannel === 'GLOBAL' && m.created_at) {
+        const msgTime = new Date(m.created_at).getTime();
+        if (msgTime < startOfTodayUtc) return false;
+      }
+
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      const userProf = profilesMap[m.user_id] || (m.user_name ? profilesMap[m.user_name.toLowerCase()] : undefined);
+      const nameToFilter = userProf?.username || m.user_name || '';
+      return m.content.toLowerCase().includes(q) || (nameToFilter && nameToFilter.toLowerCase().includes(q));
+    });
+  }, [messages, activeChannel, searchQuery, profilesMap]);
 
   const availableChannels = [
     { id: 'GLOBAL', label: 'GLOBAL', icon: Globe },

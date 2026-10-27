@@ -208,7 +208,6 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, isSelected, onClick
         ${activeBorder}
       `}
     >
-      {/* 1. Header de la Tarjeta: Categoría y Cantidad (Compacto y Firme) */}
       <div className="shrink-0 h-5 px-1.5 flex items-center justify-between z-10 bg-[#04080e]/95 border-b border-cyan-500/20">
         <span className="text-[7.5px] sm:text-[8px] font-mono tracking-wider uppercase text-cyan-400 font-bold truncate max-w-[65%]">
           {asset.category || 'ASSET'}
@@ -218,7 +217,6 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, isSelected, onClick
         </span>
       </div>
 
-      {/* 2. Visual del Activo: Imagen Centrada con Resplandor */}
       <div className="flex-1 min-h-0 w-full p-1 flex items-center justify-center relative overflow-hidden bg-black/40">
         <div className="absolute inset-0 bg-radial from-cyan-500/10 via-transparent to-transparent opacity-30 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
@@ -254,7 +252,6 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, isSelected, onClick
         )}
       </div>
 
-      {/* 3. Pie de la Tarjeta: Nombre y Rareza/POW (Siempre Visible, Nunca Cubierto) */}
       <div className="shrink-0 h-6 sm:h-7 px-1.5 py-0.5 flex flex-col justify-center z-10 bg-[#03060a]/95 border-t border-cyan-500/20">
         <p className="text-[8.5px] sm:text-[9.5px] font-mono font-bold text-white truncate group-hover:text-cyan-300 transition-colors flex items-center justify-between leading-tight">
           <span className="truncate">{asset.name}</span>
@@ -272,7 +269,6 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, isSelected, onClick
         </div>
       </div>
 
-      {/* Línea de escaneo superior en hover */}
       <div className="absolute top-0 inset-x-0 h-[1px] bg-cyan-400 opacity-0 group-hover:opacity-100 group-hover:animate-pulse pointer-events-none transition-opacity" />
     </div>
   );
@@ -323,9 +319,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   useEffect(() => {
     if (showSubModal === "fleet") {
-      supabase.auth.getUser().then(({ data: { user } }) => {
-        if (!user) return;
-        supabase.from("fleets").select("*").eq("user_id", user.id).then(({ data }) => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session?.user) return;
+        supabase.from("fleets").select("*").eq("user_id", session.user.id).then(({ data }) => {
           if (data) setFleets(data);
         });
       });
@@ -404,10 +400,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   return (
     <div className="w-full h-[calc(100dvh-var(--header-height,2.75rem))] grid grid-cols-12 gap-2 p-2 sm:p-3 overflow-hidden select-none font-mono text-white">
       
-      {/* ── 1. COLUMNA IZQUIERDA: SIDEBAR TÁCTICO (col-span-3) ── */}
+      {/* ── 1. COLUMNA IZQUIERDA: SIDEBAR TÁCTICO ── */}
       <div className="col-span-3 hud-panel hud-corners flex flex-col justify-between p-2 h-full overflow-hidden min-h-0 bg-[#05080c]/90 border border-cyan-500/30 rounded-xl shadow-xl">
         
-        {/* Cabecera del Sidebar */}
         <div className="shrink-0 mb-1 border-b border-cyan-500/20 pb-1.5">
           <button
             onClick={onBack}
@@ -419,11 +414,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
           <div className="text-[9px] sm:text-[10px] font-mono text-zinc-400 bg-black/60 border border-cyan-900/50 rounded px-2 py-1 flex items-center justify-between">
             <span className="uppercase">{t('inventory.galactic_power', 'PODER GALÁCTICO')}:</span>
-            <span className="text-emerald-400 font-black">{playerPower.toLocaleString()} POW</span>
+            <span className="text-emerald-400 font-black">{(playerPower ?? 0).toLocaleString()} POW</span>
           </div>
         </div>
 
-        {/* Menú de Categorías Vertical */}
         <div className="flex-1 min-h-0 flex flex-col gap-1 overflow-y-auto no-scrollbar py-1 pr-0.5">
           {subSections.map(({ key, labelKey, fallbackLabel, locked }) => {
             const isActive = activeSidebarCategory === key;
@@ -454,19 +448,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           })}
         </div>
 
-        {/* Contador Inferior */}
         <div className="shrink-0 border-t border-cyan-500/20 pt-1.5 text-[10px] text-cyan-400/70 font-mono tracking-wider uppercase truncate">
           FILTERED ASSETS: {getFilteredCharacters.length} / {characters.length}
         </div>
       </div>
 
-      {/* ── 2. COLUMNA DERECHA: GRILLA DE 5 COLUMNAS DE ACTIVOS (col-span-9) ── */}
+      {/* ── 2. COLUMNA DERECHA: GRILLA DE ACTIVOS ── */}
       <div className="col-span-9 hud-panel hud-corners flex flex-col h-full min-h-0 p-2 overflow-hidden bg-[#05080c]/80 border border-cyan-500/30 rounded-xl shadow-xl">
         
-        {/* Barra Superior Fija: Filtros y Búsqueda */}
         <div className="flex items-center justify-between gap-1.5 sm:gap-2 mb-2 pb-1.5 border-b border-cyan-500/20 text-xs shrink-0 flex-wrap sm:flex-nowrap">
           <div className="flex items-center gap-1.5">
-            {/* Dropdown 1: Clases */}
             <div className="relative">
               <button
                 onClick={() => { setShowFilter1Modal(!showFilter1Modal); setShowFilter2Modal(false); }}
@@ -490,7 +481,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </AnimatePresence>
             </div>
 
-            {/* Dropdown 2: Facciones / Filtros */}
             <div className="relative">
               <button
                 onClick={() => { setShowFilter2Modal(!showFilter2Modal); setShowFilter1Modal(false); }}
@@ -514,7 +504,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </AnimatePresence>
             </div>
 
-            {/* Checkbox: Flotas en vuelo */}
             <button
               onClick={() => { setModsEnabled(!modsEnabled); triggerNotification(modsEnabled ? "🔴 FILTRO APAGADO" : "🟢 MOSTRANDO FLOTAS EN VUELO"); }}
               className="flex items-center gap-1 hover:opacity-90 select-none cursor-pointer px-1.5 py-0.5"
@@ -528,7 +517,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </button>
           </div>
 
-          {/* Buscador */}
           <div className="relative w-36 sm:w-48 ml-auto">
             <Search className="absolute left-2 top-2 w-3 h-3 text-cyan-500 pointer-events-none" />
             <input
@@ -541,10 +529,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
         </div>
 
-        {/* Galería de Activos: Formato Estricto 5 Columnas con Scroll Interno Suave */}
         {activeSidebarCategory === "Fleets" ? (
           <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-            <FleetManager characters={characters} triggerNotification={triggerNotification} />
+            <FleetManager characters={characters as any} triggerNotification={triggerNotification} />
           </div>
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1.5 p-1.5 grid grid-cols-5 gap-2 sm:gap-2.5 content-start no-scrollbar">
@@ -565,7 +552,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               getFilteredCharacters.map((char, idx) => {
                 const uniqueKey = `${char.category || 'asset'}-${char.id}-${idx}`;
                 const isSelected = selectedChar?.id === char.id;
-                const power = char.power || (char as any).combat_power || (char as any).galactic_power || undefined;
+                const power = (char as any).power || char.power_score || (char as any).combat_power || (char as any).galactic_power || undefined;
                 return (
                   <AssetCard
                     key={uniqueKey}
@@ -604,7 +591,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             >
               <div className="absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.015)_1px,transparent_1px)] bg-[size:18px_18px] pointer-events-none" />
 
-              {/* Cabecera del Modal */}
               <div className="shrink-0 flex justify-between items-start border-b border-cyan-950 pb-2 mb-3 relative z-10">
                 <div>
                   <div className="flex items-center gap-2">
@@ -631,7 +617,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
               )}
 
-              {/* Cuerpo del Modal con Scroll */}
               <div className="flex-1 min-h-0 overflow-y-auto pr-1 overscroll-contain">
                 {showSubModal === "fleet" ? (
                   <div className="relative z-10 space-y-3">
@@ -639,7 +624,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     {fleets.length === 0 ? (
                       <div className="text-[9px] text-zinc-500 font-mono uppercase py-8 text-center bg-black/40 rounded-xl border border-cyan-950">{t('inventory.detail.no_fleets', 'NO TIENES FLOTAS CREADAS')}</div>
                     ) : (
-                      <Scroller overflow="x" withButtons className="pb-2" gap="gap-3">
+                      <Scroller overflow="x" withButtons className="pb-2" gapClass="gap-3">
                         {fleets.map(f => (
                           <div key={f.id} onClick={() => { triggerNotification(`🚢 ASIGNADO A FLOTA: ${f.name}`); setShowSubModal(null); }} className="min-w-[140px] bg-cyan-950/30 border border-cyan-900 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-cyan-900/50 hover:border-cyan-400 transition-all text-center">
                             <Layers className="w-7 h-7 text-cyan-400 mb-1.5" />
@@ -655,8 +640,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     const ship = getShipStats(selectedChar);
                     return (
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 relative z-10 text-white">
-                        
-                        {/* COLUMNA IZQUIERDA: VISUAL + ESPECIFICACIONES DE CASCO */}
                         <div className="md:col-span-4 flex flex-col items-center gap-2 bg-black/50 border border-cyan-500/30 p-2.5 rounded-xl h-fit">
                           <div className="relative w-full aspect-square rounded-lg border border-cyan-400/80 overflow-hidden bg-gradient-to-b from-cyan-950/40 via-black to-black p-2 flex items-center justify-center">
                             <img 
@@ -674,7 +657,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                             </div>
                           </div>
 
-                          {/* Ficha de Fabricación y Serie */}
                           <div className="w-full space-y-1 font-mono text-[7.5px] uppercase pt-1 border-t border-cyan-900/40">
                             <div className="flex justify-between text-zinc-400">
                               <span>FABRICANTE:</span>
@@ -695,10 +677,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           </div>
                         </div>
 
-                        {/* COLUMNA DERECHA: DESCRIPCIÓN Y ESTADÍSTICAS OPERATIVAS */}
                         <div className="md:col-span-8 flex flex-col gap-2 max-h-[350px] overflow-y-auto pr-1 no-scrollbar">
-                          
-                          {/* Descripción */}
                           <div className="bg-[#05080e] border border-cyan-500/25 p-2 rounded-lg">
                             <span className="text-[7px] font-mono tracking-widest text-cyan-400 font-bold uppercase block mb-0.5">
                               // DESCRIPCIÓN DEL ACTIVO
@@ -708,7 +687,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                             </p>
                           </div>
 
-                          {/* Matriz Ofensiva (5 Tipos de Daño) */}
                           <div className="bg-[#070508] border border-red-500/30 p-2 rounded-lg">
                             <span className="text-[7px] font-mono text-red-400 font-bold tracking-widest uppercase block mb-1 border-b border-red-950 pb-0.5">
                               MATRIZ OFENSIVA
@@ -737,9 +715,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                             </div>
                           </div>
 
-                          {/* Blindaje, Supervivencia y Logística */}
                           <div className="grid grid-cols-2 gap-2">
-                            {/* Blindaje & Cinemática */}
                             <div className="bg-[#04080e] border border-cyan-500/30 p-2 rounded-lg">
                               <span className="text-[7px] font-mono text-cyan-400 font-bold tracking-widest uppercase block mb-1 border-b border-cyan-950 pb-0.5">
                                 BLINDAJE Y CINEMÁTICA
@@ -764,7 +740,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                               </div>
                             </div>
 
-                            {/* Logística y Capacidad */}
                             <div className="bg-[#05090a] border border-amber-500/30 p-2 rounded-lg">
                               <span className="text-[7px] font-mono text-amber-400 font-bold tracking-widest uppercase block mb-1 border-b border-amber-950 pb-0.5">
                                 LOGÍSTICA Y RECURSOS
@@ -842,7 +817,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 )}
               </div>
 
-              {/* Botones de Acción al Pie del Modal */}
               <div className="shrink-0 border-t border-cyan-950/80 pt-2.5 mt-2 flex justify-between items-center gap-2 relative z-10">
                 <div className="flex gap-2">
                   <button
@@ -881,7 +855,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         )}
       </AnimatePresence>
 
-      {/* ── MODAL FLOTANTE DE SKILLS ── */}
       <AnimatePresence>
         {showSkillsPopup && selectedChar && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 z-[10000]">

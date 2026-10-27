@@ -96,7 +96,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
 
   const [expeditionStats, setExpeditionStats] = useState({ completed: 0, active: 0, historyByCluster: {} as Record<string, number> });
   const [assetCounts, setAssetStats] = useState({ ships: 0, tools: 0, fleets: 0, discoveredStars: 0 });
-  const [battleLogs, setBattleLogs] = useState<any[]>([]);
+  const [, setBattleLogs] = useState<any[]>([]);
 
   useEffect(() => {
     if (!hookProfile) return;
@@ -273,334 +273,341 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, triggerNotific
   ];
 
   return (
-    <GalaxyFrame className="w-full max-w-7xl mx-auto my-2 text-white font-mono select-none" innerPadding="p-4 sm:p-6">
-      <div className="flex flex-col gap-4 w-full">
-        {/* BARRA SUPERIOR */}
-        <div className="w-full bg-[#05070a] border border-cyan-500/30 p-3 rounded-xl flex justify-between items-center shrink-0">
-          <div className="flex items-center gap-3">
-            {onBack && (
-              <button onClick={() => { playSfx(440); onBack(); }} className="p-1.5 bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 rounded-lg cursor-pointer">
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-            )}
-            <h1 className="text-sm font-black tracking-widest text-white uppercase flex items-center gap-2">
-              <User className="w-4 h-4 text-cyan-400" /> {t('profile.title')}
-            </h1>
-          </div>
-        </div>
-
-        {/* TARJETA PRINCIPAL */}
-        <div className="w-full bg-[#05070a] border border-cyan-500/30 p-4 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-4">
-            <div 
-              onClick={handleOpenAvatarModal}
-              className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-black border-2 border-cyan-400/80 hover:border-cyan-300 flex items-center justify-center overflow-hidden shrink-0 shadow-[0_0_15px_rgba(34,211,238,0.3)] cursor-pointer group"
-              title="Cambiar Avatar"
-            >
-              <img 
-                src={resolveAvatarUrl(profileData.avatar_url)} 
-                alt="Avatar" 
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  if (target.src !== SAFE_FALLBACK_AVATAR) {
-                    target.src = SAFE_FALLBACK_AVATAR;
-                  }
-                }}
-              />
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                <Edit3 className="w-5 h-5 text-cyan-300" />
-              </div>
-            </div>
-
-            <div className="flex flex-col text-left gap-1.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-base sm:text-lg font-black text-white uppercase">{profileData.username}</h2>
-                <span className="text-[8px] font-black bg-cyan-950 border border-cyan-500/60 text-cyan-300 px-2 py-0.5 rounded uppercase">LVL {profileData.level}</span>
-                
-                <button
-                  onClick={async () => {
-                    playSfx(440);
-                    await supabase.auth.signOut();
-                    window.location.reload();
-                  }}
-                  className="ml-2 px-3 py-1 bg-red-950/70 hover:bg-red-900/90 border border-red-500/60 hover:border-red-400 text-red-300 text-[8.5px] font-mono font-black uppercase tracking-wider rounded-lg shadow-[0_0_10px_rgba(239,68,68,0.2)] transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <LogOut className="w-3 h-3 text-red-400" />
-                  <span>{t('profile.logout')}</span>
+    <div className="w-full h-full max-h-full flex flex-col overflow-hidden py-1">
+      <GalaxyFrame 
+        className="w-full max-w-7xl mx-auto h-full max-h-full flex flex-col min-h-0 font-mono text-left select-none text-white backdrop-blur-md relative overflow-hidden" 
+        innerPadding="p-2 sm:p-3.5 h-full flex flex-col min-h-0 overflow-hidden"
+      >
+        <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden w-full">
+          {/* BARRA SUPERIOR */}
+          <div className="w-full bg-[#05070a] border border-cyan-500/30 p-2 sm:p-2.5 rounded-xl flex justify-between items-center shrink-0">
+            <div className="flex items-center gap-3">
+              {onBack && (
+                <button onClick={() => { playSfx(440); onBack(); }} className="p-1.5 bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 rounded-lg cursor-pointer">
+                  <ArrowLeft className="w-4 h-4" />
                 </button>
-              </div>
-
-              <div className="w-full max-w-xs space-y-1">
-                <div className="flex justify-between text-[7.5px] text-zinc-400 font-mono">
-                  <span>{t('profile.exp')}</span>
-                  <span className="text-cyan-400 font-bold">{profileData.ep} / {profileData.max_ep}</span>
-                </div>
-                <div className="w-full h-1.5 bg-neutral-900 rounded-full overflow-hidden p-0.5 border border-cyan-950">
-                  <div className="h-full bg-cyan-400 rounded-full transition-all duration-300" style={{ width: `${epPercentage}%` }} />
-                </div>
-              </div>
+              )}
+              <h1 className="text-sm font-black tracking-widest text-white uppercase flex items-center gap-2">
+                <User className="w-4 h-4 text-cyan-400" /> {t('profile.title')}
+              </h1>
             </div>
           </div>
 
-          <div 
-            className="relative w-full md:w-64 h-16 rounded-xl border border-cyan-500/50 bg-cover bg-center overflow-hidden flex items-center justify-between p-3 shadow-lg shrink-0"
-            style={{ backgroundImage: `url('${profileData.badge_image}')` }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-black/90" />
-            <span className="relative z-10 text-[10px] font-black text-cyan-300 uppercase truncate max-w-[140px] drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">{profileData.badge_name}</span>
-            <button
-              onClick={handleOpenBadgeModal}
-              className="relative z-10 px-2.5 py-1 bg-gradient-to-r from-blue-600 to-cyan-600 border border-cyan-400/80 text-white text-[8px] font-black uppercase rounded cursor-pointer hover:brightness-110 active:scale-95 transition-all"
+          {/* TARJETA PRINCIPAL */}
+          <div className="w-full bg-[#05070a] border border-cyan-500/30 p-2.5 sm:p-3 rounded-xl flex flex-col md:flex-row justify-between items-center gap-3 shrink-0">
+            <div className="flex items-center gap-4">
+              <div 
+                onClick={handleOpenAvatarModal}
+                className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-black border-2 border-cyan-400/80 hover:border-cyan-300 flex items-center justify-center overflow-hidden shrink-0 shadow-[0_0_15px_rgba(34,211,238,0.3)] cursor-pointer group"
+                title="Cambiar Avatar"
+              >
+                <img 
+                  src={resolveAvatarUrl(profileData.avatar_url)} 
+                  alt="Avatar" 
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    if (target.src !== SAFE_FALLBACK_AVATAR) {
+                      target.src = SAFE_FALLBACK_AVATAR;
+                    }
+                  }}
+                />
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <Edit3 className="w-5 h-5 text-cyan-300" />
+                </div>
+              </div>
+
+              <div className="flex flex-col text-left gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-sm sm:text-base font-black text-white uppercase">{profileData.username}</h2>
+                  <span className="text-[8px] font-black bg-cyan-950 border border-cyan-500/60 text-cyan-300 px-2 py-0.5 rounded uppercase">LVL {profileData.level}</span>
+                  
+                  <button
+                    onClick={async () => {
+                      playSfx(440);
+                      await supabase.auth.signOut();
+                      window.location.reload();
+                    }}
+                    className="ml-2 px-2.5 py-0.5 bg-red-950/70 hover:bg-red-900/90 border border-red-500/60 hover:border-red-400 text-red-300 text-[8px] font-mono font-black uppercase tracking-wider rounded-lg shadow-[0_0_10px_rgba(239,68,68,0.2)] transition-all cursor-pointer flex items-center gap-1"
+                  >
+                    <LogOut className="w-3 h-3 text-red-400" />
+                    <span>{t('profile.logout')}</span>
+                  </button>
+                </div>
+
+                <div className="w-full max-w-xs space-y-1">
+                  <div className="flex justify-between text-[7.5px] text-zinc-400 font-mono">
+                    <span>{t('profile.exp')}</span>
+                    <span className="text-cyan-400 font-bold">{profileData.ep} / {profileData.max_ep}</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-neutral-900 rounded-full overflow-hidden p-0.5 border border-cyan-950">
+                    <div className="h-full bg-cyan-400 rounded-full transition-all duration-300" style={{ width: `${epPercentage}%` }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div 
+              className="relative w-full md:w-64 h-14 sm:h-16 rounded-xl border border-cyan-500/50 bg-cover bg-center overflow-hidden flex items-center justify-between p-2.5 sm:p-3 shadow-lg shrink-0"
+              style={{ backgroundImage: `url('${profileData.badge_image}')` }}
             >
-              {t('profile.change_badge')}
-            </button>
-          </div>
-        </div>
-
-        {/* PESTAÑAS SUB-MENÚ */}
-        <div className="w-full grid grid-cols-4 gap-1.5 bg-black/60 p-1 rounded-lg border border-cyan-950 text-[9px] font-bold text-center uppercase">
-          {([
-            { id: 'STATS', label: t('profile.tab_stats') },
-            { id: 'PVP-PVE', label: t('profile.tab_pvp') },
-            { id: 'ECONOMY', label: t('profile.tab_economy') },
-            { id: 'ACHIEVEMENTS', label: t('profile.tab_achievements') }
-          ] as const).map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => { playSfx(880); setActiveTab(tab.id as any); }}
-              className={`py-2 rounded transition-all cursor-pointer border ${
-                activeTab === tab.id
-                  ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black shadow-md'
-                  : 'bg-black/40 text-zinc-400 border-transparent hover:text-white'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* PESTAÑA STATS */}
-        {activeTab === 'STATS' && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="bg-[#050910] border border-cyan-500/30 p-4 rounded-xl flex flex-col justify-between gap-2 shadow-lg">
-                <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider">{t('profile.stat_domination')}</span>
-                <div className="text-2xl font-black text-white font-mono">{assetCounts.discoveredStars}</div>
-                <span className="text-[7.5px] text-zinc-500 uppercase">{t('profile.stat_stars')}</span>
-              </div>
-
-              <div className="bg-[#050910] border border-cyan-500/30 p-4 rounded-xl flex flex-col justify-between gap-2 shadow-lg">
-                <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider">{t('profile.stat_expeditions')}</span>
-                <div className="flex justify-between items-baseline font-mono">
-                  <span className="text-2xl font-black text-white">{expeditionStats.completed}</span>
-                  <span className="text-[9px] text-amber-400 font-bold">{expeditionStats.active} {t('profile.stat_in_flight')}</span>
-                </div>
-                <span className="text-[7.5px] text-zinc-500 uppercase">{t('profile.stat_completed')}</span>
-              </div>
-
-              <div className="bg-[#050910] border border-cyan-500/30 p-4 rounded-xl flex flex-col justify-between gap-2 shadow-lg">
-                <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider">{t('profile.stat_power')}</span>
-                <div className="text-2xl font-black text-cyan-300 font-mono">{profileData.power_score.toLocaleString()} POW</div>
-                <span className="text-[7.5px] text-zinc-500 uppercase">{t('profile.stat_score')}</span>
-              </div>
+              <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-black/90" />
+              <span className="relative z-10 text-[9.5px] sm:text-[10px] font-black text-cyan-300 uppercase truncate max-w-[140px] drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">{profileData.badge_name}</span>
+              <button
+                onClick={handleOpenBadgeModal}
+                className="relative z-10 px-2 py-1 bg-gradient-to-r from-blue-600 to-cyan-600 border border-cyan-400/80 text-white text-[7.5px] sm:text-[8px] font-black uppercase rounded cursor-pointer hover:brightness-110 active:scale-95 transition-all"
+              >
+                {t('profile.change_badge')}
+              </button>
             </div>
           </div>
-        )}
 
-        {/* PESTAÑA PVP - PVE */}
-        {activeTab === 'PVP-PVE' && (
-          <div className="space-y-3">
-            <div className="flex flex-col items-center justify-center p-12 bg-[#05080c] rounded-xl border border-red-900/50 shadow-[inset_0_0_50px_rgba(220,38,38,0.05)] relative overflow-hidden">
-              {/* Sello Top Secret background */}
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -rotate-12 opacity-5 pointer-events-none">
-                <span className="text-[100px] font-black text-red-500 uppercase tracking-tighter whitespace-nowrap">CLASSIFIED</span>
-              </div>
-              
-              <Lock className="w-10 h-10 text-red-500 mb-3 opacity-80" />
-              <span className="text-[14px] font-black text-red-400 tracking-widest uppercase drop-shadow-md z-10 text-center">
-                MÓDULO DE COMBATE EN DESARROLLO
-              </span>
-              <p className="text-[9px] text-zinc-500 mt-3 text-center uppercase max-w-md z-10 leading-relaxed font-bold">
-                El registro de operaciones PvP y simulaciones PvE (Combate Táctico) se encuentra bajo restricciones de nivel Beta. Acceso denegado temporalmente por alto mando.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* PESTAÑA ECONOMY */}
-        {activeTab === 'ECONOMY' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="bg-[#05070a] border border-cyan-950 p-4 rounded-xl space-y-2.5 text-left">
-              <span className="text-[9px] font-black text-cyan-400 uppercase tracking-widest block border-b border-cyan-950 pb-1">RESERVA DE RECURSOS BÁSICOS</span>
-              <div className="space-y-2 text-[9px] font-mono">
-                <div className="flex justify-between items-center p-2 bg-black/50 rounded border border-cyan-950"><span className="text-zinc-400">METAL:</span><span className="text-cyan-200 font-bold">{profileData.metal.toLocaleString()}</span></div>
-                <div className="flex justify-between items-center p-2 bg-black/50 rounded border border-purple-950"><span className="text-zinc-400">CRISTAL:</span><span className="text-purple-200 font-bold">{profileData.crystal.toLocaleString()}</span></div>
-                <div className="flex justify-between items-center p-2 bg-black/50 rounded border border-blue-950"><span className="text-zinc-400">DEUTERIO:</span><span className="text-blue-200 font-bold">{profileData.deuterium.toLocaleString()}</span></div>
-              </div>
-            </div>
-            <div className="bg-[#05070a] border border-cyan-950 p-4 rounded-xl space-y-2.5 text-left">
-              <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest block border-b border-amber-950 pb-1">SALDO DE MONEDAS</span>
-              <div className="space-y-2 text-[9px] font-mono">
-                <div className="flex justify-between items-center p-2 bg-black/50 rounded border border-amber-950"><span className="text-zinc-400">GD COIN:</span><span className="text-amber-300 font-bold">{profileData.gd_coin.toLocaleString()}</span></div>
-                <div className="flex justify-between items-center p-2 bg-black/50 rounded border border-cyan-950"><span className="text-zinc-400">QUANTUM CREDIT:</span><span className="text-cyan-300 font-bold">{profileData.quantum_credit.toLocaleString()}</span></div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* PESTAÑA ACHIEVEMENTS */}
-        {activeTab === 'ACHIEVEMENTS' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-            {realAchievements.map((ach, idx) => (
-              <div key={idx} className={`p-3 rounded-xl border flex items-center justify-between text-left font-mono ${ach.done ? 'bg-cyan-950/40 border-cyan-500/60' : 'bg-black/60 border-cyan-950 opacity-50'}`}>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[9.5px] font-black text-white uppercase">{ach.title}</span>
-                  <span className="text-[7.5px] text-zinc-400 normal-case">{ach.desc}</span>
-                </div>
-                {ach.done ? <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" /> : <Lock className="w-4 h-4 text-zinc-600 shrink-0" />}
-              </div>
+          {/* PESTAÑAS SUB-MENÚ */}
+          <div className="w-full grid grid-cols-4 gap-1.5 bg-black/60 p-1 rounded-lg border border-cyan-950 text-[8.5px] sm:text-[9px] font-bold text-center uppercase shrink-0">
+            {([
+              { id: 'STATS', label: t('profile.tab_stats') },
+              { id: 'PVP-PVE', label: t('profile.tab_pvp') },
+              { id: 'ECONOMY', label: t('profile.tab_economy') },
+              { id: 'ACHIEVEMENTS', label: t('profile.tab_achievements') }
+            ] as const).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => { playSfx(880); setActiveTab(tab.id as any); }}
+                className={`py-1.5 sm:py-2 rounded transition-all cursor-pointer border ${
+                  activeTab === tab.id
+                    ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60 font-black shadow-md'
+                    : 'bg-black/40 text-zinc-400 border-transparent hover:text-white'
+                }`}
+              >
+                {tab.label}
+              </button>
             ))}
           </div>
-        )}
 
-        {/* MODAL 1: SELECCIÓN DE AVATAR */}
-        {isAvatarModalOpen && (
-          <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 font-mono">
-            <div className="w-full max-w-md bg-[#080b0e] border border-cyan-500/50 rounded-2xl p-5 text-left space-y-4 shadow-2xl">
-              <div className="flex justify-between items-center border-b border-cyan-950 pb-3">
-                <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
-                  <User className="w-4 h-4 text-cyan-400" /> SELECCIONAR AVATAR IMPERIAL
-                </h3>
-                <button onClick={() => setIsAvatarModalOpen(false)} className="text-zinc-400 hover:text-white cursor-pointer"><X className="w-4 h-4" /></button>
-              </div>
+          {/* CONTENEDOR CON SCROLL SUAVE PARA LAS SUB-PESTAÑAS */}
+          <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
+            {/* PESTAÑA STATS */}
+            {activeTab === 'STATS' && (
+              <div className="space-y-3 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div className="bg-[#050910] border border-cyan-500/30 p-3.5 rounded-xl flex flex-col justify-between gap-1.5 shadow-lg">
+                    <span className="text-[8.5px] sm:text-[9px] font-black text-cyan-400 uppercase tracking-wider">{t('profile.stat_domination')}</span>
+                    <div className="text-xl sm:text-2xl font-black text-white font-mono">{assetCounts.discoveredStars}</div>
+                    <span className="text-[7.5px] text-zinc-500 uppercase">{t('profile.stat_stars')}</span>
+                  </div>
 
-              <p className="text-[8.5px] text-zinc-400 uppercase">
-                Toca una opción para seleccionarla y luego presiona "Confirmar Cambio".
-              </p>
-
-              <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 sm:gap-2.5 py-2 max-h-[190px] sm:max-h-[300px] overflow-y-auto pr-1.5 custom-scrollbar">
-                {GAME_AVATARS.map((url, idx) => {
-                  const resolvedUrl = resolveAvatarUrl(url);
-                  const isSelected = tempSelectedAvatar === resolvedUrl || tempSelectedAvatar === url;
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => { playSfx(660); setTempSelectedAvatar(resolvedUrl); }}
-                      className={`relative w-full aspect-square rounded-xl bg-black border-2 cursor-pointer overflow-hidden transition-all hover:scale-102 ${
-                        isSelected 
-                          ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.7)]' 
-                          : 'border-cyan-950 hover:border-cyan-700 opacity-60 hover:opacity-100'
-                      }`}
-                    >
-                      <img 
-                        src={resolvedUrl} 
-                        alt={`Avatar ${idx + 1}`} 
-                        className="w-full h-full object-cover" 
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          if (target.src !== SAFE_FALLBACK_AVATAR) {
-                            target.src = SAFE_FALLBACK_AVATAR;
-                          }
-                        }}
-                      />
-                      {isSelected && (
-                        <div className="absolute top-2 right-2 bg-cyan-500 text-black rounded-full p-1 shadow-md">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        </div>
-                      )}
+                  <div className="bg-[#050910] border border-cyan-500/30 p-3.5 rounded-xl flex flex-col justify-between gap-1.5 shadow-lg">
+                    <span className="text-[8.5px] sm:text-[9px] font-black text-cyan-400 uppercase tracking-wider">{t('profile.stat_expeditions')}</span>
+                    <div className="flex justify-between items-baseline font-mono">
+                      <span className="text-xl sm:text-2xl font-black text-white">{expeditionStats.completed}</span>
+                      <span className="text-[8.5px] sm:text-[9px] text-amber-400 font-bold">{expeditionStats.active} {t('profile.stat_in_flight')}</span>
                     </div>
-                  );
-                })}
+                    <span className="text-[7.5px] text-zinc-500 uppercase">{t('profile.stat_completed')}</span>
+                  </div>
+
+                  <div className="bg-[#050910] border border-cyan-500/30 p-3.5 rounded-xl flex flex-col justify-between gap-1.5 shadow-lg">
+                    <span className="text-[8.5px] sm:text-[9px] font-black text-cyan-400 uppercase tracking-wider">{t('profile.stat_power')}</span>
+                    <div className="text-xl sm:text-2xl font-black text-cyan-300 font-mono">{profileData.power_score.toLocaleString()} POW</div>
+                    <span className="text-[7.5px] text-zinc-500 uppercase">{t('profile.stat_score')}</span>
+                  </div>
+                </div>
               </div>
+            )}
 
-              <div className="pt-3 border-t border-cyan-950 flex justify-between items-center">
-                <button
-                  onClick={() => setIsAvatarModalOpen(false)}
-                  className="px-3 py-2 bg-black border border-zinc-800 text-zinc-400 hover:text-white text-[9px] font-bold uppercase rounded-lg cursor-pointer"
-                >
-                  CANCELAR
-                </button>
+            {/* PESTAÑA PVP - PVE */}
+            {activeTab === 'PVP-PVE' && (
+              <div className="space-y-3 pt-1">
+                <div className="flex flex-col items-center justify-center p-8 sm:p-12 bg-[#05080c] rounded-xl border border-red-900/50 shadow-[inset_0_0_50px_rgba(220,38,38,0.05)] relative overflow-hidden">
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -rotate-12 opacity-5 pointer-events-none">
+                    <span className="text-[80px] sm:text-[100px] font-black text-red-500 uppercase tracking-tighter whitespace-nowrap">CLASSIFIED</span>
+                  </div>
+                  
+                  <Lock className="w-8 h-8 sm:w-10 sm:h-10 text-red-500 mb-2 opacity-80" />
+                  <span className="text-[12px] sm:text-[14px] font-black text-red-400 tracking-widest uppercase drop-shadow-md z-10 text-center">
+                    MÓDULO DE COMBATE EN DESARROLLO
+                  </span>
+                  <p className="text-[8.5px] sm:text-[9px] text-zinc-500 mt-2 text-center uppercase max-w-md z-10 leading-relaxed font-bold">
+                    El registro de operaciones PvP y simulaciones PvE (Combate Táctico) se encuentra bajo restricciones de nivel Beta. Acceso denegado temporalmente por alto mando.
+                  </p>
+                </div>
+              </div>
+            )}
 
-                <button
-                  onClick={handleConfirmAvatar}
-                  disabled={!tempSelectedAvatar}
-                  className="px-5 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 border border-cyan-400 text-white text-[9px] font-black uppercase tracking-widest rounded-lg shadow-[0_0_12px_rgba(34,211,238,0.4)] disabled:opacity-50 cursor-pointer active:scale-95 transition-all flex items-center gap-1.5"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  CONFIRMAR CAMBIO
-                </button>
+            {/* PESTAÑA ECONOMY */}
+            {activeTab === 'ECONOMY' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div className="bg-[#05070a] border border-cyan-950 p-3 sm:p-4 rounded-xl space-y-2 text-left">
+                  <span className="text-[8.5px] sm:text-[9px] font-black text-cyan-400 uppercase tracking-widest block border-b border-cyan-950 pb-1">RESERVA DE RECURSOS BÁSICOS</span>
+                  <div className="space-y-1.5 text-[8.5px] sm:text-[9px] font-mono">
+                    <div className="flex justify-between items-center p-1.5 sm:p-2 bg-black/50 rounded border border-cyan-950"><span className="text-zinc-400">METAL:</span><span className="text-cyan-200 font-bold">{profileData.metal.toLocaleString()}</span></div>
+                    <div className="flex justify-between items-center p-1.5 sm:p-2 bg-black/50 rounded border border-purple-950"><span className="text-zinc-400">CRISTAL:</span><span className="text-purple-200 font-bold">{profileData.crystal.toLocaleString()}</span></div>
+                    <div className="flex justify-between items-center p-1.5 sm:p-2 bg-black/50 rounded border border-blue-950"><span className="text-zinc-400">DEUTERIO:</span><span className="text-blue-200 font-bold">{profileData.deuterium.toLocaleString()}</span></div>
+                  </div>
+                </div>
+                <div className="bg-[#05070a] border border-cyan-950 p-3 sm:p-4 rounded-xl space-y-2 text-left">
+                  <span className="text-[8.5px] sm:text-[9px] font-black text-amber-400 uppercase tracking-widest block border-b border-amber-950 pb-1">SALDO DE MONEDAS</span>
+                  <div className="space-y-1.5 text-[8.5px] sm:text-[9px] font-mono">
+                    <div className="flex justify-between items-center p-1.5 sm:p-2 bg-black/50 rounded border border-amber-950"><span className="text-zinc-400">GD COIN:</span><span className="text-amber-300 font-bold">{profileData.gd_coin.toLocaleString()}</span></div>
+                    <div className="flex justify-between items-center p-1.5 sm:p-2 bg-black/50 rounded border border-cyan-950"><span className="text-zinc-400">QUANTUM CREDIT:</span><span className="text-cyan-300 font-bold">{profileData.quantum_credit.toLocaleString()}</span></div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PESTAÑA ACHIEVEMENTS */}
+            {activeTab === 'ACHIEVEMENTS' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
+                {realAchievements.map((ach, idx) => (
+                  <div key={idx} className={`p-2.5 sm:p-3 rounded-xl border flex items-center justify-between text-left font-mono ${ach.done ? 'bg-cyan-950/40 border-cyan-500/60' : 'bg-black/60 border-cyan-950 opacity-50'}`}>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[9px] sm:text-[9.5px] font-black text-white uppercase">{ach.title}</span>
+                      <span className="text-[7.5px] text-zinc-400 normal-case">{ach.desc}</span>
+                    </div>
+                    {ach.done ? <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400 shrink-0" /> : <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-600 shrink-0" />}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* MODAL 1: SELECCIÓN DE AVATAR */}
+          {isAvatarModalOpen && (
+            <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 font-mono">
+              <div className="w-full max-w-md bg-[#080b0e] border border-cyan-500/50 rounded-2xl p-5 text-left space-y-4 shadow-2xl">
+                <div className="flex justify-between items-center border-b border-cyan-950 pb-3">
+                  <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
+                    <User className="w-4 h-4 text-cyan-400" /> SELECCIONAR AVATAR IMPERIAL
+                  </h3>
+                  <button onClick={() => setIsAvatarModalOpen(false)} className="text-zinc-400 hover:text-white cursor-pointer"><X className="w-4 h-4" /></button>
+                </div>
+
+                <p className="text-[8.5px] text-zinc-400 uppercase">
+                  Toca una opción para seleccionarla y luego presiona "Confirmar Cambio".
+                </p>
+
+                <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 sm:gap-2.5 py-2 max-h-[190px] sm:max-h-[300px] overflow-y-auto pr-1.5 custom-scrollbar">
+                  {GAME_AVATARS.map((url, idx) => {
+                    const resolvedUrl = resolveAvatarUrl(url);
+                    const isSelected = tempSelectedAvatar === resolvedUrl || tempSelectedAvatar === url;
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => { playSfx(660); setTempSelectedAvatar(resolvedUrl); }}
+                        className={`relative w-full aspect-square rounded-xl bg-black border-2 cursor-pointer overflow-hidden transition-all hover:scale-102 ${
+                          isSelected 
+                            ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.7)]' 
+                            : 'border-cyan-950 hover:border-cyan-700 opacity-60 hover:opacity-100'
+                        }`}
+                      >
+                        <img 
+                          src={resolvedUrl} 
+                          alt={`Avatar ${idx + 1}`} 
+                          className="w-full h-full object-cover" 
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            if (target.src !== SAFE_FALLBACK_AVATAR) {
+                              target.src = SAFE_FALLBACK_AVATAR;
+                            }
+                          }}
+                        />
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 bg-cyan-500 text-black rounded-full p-1 shadow-md">
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="pt-3 border-t border-cyan-950 flex justify-between items-center">
+                  <button
+                    onClick={() => setIsAvatarModalOpen(false)}
+                    className="px-3 py-2 bg-black border border-zinc-800 text-zinc-400 hover:text-white text-[9px] font-bold uppercase rounded-lg cursor-pointer"
+                  >
+                    CANCELAR
+                  </button>
+
+                  <button
+                    onClick={handleConfirmAvatar}
+                    disabled={!tempSelectedAvatar}
+                    className="px-5 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 border border-cyan-400 text-white text-[9px] font-black uppercase tracking-widest rounded-lg shadow-[0_0_12px_rgba(34,211,238,0.4)] disabled:opacity-50 cursor-pointer active:scale-95 transition-all flex items-center gap-1.5"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    CONFIRMAR CAMBIO
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* MODAL 2: CATÁLOGO DE INSIGNIAS */}
-        {isBadgeModalOpen && (
-          <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 font-mono">
-            <div className="w-full max-w-md bg-[#080b0e] border border-cyan-500/50 rounded-2xl p-5 text-left space-y-4 shadow-2xl">
-              <div className="flex justify-between items-center border-b border-cyan-950 pb-3">
-                <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
-                  <Award className="w-4 h-4 text-cyan-400" /> CATÁLOGO DE INSIGNIAS
-                </h3>
-                <button onClick={() => setIsBadgeModalOpen(false)} className="text-zinc-400 hover:text-white cursor-pointer"><X className="w-4 h-4" /></button>
-              </div>
+          {/* MODAL 2: CATÁLOGO DE INSIGNIAS */}
+          {isBadgeModalOpen && (
+            <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 font-mono">
+              <div className="w-full max-w-md bg-[#080b0e] border border-cyan-500/50 rounded-2xl p-5 text-left space-y-4 shadow-2xl">
+                <div className="flex justify-between items-center border-b border-cyan-950 pb-3">
+                  <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
+                    <Award className="w-4 h-4 text-cyan-400" /> CATÁLOGO DE INSIGNIAS
+                  </h3>
+                  <button onClick={() => setIsBadgeModalOpen(false)} className="text-zinc-400 hover:text-white cursor-pointer"><X className="w-4 h-4" /></button>
+                </div>
 
-              <p className="text-[8.5px] text-zinc-400 uppercase">
-                Toca una insignia para seleccionarla y luego presiona "Confirmar Cambio".
-              </p>
+                <p className="text-[8.5px] text-zinc-400 uppercase">
+                  Toca una insignia para seleccionarla y luego presiona "Confirmar Cambio".
+                </p>
 
-              <div className="grid grid-cols-1 gap-3 py-2">
-                {GAME_BADGES.map((badge) => {
-                  const isSelected = tempSelectedBadge?.name === badge.name;
-                  return (
-                    <div
-                      key={badge.id}
-                      onClick={() => { playSfx(660); setTempSelectedBadge({ name: badge.name, image: badge.image }); }}
-                      className={`relative h-20 rounded-xl border-2 cursor-pointer overflow-hidden flex items-center justify-between p-4 transition-all hover:scale-101 ${
-                        isSelected
-                          ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.7)]'
-                          : 'border-cyan-950 hover:border-cyan-700 opacity-60 hover:opacity-100'
-                      }`}
-                      style={{ backgroundImage: `url('${badge.image}')`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/75 to-black/90" />
-                      <span className="relative z-10 text-[10px] font-black text-cyan-300 uppercase tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                        {badge.name}
-                      </span>
+                <div className="grid grid-cols-1 gap-3 py-2">
+                  {GAME_BADGES.map((badge) => {
+                    const isSelected = tempSelectedBadge?.name === badge.name;
+                    return (
+                      <div
+                        key={badge.id}
+                        onClick={() => { playSfx(660); setTempSelectedBadge({ name: badge.name, image: badge.image }); }}
+                        className={`relative h-20 rounded-xl border-2 cursor-pointer overflow-hidden flex items-center justify-between p-4 transition-all hover:scale-101 ${
+                          isSelected
+                            ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.7)]'
+                            : 'border-cyan-950 hover:border-cyan-700 opacity-60 hover:opacity-100'
+                        }`}
+                        style={{ backgroundImage: `url('${badge.image}')`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/75 to-black/90" />
+                        <span className="relative z-10 text-[10px] font-black text-cyan-300 uppercase tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+                          {badge.name}
+                        </span>
 
-                      {isSelected && (
-                        <div className="relative z-10 bg-cyan-500 text-black rounded-full p-1 shadow-md">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                        {isSelected && (
+                          <div className="relative z-10 bg-cyan-500 text-black rounded-full p-1 shadow-md">
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
 
-              <div className="pt-3 border-t border-cyan-950 flex justify-between items-center">
-                <button
-                  onClick={() => setIsBadgeModalOpen(false)}
-                  className="px-3 py-2 bg-black border border-zinc-800 text-zinc-400 hover:text-white text-[9px] font-bold uppercase rounded-lg cursor-pointer"
-                >
-                  CANCELAR
-                </button>
+                <div className="pt-3 border-t border-cyan-950 flex justify-between items-center">
+                  <button
+                    onClick={() => setIsBadgeModalOpen(false)}
+                    className="px-3 py-2 bg-black border border-zinc-800 text-zinc-400 hover:text-white text-[9px] font-bold uppercase rounded-lg cursor-pointer"
+                  >
+                    CANCELAR
+                  </button>
 
-                <button
-                  onClick={handleConfirmBadge}
-                  disabled={!tempSelectedBadge}
-                  className="px-5 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 border border-cyan-400 text-white text-[9px] font-black uppercase tracking-widest rounded-lg shadow-[0_0_12px_rgba(34,211,238,0.4)] disabled:opacity-50 cursor-pointer active:scale-95 transition-all flex items-center gap-1.5"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  CONFIRMAR CAMBIO
-                </button>
+                  <button
+                    onClick={handleConfirmBadge}
+                    disabled={!tempSelectedBadge}
+                    className="px-5 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 border border-cyan-400 text-white text-[9px] font-black uppercase tracking-widest rounded-lg shadow-[0_0_12px_rgba(34,211,238,0.4)] disabled:opacity-50 cursor-pointer active:scale-95 transition-all flex items-center gap-1.5"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    CONFIRMAR CAMBIO
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
-    </GalaxyFrame>
+          )}
+        </div>
+      </GalaxyFrame>
+    </div>
   );
 };
 

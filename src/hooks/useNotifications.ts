@@ -20,14 +20,22 @@ export const useNotifications = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const isFetchingRef = useRef(false);
 
-  // Obtener sesión activa una sola vez
+  // 1. Obtener la sesión activa localmente sin generar peticiones HTTP a Auth
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data?.user) setUserId(data.user.id);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUserId(session.user.id);
+      }
     }).catch(() => {});
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // 1. Carga protegida sin parámetros conflictivos en PostgREST
+  // 2. Carga protegida con límite defensivo para PostgREST
   const fetchNotifications = useCallback(async (currentUserId?: string) => {
     const uid = currentUserId || userId;
     if (!uid || isFetchingRef.current) return;
@@ -41,7 +49,7 @@ export const useNotifications = () => {
         .select('*')
         .eq('user_id', uid)
         .order('created_at', { ascending: false })
-        .limit(50); // Límite defensivo para evitar sobrecarga de red
+        .limit(50);
 
       if (error) {
         console.warn('[NOTIFICATIONS] Consulta silenciada:', error.message);
@@ -49,7 +57,6 @@ export const useNotifications = () => {
       }
 
       if (data) {
-        // Filtrado en memoria: soporta boolean (false), integer (0) o string ('0')
         const unreadOnly = data.filter((item: any) => {
           const val = item.is_read;
           return val === false || val === 0 || val === '0' || val === null || val === undefined;
@@ -77,7 +84,7 @@ export const useNotifications = () => {
     }
   }, [userId]);
 
-  // 2. Suscripción única al canal Realtime
+  // 3. Suscripción única al canal Realtime
   useEffect(() => {
     if (!userId) return;
 
@@ -119,7 +126,12 @@ export const useNotifications = () => {
     return notifications.filter(n => !n.is_read && isOfficialComunicado(n)).length;
   }, [notifications]);
 
-  const markAsRead = async (notificationId: string) => {
+  // 🎯 Referencia estable a refresh para evitar bucles en componentes dependientes
+  const refresh = useCallback(() => {
+    fetchNotifications(userId || undefined);
+  }, [fetchNotifications, userId]);
+
+  const markAsRead = useCallback(async (notificationId: string) => {
     if (!userId) return;
     try {
       const { error } = await supabase
@@ -139,9 +151,9 @@ export const useNotifications = () => {
     } catch (err) {
       console.warn('[NOTIFICATIONS] Error en markAsRead:', err);
     }
-  };
+  }, [userId, fetchNotifications]);
 
-  const markAllAsRead = async () => {
+  const markAllAsRead = useCallback(async () => {
     if (!userId) return;
     try {
       const { error } = await supabase
@@ -159,9 +171,9 @@ export const useNotifications = () => {
     } catch (err) {
       console.warn('[NOTIFICATIONS] Error en markAllAsRead:', err);
     }
-  };
+  }, [userId, fetchNotifications]);
 
-  const deleteNotification = async (notificationId: string) => {
+  const deleteNotification = useCallback(async (notificationId: string) => {
     if (!userId) return;
     try {
       const { error } = await supabase
@@ -181,9 +193,9 @@ export const useNotifications = () => {
     } catch (err) {
       console.warn('[NOTIFICATIONS] Error en deleteNotification:', err);
     }
-  };
+  }, [userId, fetchNotifications]);
 
-  const deleteAllNotifications = async () => {
+  const deleteAllNotifications = useCallback(async () => {
     if (!userId) return;
     try {
       await supabase
@@ -194,13 +206,13 @@ export const useNotifications = () => {
     } catch (err) {
       console.warn('[NOTIFICATIONS] Error en deleteAllNotifications:', err);
     }
-  };
+  }, [userId, fetchNotifications]);
 
   return {
     notifications,
     unreadCount,
     loading,
-    refresh: () => fetchNotifications(userId || undefined),
+    refresh,
     markAsRead,
     markAllAsRead,
     deleteNotification,

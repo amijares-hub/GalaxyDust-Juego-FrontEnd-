@@ -291,16 +291,10 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
       const assets = exp.equipped_assets || exp.assets || exp.ships || [];
       if (Array.isArray(assets)) {
         assets.forEach((a: any) => {
-          if (a.id) allIds.add(a.id.toString());
-          if (a.seed_id) allIds.add(a.seed_id.toString());
-          
-          if (a.type && isShipAsset(a.type)) {
-            if (a.id) shipIds.add(a.id.toString());
-            if (a.seed_id) shipIds.add(a.seed_id.toString());
-          }
-          if (a.type && isToolAsset(a.type)) {
-            if (a.id) toolIds.add(a.id.toString());
-            if (a.seed_id) toolIds.add(a.seed_id.toString());
+          if (a.id) {
+            allIds.add(a.id.toString());
+            if (a.type && isShipAsset(a.type)) shipIds.add(a.id.toString());
+            if (a.type && isToolAsset(a.type)) toolIds.add(a.id.toString());
           }
         });
       }
@@ -309,21 +303,27 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         if (fleet) {
           (fleet.ships || []).forEach(s => {
             if (s.id) { allIds.add(s.id.toString()); shipIds.add(s.id.toString()); }
-            if (s.seed_id) { allIds.add(s.seed_id.toString()); shipIds.add(s.seed_id.toString()); }
           });
           (fleet.tools || []).forEach(t => {
             if (t.id) { allIds.add(t.id.toString()); toolIds.add(t.id.toString()); }
-            if (t.seed_id) { allIds.add(t.seed_id.toString()); toolIds.add(t.seed_id.toString()); }
           });
           (fleet.licenses || []).forEach(l => {
             if (l.id) allIds.add(l.id.toString());
-            if (l.seed_id) allIds.add(l.seed_id.toString());
           });
         }
       }
     });
     return { busyToolIds: toolIds, busyShipIds: shipIds, busyAssetIds: allIds };
   }, [activeExpeditions, fleets]);
+
+  // Grupos 50/50 para la bandeja inferior
+  const selectedLeftGroup = useMemo(() => {
+    return selectedAssets.filter(a => isShipAsset(a.type) || String(a.type || '').toLowerCase().includes('astrobot'));
+  }, [selectedAssets]);
+
+  const selectedRightGroup = useMemo(() => {
+    return selectedAssets.filter(a => isToolAsset(a.type) || isLicenseAsset(a.type) || String(a.type || '').toLowerCase().includes('consum'));
+  }, [selectedAssets]);
 
   const activeGcObject = useMemo(() => {
     return gcList.find(g => g.id === selectedGC) || null;
@@ -1136,13 +1136,8 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
   };
 
   const toggleAssetSelection = (asset: Asset) => {
-    const isShip = isShipAsset(asset.type);
-    const isTool = isToolAsset(asset.type);
-    const isInFlight = busyAssetIds.has(asset.id) || 
-      (asset.seed_id && (
-        (isShip && busyShipIds.has(asset.seed_id)) || 
-        (isTool && busyToolIds.has(asset.seed_id))
-      ));
+    // Evaluar bloqueo únicamente sobre la instancia individual (id único)
+    const isInFlight = busyAssetIds.has(asset.id);
 
     if (isInFlight) {
       playSfx(300);
@@ -1220,7 +1215,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
         p_user_id: currentUser.id,
         p_cluster_id: selectedGC ?? 'STAR CLUSTER',
         p_ship_ids: launchShipIds,
-        p_tool_id: launchTool?.seed_id ?? launchTool?.id ?? null
+        p_tool_id: launchTool?.id ?? launchTool?.seed_id ?? null
       });
 
       if (error) throw error;
@@ -2333,7 +2328,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                 </div>
               </div>
 
-              {/* ── PARTE INFERIOR: BANDEJA CLÁSICA DE ACTIVOS SELECCIONADOS ── */}
+              {/* ── PARTE INFERIOR: BANDEJA DIVIDIDA 50/50 (NAVIES/ASTROBOTS vs TOOLS/CONSUMIBLES/LICENCIAS) ── */}
               <div className="h-[52%] min-h-0 flex flex-col justify-between bg-[#03060a]/90 border border-cyan-900/50 rounded-lg p-2 overflow-hidden">
                 
                 {/* 1. Header de Selección y Botón Limpiar */}
@@ -2355,61 +2350,97 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                   )}
                 </div>
 
-                {/* 2. Bandeja Clásica Horizontal */}
-                <div className="flex-1 min-h-0 my-1 overflow-x-auto no-scrollbar flex items-center gap-2 py-1">
-                  {selectedAssets.length === 0 && !selectedFleet ? (
-                    <div className="w-full h-full flex items-center justify-center text-[9px] font-mono text-zinc-500 uppercase tracking-widest border border-dashed border-cyan-950 rounded p-2 text-center">
-                      {t('expeditions.click_to_add_hint', 'HAZ CLIC EN LOS ACTIVOS DE ARRIBA PARA AÑADIRLOS A ESTA EXPEDICIÓN')}
+                {/* 2. Grid Dividido 50/50 */}
+                <div className="flex-1 min-h-0 my-1 grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-hidden">
+                  
+                  {/* COLUMNA IZQUIERDA (50%): NAVES & ASTROBOTS */}
+                  <div className="h-full border border-cyan-950/80 rounded bg-[#020509]/80 p-1.5 flex flex-col min-h-0">
+                    <div className="shrink-0 flex items-center justify-between pb-1 border-b border-cyan-950 text-[8px] font-bold text-cyan-400 uppercase">
+                      <span>NAVES & ASTROBOTS ({selectedLeftGroup.length + (selectedFleet ? 1 : 0)})</span>
                     </div>
-                  ) : (
-                    <>
-                      {selectedFleet && (
-                        <div
-                          onClick={() => { playSfx(440); setSelectedFleet(null); }}
-                          className="w-[120px] sm:w-[135px] shrink-0 h-full max-h-[75px] bg-[#05080c] border border-purple-500/60 rounded p-1.5 flex items-center gap-2 relative group cursor-pointer hover:border-purple-400 transition-all"
-                        >
-                          <div className="w-8 h-8 rounded bg-purple-900/60 border border-purple-800 shrink-0 flex items-center justify-center font-black text-purple-200 text-[10px]">
-                            FLT
-                          </div>
-                          <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
-                            <span className="text-[8px] font-black text-white truncate">{selectedFleet.name}</span>
-                            <span className="text-[6.5px] text-purple-300 font-mono font-bold">{t('expeditions.fleet_equipped')}</span>
-                          </div>
-                          <div className="absolute -top-1 -right-1 bg-red-950 border border-red-500 text-red-300 rounded-full w-3.5 h-3.5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <X className="w-2 h-2" />
-                          </div>
-                        </div>
-                      )}
 
-                      {selectedAssets.map(asset => {
-                        const effectVal = asset.effect || 0;
-                        return (
+                    <div className="flex-1 min-h-0 overflow-x-auto no-scrollbar flex items-center gap-1.5 py-1">
+                      {selectedLeftGroup.length === 0 && !selectedFleet ? (
+                        <div className="w-full h-full flex items-center justify-center text-[7.5px] font-mono text-zinc-600 uppercase tracking-widest text-center">
+                          SIN NAVES NI ASTROBOTS
+                        </div>
+                      ) : (
+                        <>
+                          {selectedFleet && (
+                            <div
+                              onClick={() => { playSfx(440); setSelectedFleet(null); }}
+                              className="w-[115px] shrink-0 h-full max-h-[68px] bg-[#05080c] border border-purple-500/60 rounded p-1 flex items-center gap-1.5 relative group cursor-pointer hover:border-purple-400 transition-all"
+                            >
+                              <div className="w-7 h-7 rounded bg-purple-900/60 border border-purple-800 shrink-0 flex items-center justify-center font-black text-purple-200 text-[9px]">
+                                FLT
+                              </div>
+                              <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
+                                <span className="text-[7.5px] font-black text-white truncate">{selectedFleet.name}</span>
+                                <span className="text-[6px] text-purple-300 font-mono font-bold">FLOTA</span>
+                              </div>
+                              <div className="absolute -top-1 -right-1 bg-red-950 border border-red-500 text-red-300 rounded-full w-3.5 h-3.5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <X className="w-2 h-2" />
+                              </div>
+                            </div>
+                          )}
+
+                          {selectedLeftGroup.map(asset => (
+                            <div
+                              key={`selected-left-${asset.id}`}
+                              onClick={() => toggleAssetSelection(asset)}
+                              className="w-[115px] shrink-0 h-full max-h-[68px] bg-[#05080c] border border-cyan-500/50 rounded p-1 flex items-center gap-1.5 relative group cursor-pointer hover:border-cyan-300 transition-all"
+                            >
+                              <div className="w-7 h-7 rounded bg-black border border-cyan-900 shrink-0 overflow-hidden">
+                                <img src={asset.image_url} className="w-full h-full object-cover" alt={asset.name} />
+                              </div>
+                              <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
+                                <span className="text-[7.5px] font-black text-white truncate">{asset.name}</span>
+                                <span className="text-[6px] text-cyan-400/80 font-mono uppercase">{asset.type}</span>
+                              </div>
+                              <div className="absolute -top-1 -right-1 bg-red-950 border border-red-500 text-red-300 rounded-full w-3.5 h-3.5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <X className="w-2 h-2" />
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* COLUMNA DERECHA (50%): TOOLS, CONSUMIBLES & LICENCIAS */}
+                  <div className="h-full border border-amber-950/60 rounded bg-[#020509]/80 p-1.5 flex flex-col min-h-0">
+                    <div className="shrink-0 flex items-center justify-between pb-1 border-b border-amber-950/80 text-[8px] font-bold text-amber-400 uppercase">
+                      <span>TOOLS, CONSUMIBLES & LICENCIAS ({selectedRightGroup.length})</span>
+                    </div>
+
+                    <div className="flex-1 min-h-0 overflow-x-auto no-scrollbar flex items-center gap-1.5 py-1">
+                      {selectedRightGroup.length === 0 ? (
+                        <div className="w-full h-full flex items-center justify-center text-[7.5px] font-mono text-zinc-600 uppercase tracking-widest text-center">
+                          SIN TOOLS NI LICENCIAS
+                        </div>
+                      ) : (
+                        selectedRightGroup.map(asset => (
                           <div
-                            key={`selected-${asset.id}`}
+                            key={`selected-right-${asset.id}`}
                             onClick={() => toggleAssetSelection(asset)}
-                            className="w-[120px] sm:w-[135px] shrink-0 h-full max-h-[75px] bg-[#05080c] border border-cyan-500/50 rounded p-1.5 flex items-center gap-2 relative group cursor-pointer hover:border-cyan-300 transition-all"
+                            className="w-[115px] shrink-0 h-full max-h-[68px] bg-[#05080c] border border-amber-500/50 rounded p-1 flex items-center gap-1.5 relative group cursor-pointer hover:border-amber-300 transition-all"
                           >
-                            <div className="w-8 h-8 rounded bg-black border border-cyan-900 shrink-0 overflow-hidden">
+                            <div className="w-7 h-7 rounded bg-black border border-amber-900 shrink-0 overflow-hidden">
                               <img src={asset.image_url} className="w-full h-full object-cover" alt={asset.name} />
                             </div>
                             <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
-                              <span className="text-[8px] font-black text-white truncate">{asset.name}</span>
-                              {effectVal !== 0 ? (
-                                <span className={`text-[6.5px] font-mono font-bold ${effectVal > 0 ? 'text-cyan-300' : 'text-red-300'}`}>
-                                  {effectVal > 0 ? `+${effectVal.toFixed(1)}%` : `${effectVal.toFixed(1)}%`}
-                                </span>
-                              ) : (
-                                <span className="text-[6.5px] text-cyan-400/70 font-mono uppercase">{asset.type}</span>
-                              )}
+                              <span className="text-[7.5px] font-black text-white truncate">{asset.name}</span>
+                              <span className="text-[6px] text-amber-400/80 font-mono uppercase">{asset.type}</span>
                             </div>
                             <div className="absolute -top-1 -right-1 bg-red-950 border border-red-500 text-red-300 rounded-full w-3.5 h-3.5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                               <X className="w-2 h-2" />
                             </div>
                           </div>
-                        );
-                      })}
-                    </>
-                  )}
+                        ))
+                      )}
+                    </div>
+                  </div>
+
                 </div>
 
                 {/* 3. Consolidado Táctico de Stats (DEFENSIVO) */}

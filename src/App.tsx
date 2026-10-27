@@ -5,23 +5,25 @@ import { Homepage } from './pages/Homepage';
 import { RefreshCw } from 'lucide-react';
 
 import { GamePreloader } from './components/GamePreloader';
+import { IntroVideo } from './components/IntroVideo';
 import { useUpdater } from './hooks/useUpdater';
 
 function AppContent() {
   const { user, logout, isInitializing } = useAuth();
   const [isPreloaderFinished, setIsPreloaderFinished] = useState(false);
+  const [hasSeenIntro, setHasSeenIntro] = useState<boolean>(() => {
+    return !!sessionStorage.getItem('gd_intro_seen');
+  });
 
   // 🔄 Verifica actualizaciones al arrancar (solo en Tauri Desktop)
   useUpdater();
 
   // 🚀 Forzar Giro y Pantalla Completa Automáticos (Zero Click)
   useEffect(() => {
-    // Intento inmediato al inicializar
     if (window.screen?.orientation && 'lock' in window.screen.orientation) {
       (window.screen.orientation as any).lock('landscape').catch(() => {});
     }
 
-    // Listener global pasivo en primer gesto del usuario
     const autoLockFullscreen = () => {
       if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
         document.documentElement.requestFullscreen().then(() => {
@@ -41,6 +43,13 @@ function AppContent() {
     };
   }, []);
 
+  // Si el intro ya fue visto en esta sesión (por ejemplo tras un F5), activar la música en el primer clic
+  useEffect(() => {
+    if (user && isPreloaderFinished && hasSeenIntro) {
+      window.dispatchEvent(new CustomEvent('gd_play_bg_music'));
+    }
+  }, [user, isPreloaderFinished, hasSeenIntro]);
+
   if (isInitializing) {
     return (
       <div className="w-screen h-screen bg-[#0C0D0E] flex flex-col items-center justify-center text-cyan-500 font-mono space-y-4 select-none">
@@ -53,11 +62,24 @@ function AppContent() {
   }
 
   if (user) {
-    // Si el usuario se ha autenticado pero la precarga multimedia no ha terminado
+    // 1. Precarga multimedia
     if (!isPreloaderFinished) {
       return <GamePreloader onComplete={() => setIsPreloaderFinished(true)} />;
     }
 
+    // 2. Cinemática Intro oficial con trigger a la música de fondo
+    if (!hasSeenIntro) {
+      return (
+        <IntroVideo
+          onEnded={() => {
+            sessionStorage.setItem('gd_intro_seen', 'true');
+            setHasSeenIntro(true);
+          }}
+        />
+      );
+    }
+
+    // 3. Homepage oficial del juego
     return <Homepage user={user as any} onLogout={logout} />;
   }
 

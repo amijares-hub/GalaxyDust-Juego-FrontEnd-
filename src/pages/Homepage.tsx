@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, Settings, X, Bell, Lock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -162,6 +162,10 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     return activeFlights.filter(exp => new Date(exp.estimated_return_time).getTime() <= nowMs).length;
   }, [activeFlights, utcTime]);
 
+  const currentUserIdRef = useRef<string | null>(null);
+  const refreshNotificationsRef = useRef(refreshNotifications);
+  refreshNotificationsRef.current = refreshNotifications;
+
   // 🎯 Muestra SIEMPRE el aviso flotante Toast en pantalla, pero NUNCA suma +1 directo a la campana
   // Solo se persiste en DB si es uno de los 5 Comunicados Oficiales permitidos
   const handleTriggerNotification = async (text: string, payloadOrExpId?: any) => {
@@ -196,13 +200,13 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
 
     // 3. Persistir en Supabase expedition_logs únicamente ante eventos con expedition_id verificado
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) return;
+      const authUserId = currentUserIdRef.current;
+      if (!authUserId) return;
 
       const { data: existingLog } = await supabase
         .from('expedition_logs')
         .select('id')
-        .eq('user_id', authUser.id)
+        .eq('user_id', authUserId)
         .eq('expedition_id', validExpId)
         .maybeSingle();
 
@@ -219,7 +223,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         : {};
 
       await supabase.from('expedition_logs').insert([{
-        user_id: authUser.id,
+        user_id: authUserId,
         expedition_id: validExpId,
         event_type: eventType,
         title: title,
@@ -228,7 +232,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         is_read: false
       }]);
 
-      refreshNotifications();
+      refreshNotificationsRef.current?.();
     } catch (err: any) {
       console.warn("[NOTIFICATIONS] Error al persistir comunicado oficial:", err?.message || err);
     }
@@ -245,37 +249,25 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     return () => clearInterval(timer);
   }, []);
 
-  // Control estricto anti-duplicados al verificar vuelos terminados
+  // Control estricto anti-duplicados al verificar vuelos terminados (en memoria, 0 peticiones HTTP a Auth por segundo)
   useEffect(() => {
     if (!activeFlights.length) return;
+    const authUserId = currentUserIdRef.current;
+    if (!authUserId) return;
+
     const nowMs = Date.now();
+    const notifiedSet = getNotifiedExpeditionIds(authUserId);
 
-    supabase.auth.getUser().then(({ data: { user: authUser } }) => {
-      if (!authUser) return;
+    activeFlights.forEach((exp) => {
+      const returnMs = new Date(exp.estimated_return_time).getTime();
+      if (nowMs >= returnMs && !notifiedSet.has(exp.id)) {
+        addNotifiedExpeditionId(authUserId, exp.id);
 
-      const notifiedSet = getNotifiedExpeditionIds(authUser.id);
-
-      activeFlights.forEach(async (exp) => {
-        const returnMs = new Date(exp.estimated_return_time).getTime();
-        if (nowMs >= returnMs && !notifiedSet.has(exp.id)) {
-          // Registrar en almacenamiento persistente
-          addNotifiedExpeditionId(authUser.id, exp.id);
-
-          const { data: existingLog } = await supabase
-            .from('expedition_logs')
-            .select('id')
-            .eq('user_id', authUser.id)
-            .eq('expedition_id', exp.id)
-            .maybeSingle();
-
-          if (!existingLog) {
-            handleTriggerNotification(
-              `🎉 ¡EXPEDICIÓN FINALIZADA! La flota ${exp.fleet_name || 'de expedición'} ha llegado a su destino (${exp.sector_name || 'SC'}). Reclama tus recompensas en Expeditions In Flight.`,
-              { expId: exp.id, category: 'EXPEDITION', title: 'EXPEDICIÓN FINALIZADA' }
-            );
-          }
-        }
-      });
+        handleTriggerNotification(
+          `🎉 ¡EXPEDICIÓN FINALIZADA! La flota ${exp.fleet_name || 'de expedición'} ha llegado a su destino (${exp.sector_name || 'SC'}). Reclama tus recompensas en Expeditions In Flight.`,
+          { expId: exp.id, category: 'EXPEDITION', title: 'EXPEDICIÓN FINALIZADA' }
+        );
+      }
     });
   }, [utcTime, activeFlights]);
 
@@ -283,21 +275,20 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     let profileChannel: any;
     let logsChannel: any;
     let expeditionsChannel: any;
-    let pollInterval: any;
     let isMounted = true;
 
-    const loadUserProfile = async (authUser: any) => {
+    const loadUserProfile = async (userId: string) => {
       let { data: profile } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('user_id', authUser.id)
+        .eq('user_id', userId)
         .maybeSingle();
 
       if (!profile) {
         const { data: profileById } = await supabase
           .from('user_profiles')
           .select('*')
-          .eq('id', authUser.id)
+          .eq('id', userId)
           .maybeSingle();
         profile = profileById;
       }
@@ -306,7 +297,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         if (profile.avatar_url) {
           const validUrl = resolveAvatarUrl(profile.avatar_url);
           setCurrentAvatarUrl(validUrl);
-          try { localStorage.setItem(`user_avatar_${authUser.id}`, validUrl); } catch {}
+          try { localStorage.setItem(`user_avatar_${userId}`, validUrl); } catch {}
         }
         setPower(parseFloat(profile.power_score || 0));
         setCurrencies({
@@ -348,15 +339,18 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     };
 
     const initEngine = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const authUser = session?.user;
       if (!authUser || !isMounted) return;
+
+      currentUserIdRef.current = authUser.id;
 
       const savedAvatar = localStorage.getItem(`user_avatar_${authUser.id}`);
       if (savedAvatar) {
         setCurrentAvatarUrl(savedAvatar);
       }
 
-      await loadUserProfile(authUser);
+      await loadUserProfile(authUser.id);
       await loadActiveExpeditions(authUser.id);
 
       const createSafeChannel = async (channelName: string, options: any, callback: () => void) => {
@@ -368,7 +362,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       profileChannel = await createSafeChannel(
         `economy_hud_stream_${authUser.id}`,
         { event: 'UPDATE', schema: 'public', table: 'user_profiles' },
-        () => { if (isMounted) loadUserProfile(authUser); }
+        () => { if (isMounted) loadUserProfile(authUser.id); }
       );
 
       expeditionsChannel = await createSafeChannel(
@@ -380,27 +374,28 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       logsChannel = await createSafeChannel(
         `expedition_logs_stream_${authUser.id}`,
         { event: 'INSERT', schema: 'public', table: 'expedition_logs', filter: `user_id=eq.${authUser.id}` },
-        () => { if (isMounted) refreshNotifications(); }
+        () => { if (isMounted) refreshNotificationsRef.current?.(); }
       );
 
-      pollInterval = setInterval(() => {
-        if (isMounted) {
-          loadUserProfile(authUser);
+      // Re-sincronización pasiva solo cuando el jugador vuelve a enfocar la pestaña
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible' && isMounted) {
+          loadUserProfile(authUser.id);
           loadActiveExpeditions(authUser.id);
         }
-      }, 5000);
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
     };
 
     initEngine();
 
     return () => {
       isMounted = false;
-      if (pollInterval) clearInterval(pollInterval);
       if (profileChannel) supabase.removeChannel(profileChannel);
       if (logsChannel) supabase.removeChannel(logsChannel);
       if (expeditionsChannel) supabase.removeChannel(expeditionsChannel);
     };
-  }, [refreshNotifications]);
+  }, []);
 
   return (
     <div 

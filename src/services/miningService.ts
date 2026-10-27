@@ -73,7 +73,7 @@ export const miningService = {
           user_id,
           structure_id,
           is_active,
-          seed_structures (
+          seed_structures!fk_user_structures_seed_structures (
             name,
             skills
           )
@@ -205,7 +205,8 @@ export const miningService = {
    */
   async hasActiveMiningExpeditions(): Promise<boolean> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) return false;
 
       const { count, error } = await supabase

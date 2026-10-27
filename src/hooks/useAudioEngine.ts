@@ -6,7 +6,12 @@ export interface AudioSettings {
   sfx: number;    // 0 - 100
 }
 
+// 🎵 URL OFICIAL DE LA MÚSICA DE FONDO
+export const BACKGROUND_MUSIC_URL =
+  'https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20music/GD%20MainMenu%201.0.mp3';
+
 let sharedAudioCtx: AudioContext | null = null;
+let sharedBgMusic: HTMLAudioElement | null = null;
 
 export function getSharedAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null;
@@ -28,17 +33,6 @@ export const unlockAudioContext = () => {
   } catch {}
 };
 
-// Desbloqueo pasivo global al primer gesto táctil o clic
-if (typeof window !== 'undefined') {
-  const handleFirstInteraction = () => {
-    unlockAudioContext();
-    window.removeEventListener('click', handleFirstInteraction);
-    window.removeEventListener('touchstart', handleFirstInteraction);
-  };
-  window.addEventListener('click', handleFirstInteraction, { once: true, passive: true });
-  window.addEventListener('touchstart', handleFirstInteraction, { once: true, passive: true });
-}
-
 export function getAudioSettings(): AudioSettings {
   try {
     const master = localStorage.getItem('gd_audio_master');
@@ -54,12 +48,60 @@ export function getAudioSettings(): AudioSettings {
   }
 }
 
+// Sincroniza el volumen del elemento de audio según Master y BGM
+export function syncMusicVolume() {
+  if (typeof window === 'undefined' || !sharedBgMusic) return;
+  const { master, bgm } = getAudioSettings();
+  const volumeFactor = (master / 100) * (bgm / 100);
+  sharedBgMusic.volume = Math.max(0, Math.min(1, volumeFactor));
+}
+
 export function saveAudioSettings(settings: Partial<AudioSettings>) {
   try {
     if (settings.master !== undefined) localStorage.setItem('gd_audio_master', String(Math.round(settings.master)));
     if (settings.bgm !== undefined) localStorage.setItem('gd_audio_bgm', String(Math.round(settings.bgm)));
     if (settings.sfx !== undefined) localStorage.setItem('gd_audio_sfx', String(Math.round(settings.sfx)));
+    syncMusicVolume();
   } catch {}
+}
+
+export function startBackgroundMusic() {
+  if (typeof window === 'undefined') return;
+  unlockAudioContext();
+
+  if (!sharedBgMusic) {
+    sharedBgMusic = new Audio(BACKGROUND_MUSIC_URL);
+    sharedBgMusic.loop = true;
+    sharedBgMusic.preload = 'auto';
+  }
+
+  syncMusicVolume();
+
+  if (sharedBgMusic.paused) {
+    sharedBgMusic.play().catch((err) => {
+      console.warn('[AudioEngine] Autoplay diferido hasta interacción:', err);
+    });
+  }
+}
+
+export function pauseBackgroundMusic() {
+  if (typeof window === 'undefined' || !sharedBgMusic) return;
+  sharedBgMusic.pause();
+}
+
+// Desbloqueo pasivo global al primer gesto táctil o clic + Event listener para el trigger del video
+if (typeof window !== 'undefined') {
+  const handleFirstInteraction = () => {
+    unlockAudioContext();
+    window.removeEventListener('click', handleFirstInteraction);
+    window.removeEventListener('touchstart', handleFirstInteraction);
+  };
+  window.addEventListener('click', handleFirstInteraction, { once: true, passive: true });
+  window.addEventListener('touchstart', handleFirstInteraction, { once: true, passive: true });
+
+  window.addEventListener('gd_play_bg_music', () => {
+    startBackgroundMusic();
+  });
 }
 
 export function useAudioEngine() {
@@ -97,6 +139,14 @@ export function useAudioEngine() {
     } catch (_) {}
   }, []);
 
-  return { playSfx, getAudioSettings, saveAudioSettings, unlockAudioContext };
+  return {
+    playSfx,
+    getAudioSettings,
+    saveAudioSettings,
+    unlockAudioContext,
+    startBackgroundMusic,
+    pauseBackgroundMusic
+  };
 }
 
+export default useAudioEngine;
