@@ -17,9 +17,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     auth.isInitializing,
     auth.errorMessage,
     auth.successMessage,
+    auth.showNewPasswordModal,
+    auth.setShowNewPasswordModal,
     auth.setScreen,
     auth.submitLogin,
     auth.submitRegister,
+    auth.submitResetPassword,
+    auth.submitUpdatePassword,
     auth.verifyTwoFA,
     auth.logout
   ]);

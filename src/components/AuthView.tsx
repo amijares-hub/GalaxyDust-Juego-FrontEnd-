@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, AlertCircle, RefreshCw, ShieldCheck, KeyRound, Calendar, CheckSquare, Square, MailCheck, ArrowRight } from 'lucide-react';
+import { Mail, Lock, AlertCircle, RefreshCw, ShieldCheck, KeyRound, Calendar, CheckSquare, Square, MailCheck, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -18,6 +18,7 @@ export const AuthView: React.FC = () => {
     setScreen,
     submitLogin,
     submitRegister,
+    submitResetPassword,
     verifyTwoFA
   } = useAuth();
 
@@ -41,7 +42,7 @@ export const AuthView: React.FC = () => {
   const [captchaNum2, setCaptchaNum2] = useState(0);
   const [userCaptchaInput, setUserCaptchaInput] = useState('');
 
-  const loading = state === 'authenticating' || state === 'registering' || state === 'verifying_2fa';
+  const loading = state === 'authenticating' || state === 'registering' || state === 'verifying_2fa' || state === 'resetting';
 
   const generateCaptcha = () => {
     setCaptchaNum1(Math.floor(Math.random() * 10) + 1);
@@ -97,6 +98,18 @@ export const AuthView: React.FC = () => {
     setPassword('');
     setConfirmPassword('');
     setUserCaptchaInput('');
+    setLocalError(null);
+  };
+
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError(null);
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      setLocalError('Introduce tu correo electrónico registrado.');
+      return;
+    }
+    await submitResetPassword(cleanEmail);
   };
 
   const handleTabChange = (tab: 'login' | 'register') => {
@@ -411,7 +424,7 @@ export const AuthView: React.FC = () => {
                     </>
                   )}
 
-                  {/* OPCIÓN RECUÉRDAME (SOLO EN LOGIN) */}
+                  {/* OPCIÓN RECUÉRDAME Y RECUPERACIÓN (SOLO EN LOGIN) */}
                   {activeTab === 'login' && (
                     <div className="flex items-center justify-between pt-0.5">
                       <button
@@ -425,6 +438,17 @@ export const AuthView: React.FC = () => {
                           <Square className="w-3.5 h-3.5 text-white/20" />
                         )}
                         <span>{t('auth.remember_me')}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLocalError(null);
+                          setScreen('forgot_password');
+                        }}
+                        className="text-[8.5px] font-mono text-cyan-400 hover:text-cyan-300 transition-colors cursor-pointer underline underline-offset-2"
+                      >
+                        ¿Olvidaste tu contraseña?
                       </button>
                     </div>
                   )}
@@ -504,6 +528,91 @@ export const AuthView: React.FC = () => {
                       {loading ? <RefreshCw className="w-3 h-3 animate-spin mx-auto" /> : "VERIFICAR"}
                     </button>
                   </div>
+                </form>
+              </motion.div>
+            )}
+
+            {/* ─── FASE RECUPERACIÓN DE CONTRASEÑA ─── */}
+            {screen === 'forgot_password' && (
+              <motion.div
+                key="forgot-password-form"
+                initial={{ opacity: 0, x: 15 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -15 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col gap-3 py-1"
+              >
+                <div className="flex flex-col items-center text-center gap-2 mb-1">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+                    <KeyRound className="w-5 h-5 text-cyan-400 animate-pulse" />
+                  </div>
+                  <h2 className="text-xs sm:text-sm font-black tracking-[0.2em] uppercase text-white">
+                    RECUPERAR ACCESO AL SISTEMA
+                  </h2>
+                  <p className="text-[9px] sm:text-[10px] text-zinc-400 font-mono leading-relaxed px-1">
+                    Introduce tu correo electrónico registrado para enviarte un enlace de restablecimiento de credenciales.
+                  </p>
+                </div>
+
+                <form onSubmit={handleResetPasswordSubmit} className="flex flex-col gap-2.5 text-left">
+                  <div className="flex flex-col gap-0.5">
+                    <label className="text-[8.5px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium ml-1">
+                      CORREO ELECTRÓNICO
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30">
+                        <Mail className="w-3.5 h-3.5" />
+                      </span>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={loading}
+                        className="w-full bg-[#1A1C20] border border-white/5 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-white/20 focus:border-cyan-500/50 focus:bg-[#1C1E22] outline-none transition-all disabled:opacity-50 font-mono"
+                        placeholder="comandante@galaxydust.io"
+                      />
+                    </div>
+                  </div>
+
+                  {(localError || errorMessage) && (
+                    <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 p-2 rounded-lg mt-0.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                      <span className="text-[9px] font-mono text-red-400 uppercase leading-tight tracking-wider">
+                        {localError || errorMessage}
+                      </span>
+                    </div>
+                  )}
+
+                  {successMessage && (
+                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-lg mt-0.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                      <span className="text-[9px] font-mono text-emerald-400 uppercase leading-tight tracking-wider">
+                        {successMessage}
+                      </span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="mt-1 w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold uppercase tracking-[0.15em] text-xs rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {loading ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <span>ENVIAR ENLACE DE RECUPERACIÓN</span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleReturnToLogin}
+                    disabled={loading}
+                    className="w-full py-2 bg-transparent hover:bg-white/5 text-zinc-400 hover:text-white border border-white/10 font-mono uppercase tracking-[0.15em] text-[9.5px] rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>VOLVER AL INICIO DE SESIÓN</span>
+                  </button>
                 </form>
               </motion.div>
             )}

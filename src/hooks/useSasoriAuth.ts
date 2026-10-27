@@ -22,6 +22,7 @@ export type AuthState =
   | 'error';
 
 export interface UserProfile {
+  id?: string;
   email: string;
   name: string;
   provider: 'password' | 'google' | 'github' | 'facebook';
@@ -30,6 +31,7 @@ export interface UserProfile {
   verified: boolean;
   avatarUrl: string;
   assignedToken: string;
+  mustResetPassword?: boolean;
 }
 
 export interface UseSasoriAuthReturn {
@@ -40,16 +42,37 @@ export interface UseSasoriAuthReturn {
   user: UserProfile | null;
   tempEmail: string;
   isInitializing: boolean;
+  showNewPasswordModal: boolean;
+  setShowNewPasswordModal: (show: boolean) => void;
   setScreen: (screen: ScreenState) => void;
   submitLogin: (email: string, password: string, rememberMe: boolean) => Promise<boolean>;
   submitRegister: (email: string, password: string, metadata?: any) => Promise<boolean>;
   submitResetPassword: (email: string) => Promise<boolean>;
+  submitUpdatePassword: (newPassword: string) => Promise<boolean>;
   triggerSocialLogin: (provider: 'google' | 'github' | 'facebook') => Promise<boolean>;
   verifyEmailCode: (code: string) => Promise<boolean>;
   verifyTwoFA: (code: string) => Promise<boolean>;
   logout: () => void;
   resetAuthStatus: () => void;
 }
+
+export const fetchUserProfileFromDb = async (userId: string) => {
+  const { data: p1 } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (p1) return p1;
+
+  const { data: p2 } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  return p2;
+};
 
 export function useSasoriAuth(): UseSasoriAuthReturn {
   const [screen, setScreenState] = useState<ScreenState>('menu');
@@ -59,38 +82,24 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [tempEmail, setTempEmail] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
+  const [showNewPasswordModal, setShowNewPasswordModal] = useState<boolean>(false);
 
   // 🛡️ HIDRATACIÓN Y CENTINELA DE SESIÓN ZERO-TRUST
   useEffect(() => {
     let isMounted = true;
-
-    const fetchUserProfile = async (userId: string) => {
-      const { data: p1 } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (p1) return p1;
-
-      const { data: p2 } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      return p2;
-    };
 
     const hydrateActiveSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
 
         if (session && session.user && isMounted) {
-          const dbProfile = await fetchUserProfile(session.user.id);
+          const dbProfile = await fetchUserProfileFromDb(session.user.id);
           if (!isMounted) return;
 
+          const mustReset = Boolean(dbProfile?.must_reset_password);
+
           setUser({
+            id: session.user.id,
             email: session.user.email || '',
             name: dbProfile?.username || session.user.email?.split('@')[0].toUpperCase() || 'PILOTO',
             provider: (session.user.app_metadata.provider || 'password') as any,
@@ -99,10 +108,19 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
             verified: true,
             avatarUrl: dbProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${session.user.email}`,
             assignedToken: 'GD-SEC-' + session.user.id.slice(0, 8).toUpperCase(),
+            mustResetPassword: mustReset,
           });
+
+          if (typeof window !== 'undefined' && (window.location.hash.includes('reset-password') || window.location.hash.includes('type=recovery'))) {
+            setShowNewPasswordModal(true);
+          } else if (mustReset) {
+            setShowNewPasswordModal(true);
+          }
 
           setScreenState('homepage');
           setState('connected');
+        } else if (typeof window !== 'undefined' && (window.location.hash.includes('reset-password') || window.location.hash.includes('type=recovery'))) {
+          setShowNewPasswordModal(true);
         }
       } catch (err) {
         console.error("Error al hidratar sesión activa:", err);
@@ -115,34 +133,42 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
 
     hydrateActiveSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setShowNewPasswordModal(true);
+      }
+
       if (event === 'SIGNED_OUT' && isMounted) {
         setUser(null);
         setScreenState('menu');
         setState('idle');
+        setShowNewPasswordModal(false);
         setIsInitializing(false);
       } else if (event === 'SIGNED_IN' && session?.user && isMounted) {
-        const provider = session.user.app_metadata?.provider;
-        if (provider && provider !== 'email') {
-          fetchUserProfile(session.user.id).then((dbProfile) => {
-            if (!isMounted) return;
-            setUser({
-              email: session.user.email || '',
-              name: dbProfile?.username || session.user.email?.split('@')[0].toUpperCase() || 'PILOTO',
-              provider: provider as any,
-              registrationDate: dbProfile?.created_at ? new Date(dbProfile.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-              mfaEnabled: dbProfile?.mfa_enabled ?? false,
-              verified: true,
-              avatarUrl: dbProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${session.user.email}`,
-              assignedToken: 'GD-SEC-' + session.user.id.slice(0, 8).toUpperCase(),
-            });
-            setScreenState('homepage');
-            setState('connected');
-            setIsInitializing(false);
-          });
-        } else {
-          setIsInitializing(false);
+        const dbProfile = await fetchUserProfileFromDb(session.user.id);
+        if (!isMounted) return;
+
+        const mustReset = Boolean(dbProfile?.must_reset_password);
+        if (mustReset) {
+          setShowNewPasswordModal(true);
         }
+
+        const provider = session.user.app_metadata?.provider || 'password';
+        setUser({
+          id: session.user.id,
+          email: session.user.email || '',
+          name: dbProfile?.username || session.user.email?.split('@')[0].toUpperCase() || 'PILOTO',
+          provider: provider as any,
+          registrationDate: dbProfile?.created_at ? new Date(dbProfile.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          mfaEnabled: dbProfile?.mfa_enabled ?? false,
+          verified: true,
+          avatarUrl: dbProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${session.user.email}`,
+          assignedToken: 'GD-SEC-' + session.user.id.slice(0, 8).toUpperCase(),
+          mustResetPassword: mustReset,
+        });
+        setScreenState('homepage');
+        setState('connected');
+        setIsInitializing(false);
       }
     });
 
@@ -171,11 +197,8 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
 
       setTempEmail(email);
 
-      const { data: dbProfile } = await supabase
-        .from('user_profiles')
-        .select('username, avatar_url, mfa_enabled')
-        .eq('id', data.user.id)
-        .maybeSingle();
+      const dbProfile = await fetchUserProfileFromDb(data.user.id);
+      const mustReset = Boolean(dbProfile?.must_reset_password);
 
       if ((dbProfile as any)?.mfa_enabled) {
         setScreenState('two_factor');
@@ -183,6 +206,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
         setSuccessMessage('CREDENCIALES CORRECTAS • COMPILANDO VERIFICACIÓN MULTIFACTOR');
       } else {
         const loadedProfile: UserProfile = {
+          id: data.user.id,
           email: data.user.email || '',
           name: dbProfile?.username || data.user.email?.split('@')[0].toUpperCase() || 'PILOTO',
           provider: 'password',
@@ -191,8 +215,12 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
           verified: true,
           avatarUrl: dbProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${data.user.email}`,
           assignedToken: 'GD-SEC-' + data.user.id.slice(0, 8).toUpperCase(),
+          mustResetPassword: mustReset,
         };
         setUser(loadedProfile);
+        if (mustReset) {
+          setShowNewPasswordModal(true);
+        }
         setScreenState('homepage');
         setState('connected');
       }
@@ -326,13 +354,11 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
         if (emailOtpErr) throw error;
       }
 
-      const { data: dbProfile } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .maybeSingle();
+      const dbProfile = await fetchUserProfileFromDb(authUser.id);
+      const mustReset = Boolean(dbProfile?.must_reset_password);
 
       const loadedProfile: UserProfile = {
+        id: authUser.id,
         email: authUser.email || '',
         name: dbProfile?.username || authUser.email.split('@')[0].toUpperCase(),
         provider: (authUser.app_metadata.provider || 'password') as any,
@@ -341,9 +367,13 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
         verified: true,
         avatarUrl: dbProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${authUser.email}`,
         assignedToken: 'GD-SEC-' + authUser.id.slice(0, 8).toUpperCase(),
+        mustResetPassword: mustReset,
       };
 
       setUser(loadedProfile);
+      if (mustReset) {
+        setShowNewPasswordModal(true);
+      }
       setScreenState('homepage');
       setState('connected');
       setSuccessMessage('ACCESO CONCEDIDO • PERFIL MAESTRO INYECTADO');
@@ -359,14 +389,15 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
   const submitResetPassword = useCallback(async (email: string) => {
     setState('resetting');
     setErrorMessage(null);
+    setSuccessMessage(null);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin,
+      const cleanEmail = email.trim();
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        redirectTo: `${window.location.origin}/#reset-password`,
       });
       if (error) throw error;
       setState('idle');
-      setSuccessMessage(`TRANSMISIÓN EMITIDA • REVISE SU BANDEJA EN ${email.toUpperCase()}`);
-      setScreenState('login');
+      setSuccessMessage('Se ha transmitido un enlace de restablecimiento a tu bandeja de entrada.');
       return true;
     } catch (err: any) {
       setState('error');
@@ -375,11 +406,52 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     }
   }, []);
 
-  // 7. CIERRE DE SESIÓN
+  // 7. ACTUALIZAR CONTRASEÑA TRAS RECUPERACIÓN O BLOQUEO MUST_RESET_PASSWORD
+  const submitUpdatePassword = useCallback(async (newPassword: string) => {
+    setState('resetting');
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+
+      const activeUserId = data?.user?.id || user?.id;
+      if (activeUserId) {
+        const { error: pErr } = await supabase
+          .from('user_profiles')
+          .update({ must_reset_password: false })
+          .eq('user_id', activeUserId);
+
+        if (pErr) {
+          await supabase
+            .from('user_profiles')
+            .update({ must_reset_password: false })
+            .eq('id', activeUserId);
+        }
+      }
+
+      setUser((prev) => (prev ? { ...prev, mustResetPassword: false } : null));
+      setShowNewPasswordModal(false);
+      setState('connected');
+      setSuccessMessage('CONTRASEÑA ACTUALIZADA CON ÉXITO');
+
+      if (typeof window !== 'undefined' && window.location.hash.includes('reset-password')) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+      return true;
+    } catch (err: any) {
+      setState('error');
+      setErrorMessage(err.message || 'ERROR AL ACTUALIZAR LA CONTRASEÑA');
+      return false;
+    }
+  }, [user]);
+
+  // 8. CIERRE DE SESIÓN
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
     setTempEmail('');
+    setShowNewPasswordModal(false);
     setScreenState('menu');
     setState('idle');
     setErrorMessage(null);
@@ -400,10 +472,13 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     user,
     tempEmail,
     isInitializing,
+    showNewPasswordModal,
+    setShowNewPasswordModal,
     setScreen,
     submitLogin,
     submitRegister,
     submitResetPassword,
+    submitUpdatePassword,
     triggerSocialLogin,
     verifyEmailCode,
     verifyTwoFA,
