@@ -9,7 +9,7 @@ import { useUpdater } from './hooks/useUpdater';
 import { NewPasswordModal } from './components/NewPasswordModal';
 
 function AppContent() {
-  const { user, logout, isInitializing, showNewPasswordModal } = useAuth();
+  const { user, logout, isInitializing, screen, showNewPasswordModal } = useAuth();
   const [isPreloaderFinished, setIsPreloaderFinished] = useState(false);
 
   // 🔄 Verifica actualizaciones al arrancar (solo en Tauri Desktop)
@@ -42,10 +42,10 @@ function AppContent() {
 
   // Activar música ambiental cuando el usuario esté conectado, no tenga bloqueo de clave y termine el preloader
   useEffect(() => {
-    if (user && !user.mustResetPassword && !showNewPasswordModal && isPreloaderFinished) {
+    if (user && !user.mustResetPassword && !showNewPasswordModal && screen !== 'reset_password' && isPreloaderFinished) {
       window.dispatchEvent(new CustomEvent('gd_play_bg_music'));
     }
-  }, [user, user?.mustResetPassword, showNewPasswordModal, isPreloaderFinished]);
+  }, [user, user?.mustResetPassword, showNewPasswordModal, screen, isPreloaderFinished]);
 
   // Pantalla de carga mientras se verifica la sesión en memoria
   if (isInitializing) {
@@ -60,19 +60,14 @@ function AppContent() {
   }
 
   // 0. BLOQUEO OBLIGATORIO: RECUPERACIÓN DE CONTRASEÑA O BANDERA must_reset_password = true
-  const isPasswordResetRequired = Boolean(showNewPasswordModal || user?.mustResetPassword);
+  const isPasswordResetRequired = Boolean(screen === 'reset_password' || showNewPasswordModal || user?.mustResetPassword);
+
+  if (isPasswordResetRequired) {
+    return <AuthView />;
+  }
 
   // 1. USUARIO CONECTADO ("Recuérdame" / Sesión activa):
   if (user) {
-    if (isPasswordResetRequired) {
-      return (
-        <>
-          <AuthView />
-          <NewPasswordModal />
-        </>
-      );
-    }
-
     if (!isPreloaderFinished) {
       return <GamePreloader onComplete={() => setIsPreloaderFinished(true)} />;
     }
@@ -80,17 +75,7 @@ function AppContent() {
     return <Homepage user={user as any} onLogout={logout} />;
   }
 
-  // 2. RETORNO DE RECUPERACIÓN SIN SESIÓN PREVIA O EN PROCESO DE RESTABLECIMIENTO
-  if (isPasswordResetRequired) {
-    return (
-      <>
-        <AuthView />
-        <NewPasswordModal />
-      </>
-    );
-  }
-
-  // 3. USUARIO NO CONECTADO:
+  // 2. USUARIO NO CONECTADO:
   return <AuthView />;
 }
 

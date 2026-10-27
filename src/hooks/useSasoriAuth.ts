@@ -6,6 +6,7 @@ export type ScreenState =
   | 'login'
   | 'register'
   | 'forgot_password'
+  | 'reset_password'
   | 'email_verification'
   | 'two_factor'
   | 'profile'
@@ -90,6 +91,13 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
 
     const hydrateActiveSession = async () => {
       try {
+        const isRecoveryUrl = typeof window !== 'undefined' && (
+          window.location.hash.includes('reset-password') ||
+          window.location.hash.includes('type=recovery') ||
+          window.location.search.includes('type=recovery') ||
+          window.location.search.includes('code=')
+        );
+
         const { data: { session } } = await supabase.auth.getSession();
 
         if (session && session.user && isMounted) {
@@ -111,16 +119,16 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
             mustResetPassword: mustReset,
           });
 
-          if (typeof window !== 'undefined' && (window.location.hash.includes('reset-password') || window.location.hash.includes('type=recovery'))) {
+          if (isRecoveryUrl || mustReset) {
             setShowNewPasswordModal(true);
-          } else if (mustReset) {
-            setShowNewPasswordModal(true);
+            setScreenState('reset_password');
+          } else {
+            setScreenState('homepage');
+            setState('connected');
           }
-
-          setScreenState('homepage');
-          setState('connected');
-        } else if (typeof window !== 'undefined' && (window.location.hash.includes('reset-password') || window.location.hash.includes('type=recovery'))) {
+        } else if (isRecoveryUrl) {
           setShowNewPasswordModal(true);
+          setScreenState('reset_password');
         }
       } catch (err) {
         console.error("Error al hidratar sesión activa:", err);
@@ -134,8 +142,16 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     hydrateActiveSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
+      const isRecoveryUrl = typeof window !== 'undefined' && (
+        window.location.hash.includes('type=recovery') ||
+        window.location.hash.includes('reset-password') ||
+        window.location.search.includes('type=recovery') ||
+        window.location.search.includes('code=')
+      );
+
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && isRecoveryUrl)) {
         setShowNewPasswordModal(true);
+        setScreenState('reset_password');
       }
 
       if (event === 'SIGNED_OUT' && isMounted) {
@@ -149,8 +165,9 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
         if (!isMounted) return;
 
         const mustReset = Boolean(dbProfile?.must_reset_password);
-        if (mustReset) {
+        if (mustReset || isRecoveryUrl) {
           setShowNewPasswordModal(true);
+          setScreenState('reset_password');
         }
 
         const provider = session.user.app_metadata?.provider || 'password';
@@ -166,8 +183,11 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
           assignedToken: 'GD-SEC-' + session.user.id.slice(0, 8).toUpperCase(),
           mustResetPassword: mustReset,
         });
-        setScreenState('homepage');
-        setState('connected');
+
+        if (!mustReset && !isRecoveryUrl) {
+          setScreenState('homepage');
+          setState('connected');
+        }
         setIsInitializing(false);
       }
     });
@@ -432,11 +452,12 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
 
       setUser((prev) => (prev ? { ...prev, mustResetPassword: false } : null));
       setShowNewPasswordModal(false);
+      setScreenState('homepage');
       setState('connected');
       setSuccessMessage('CONTRASEÑA ACTUALIZADA CON ÉXITO');
 
-      if (typeof window !== 'undefined' && window.location.hash.includes('reset-password')) {
-        window.history.replaceState(null, '', window.location.pathname);
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, document.title, window.location.pathname);
       }
       return true;
     } catch (err: any) {

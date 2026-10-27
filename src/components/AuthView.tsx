@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, AlertCircle, RefreshCw, ShieldCheck, KeyRound, Calendar, CheckSquare, Square, MailCheck, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, AlertCircle, RefreshCw, ShieldCheck, KeyRound, Calendar, CheckSquare, Square, MailCheck, ArrowRight, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -15,10 +15,12 @@ export const AuthView: React.FC = () => {
     state,
     errorMessage,
     successMessage,
+    showNewPasswordModal,
     setScreen,
     submitLogin,
     submitRegister,
     submitResetPassword,
+    submitUpdatePassword,
     verifyTwoFA
   } = useAuth();
 
@@ -32,6 +34,11 @@ export const AuthView: React.FC = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
+
+  // Campos para reset de contraseña
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   // Estado del Pop-Up de Verificación de Correo
   const [isRegisteredSuccess, setIsRegisteredSuccess] = useState(false);
@@ -53,6 +60,20 @@ export const AuthView: React.FC = () => {
   useEffect(() => {
     generateCaptcha();
   }, [activeTab]);
+
+  // 🛡️ Detección en AuthView al montar: comprueba si la URL contiene indicios de recuperación
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hasResetIndicator =
+      window.location.hash.includes('reset-password') ||
+      window.location.hash.includes('type=recovery') ||
+      window.location.search.includes('code=') ||
+      showNewPasswordModal === true;
+
+    if (hasResetIndicator) {
+      setScreen('reset_password');
+    }
+  }, [showNewPasswordModal, setScreen]);
 
   // Temporizador regresivo de 10 segundos tras registro exitoso
   useEffect(() => {
@@ -110,6 +131,35 @@ export const AuthView: React.FC = () => {
       return;
     }
     await submitResetPassword(cleanEmail);
+  };
+
+  const handleSetNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError(null);
+
+    const cleanNew = newPassword.trim();
+    const cleanConfirm = confirmNewPassword.trim();
+
+    if (!cleanNew || !cleanConfirm) {
+      setLocalError('Debes completar ambos campos.');
+      return;
+    }
+
+    if (cleanNew.length < 6) {
+      setLocalError('La contraseña debe tener un mínimo de 6 caracteres.');
+      return;
+    }
+
+    if (cleanNew !== cleanConfirm) {
+      setLocalError('Las contraseñas no coinciden');
+      return;
+    }
+
+    const success = await submitUpdatePassword(cleanNew);
+    if (success) {
+      setNewPassword('');
+      setConfirmNewPassword('');
+    }
   };
 
   const handleTabChange = (tab: 'login' | 'register') => {
@@ -601,6 +651,117 @@ export const AuthView: React.FC = () => {
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       <span>ENVIAR ENLACE DE RECUPERACIÓN</span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleReturnToLogin}
+                    disabled={loading}
+                    className="w-full py-2 bg-transparent hover:bg-white/5 text-zinc-400 hover:text-white border border-white/10 font-mono uppercase tracking-[0.15em] text-[9.5px] rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>VOLVER AL INICIO DE SESIÓN</span>
+                  </button>
+                </form>
+              </motion.div>
+            )}
+
+            {/* ─── FASE 4: ESTABLECER NUEVA CONTRASEÑA ─── */}
+            {screen === 'reset_password' && (
+              <motion.div
+                key="reset-password-screen"
+                initial={{ opacity: 0, x: 15 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -15 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col gap-3 py-1"
+              >
+                <div className="flex flex-col items-center text-center gap-1.5 mb-1">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+                    <KeyRound className="w-5 h-5 text-cyan-400 animate-pulse" />
+                  </div>
+                  <h2 className="text-xs sm:text-sm font-black tracking-[0.2em] uppercase text-white">
+                    ESTABLECER NUEVA CONTRASEÑA
+                  </h2>
+                  <p className="text-[9px] sm:text-[10px] text-zinc-400 font-mono leading-relaxed px-1">
+                    Introduce tus nuevas credenciales de acceso para proteger tu flota.
+                  </p>
+                </div>
+
+                <form onSubmit={handleSetNewPassword} className="flex flex-col gap-2.5 text-left">
+                  <div className="flex flex-col gap-0.5">
+                    <label className="text-[8.5px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium ml-1">
+                      NUEVA CONTRASEÑA
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30">
+                        <Lock className="w-3.5 h-3.5" />
+                      </span>
+                      <input
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        disabled={loading}
+                        className="w-full bg-[#1A1C20] border border-white/5 rounded-xl pl-9 pr-10 py-2 text-xs text-white placeholder-white/20 focus:border-cyan-500/50 focus:bg-[#1C1E22] outline-none transition-all disabled:opacity-50 font-mono"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-cyan-400 transition-colors cursor-pointer"
+                      >
+                        {showNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-0.5">
+                    <label className="text-[8.5px] uppercase tracking-[0.2em] text-[#A0A2A5] font-medium ml-1">
+                      CONFIRMAR NUEVA CONTRASEÑA
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30">
+                        <Lock className="w-3.5 h-3.5" />
+                      </span>
+                      <input
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={confirmNewPassword}
+                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                        disabled={loading}
+                        className="w-full bg-[#1A1C20] border border-white/5 rounded-xl pl-9 pr-10 py-2 text-xs text-white placeholder-white/20 focus:border-cyan-500/50 focus:bg-[#1C1E22] outline-none transition-all disabled:opacity-50 font-mono"
+                        placeholder="••••••••"
+                      />
+                    </div>
+                  </div>
+
+                  {(localError || errorMessage) && (
+                    <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 p-2 rounded-lg mt-0.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                      <span className="text-[9px] font-mono text-red-400 uppercase leading-tight tracking-wider">
+                        {localError || errorMessage}
+                      </span>
+                    </div>
+                  )}
+
+                  {successMessage && (
+                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-lg mt-0.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                      <span className="text-[9px] font-mono text-emerald-400 uppercase leading-tight tracking-wider">
+                        {successMessage}
+                      </span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="mt-1 w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold uppercase tracking-[0.15em] text-xs rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {loading ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <span>ACTUALIZAR CONTRASEÑA Y ENTRAR</span>
                     )}
                   </button>
 
