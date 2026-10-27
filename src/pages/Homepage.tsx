@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, Settings, X, Bell, Lock } from 'lucide-react';
+import { Eye, Settings, X, Bell, Lock, Download } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
+import { DownloadModal } from '../components/DownloadModal';
 import { ExpeditionsView } from '../components/ExpeditionsView';
 import { MarketplaceView } from '../components/MarketplaceView';
 import { PhantomStationView } from '../components/PhantomStationView';
@@ -132,6 +133,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
   const [showFlightsModal, setShowFlightsModal] = useState<boolean>(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+  const [showDownloadModal, setShowDownloadModal] = useState<boolean>(false);
   const [showTutorial, setShowTutorial] = useState<boolean>(() => {
     try {
       return !localStorage.getItem('gd_tutorial_completed');
@@ -573,6 +575,14 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         >
           <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
         </button>
+
+        <button 
+          onClick={() => setShowDownloadModal(true)} 
+          className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-black/80 text-cyan-400 border border-cyan-500/40 rounded-lg cursor-pointer hover:border-cyan-400 transition-all shadow-md"
+          title="Descargar Cliente Oficial"
+        >
+          <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
+        </button>
       </div>
 
       {/* ÁREA DE CONTENIDO */}
@@ -758,6 +768,13 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           setShowSettingsModal(false);
           setShowTutorial(true);
         }}
+      />
+
+      {/* POPUP 4: DESCARGAS */}
+      <DownloadModal
+        isOpen={showDownloadModal}
+        onClose={() => setShowDownloadModal(false)}
+        triggerNotification={handleTriggerNotification}
       />
 
       <TutorialOverlay
