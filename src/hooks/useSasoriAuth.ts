@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { translateSupabaseAuthError } from '../utils/passwordValidator';
 
 export type ScreenState =
   | 'menu'
@@ -287,17 +288,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
       return true;
     } catch (err: any) {
       setState('error');
-      let friendlyMsg = err.message || 'FALLO EN EL REGISTRO • HANDSHAKE INTERRUMPIDO';
-
-      if (err.message?.includes('Database error saving new user')) {
-        friendlyMsg = 'ERROR EN BASE DE DATOS: Fallo en el trigger de creación de perfil (user_profiles). Revisa Postgres Logs en Supabase.';
-      } else if (err.message?.includes('weak_password') || err.message?.includes('Password')) {
-        friendlyMsg = 'CLAVE DÉBIL: Debe tener al menos 8 caracteres, mayúscula, minúscula, número y símbolo especial.';
-      } else if (err.message?.includes('already registered') || err.message?.includes('already been registered')) {
-        friendlyMsg = 'ESTE CORREO YA SE ENCUENTRA REGISTRADO EN EL SISTEMA.';
-      }
-
-      setErrorMessage(friendlyMsg);
+      setErrorMessage(translateSupabaseAuthError(err));
       return false;
     }
   }, []);
@@ -462,7 +453,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
       return true;
     } catch (err: any) {
       setState('error');
-      setErrorMessage(err.message || 'ERROR AL ACTUALIZAR LA CONTRASEÑA');
+      setErrorMessage(translateSupabaseAuthError(err));
       return false;
     }
   }, [user]);

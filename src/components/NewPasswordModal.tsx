@@ -3,15 +3,19 @@ import { motion } from 'framer-motion';
 import { Lock, KeyRound, AlertCircle, RefreshCw, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { GalaxyFrame } from './CanView';
+import { PasswordChecklist } from './PasswordChecklist';
+import { validatePassword, getPasswordValidationError } from '../utils/passwordValidator';
 
 export const NewPasswordModal: React.FC = () => {
   const { submitUpdatePassword, state, errorMessage } = useAuth();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const loading = state === 'resetting';
+  const validationResult = validatePassword(newPassword, confirmPassword);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,18 +24,9 @@ export const NewPasswordModal: React.FC = () => {
     const cleanPass = newPassword.trim();
     const cleanConfirm = confirmPassword.trim();
 
-    if (!cleanPass || !cleanConfirm) {
-      setLocalError('Debes completar ambos campos.');
-      return;
-    }
-
-    if (cleanPass.length < 6) {
-      setLocalError('La contraseña debe tener un mínimo de 6 caracteres.');
-      return;
-    }
-
-    if (cleanPass !== cleanConfirm) {
-      setLocalError('Las contraseñas no coinciden.');
+    const validationError = getPasswordValidationError(cleanPass, cleanConfirm);
+    if (validationError) {
+      setLocalError(validationError);
       return;
     }
 
@@ -73,9 +68,12 @@ export const NewPasswordModal: React.FC = () => {
                   <input
                     type={showPass ? 'text' : 'password'}
                     value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      if (localError) setLocalError(null);
+                    }}
                     disabled={loading}
-                    className="w-full bg-[#1A1C20] border border-white/10 rounded-xl pl-9 pr-10 py-2.5 text-xs text-white placeholder-white/20 focus:border-cyan-500/60 focus:bg-[#1C1E22] outline-none transition-all disabled:opacity-50"
+                    className="w-full bg-[#1A1C20] border border-white/10 rounded-xl pl-9 pr-10 py-2.5 text-xs text-white placeholder-white/20 focus:border-cyan-500/60 focus:bg-[#1C1E22] outline-none transition-all disabled:opacity-50 font-mono"
                     placeholder="••••••••"
                   />
                   <button
@@ -97,15 +95,31 @@ export const NewPasswordModal: React.FC = () => {
                     <Lock className="w-4 h-4" />
                   </span>
                   <input
-                    type={showPass ? 'text' : 'password'}
+                    type={showConfirmPass ? 'text' : 'password'}
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (localError) setLocalError(null);
+                    }}
                     disabled={loading}
-                    className="w-full bg-[#1A1C20] border border-white/10 rounded-xl pl-9 pr-10 py-2.5 text-xs text-white placeholder-white/20 focus:border-cyan-500/60 focus:bg-[#1C1E22] outline-none transition-all disabled:opacity-50"
+                    className="w-full bg-[#1A1C20] border border-white/10 rounded-xl pl-9 pr-10 py-2.5 text-xs text-white placeholder-white/20 focus:border-cyan-500/60 focus:bg-[#1C1E22] outline-none transition-all disabled:opacity-50 font-mono"
                     placeholder="••••••••"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPass(!showConfirmPass)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-cyan-400 transition-colors cursor-pointer"
+                  >
+                    {showConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
+
+              {/* CHECKLIST EN TIEMPO REAL */}
+              <PasswordChecklist
+                password={newPassword}
+                confirmPassword={confirmPassword}
+              />
 
               {(localError || errorMessage) && (
                 <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 p-2.5 rounded-lg mt-1">
@@ -118,8 +132,8 @@ export const NewPasswordModal: React.FC = () => {
 
               <button
                 type="submit"
-                disabled={loading}
-                className="mt-2 w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-black uppercase tracking-[0.2em] text-xs rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                disabled={loading || !validationResult.isValid}
+                className="mt-2 w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-black uppercase tracking-[0.2em] text-xs rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loading ? (
                   <RefreshCw className="w-4 h-4 animate-spin" />
