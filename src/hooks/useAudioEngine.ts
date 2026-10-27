@@ -1,152 +1,154 @@
-import { useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
-export interface AudioSettings {
-  master: number; // 0 - 100
-  bgm: number;    // 0 - 100
-  sfx: number;    // 0 - 100
-}
+const AUDIO_MUTED_KEY = 'gd_audio_muted';
+const AUDIO_VOLUME_KEY = 'gd_audio_volume';
 
-// 🎵 URL OFICIAL DE LA MÚSICA DE FONDO
-export const BACKGROUND_MUSIC_URL =
-  'https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20music/GD%20MainMenu%201.0.mp3';
-
-let sharedAudioCtx: AudioContext | null = null;
-let sharedBgMusic: HTMLAudioElement | null = null;
-
-export function getSharedAudioContext(): AudioContext | null {
-  if (typeof window === 'undefined') return null;
-  if (!sharedAudioCtx) {
-    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
-    if (Ctx) {
-      sharedAudioCtx = new Ctx();
-    }
-  }
-  return sharedAudioCtx;
-}
-
-export const unlockAudioContext = () => {
-  try {
-    const ctx = getSharedAudioContext();
-    if (ctx && ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-    }
-  } catch {}
-};
-
-export function getAudioSettings(): AudioSettings {
-  try {
-    const master = localStorage.getItem('gd_audio_master');
-    const bgm = localStorage.getItem('gd_audio_bgm');
-    const sfx = localStorage.getItem('gd_audio_sfx');
-    return {
-      master: master !== null ? Math.max(0, Math.min(100, Number(master))) : 80,
-      bgm: bgm !== null ? Math.max(0, Math.min(100, Number(bgm))) : 40,
-      sfx: sfx !== null ? Math.max(0, Math.min(100, Number(sfx))) : 80,
-    };
-  } catch {
-    return { master: 80, bgm: 40, sfx: 80 };
-  }
-}
-
-// Sincroniza el volumen del elemento de audio según Master y BGM
-export function syncMusicVolume() {
-  if (typeof window === 'undefined' || !sharedBgMusic) return;
-  const { master, bgm } = getAudioSettings();
-  const volumeFactor = (master / 100) * (bgm / 100);
-  sharedBgMusic.volume = Math.max(0, Math.min(1, volumeFactor));
-}
-
-export function saveAudioSettings(settings: Partial<AudioSettings>) {
-  try {
-    if (settings.master !== undefined) localStorage.setItem('gd_audio_master', String(Math.round(settings.master)));
-    if (settings.bgm !== undefined) localStorage.setItem('gd_audio_bgm', String(Math.round(settings.bgm)));
-    if (settings.sfx !== undefined) localStorage.setItem('gd_audio_sfx', String(Math.round(settings.sfx)));
-    syncMusicVolume();
-  } catch {}
-}
-
-export function startBackgroundMusic() {
-  if (typeof window === 'undefined') return;
-  unlockAudioContext();
-
-  if (!sharedBgMusic) {
-    sharedBgMusic = new Audio(BACKGROUND_MUSIC_URL);
-    sharedBgMusic.loop = true;
-    sharedBgMusic.preload = 'auto';
-  }
-
-  syncMusicVolume();
-
-  if (sharedBgMusic.paused) {
-    sharedBgMusic.play().catch((err) => {
-      console.warn('[AudioEngine] Autoplay diferido hasta interacción:', err);
-    });
-  }
-}
-
-export function pauseBackgroundMusic() {
-  if (typeof window === 'undefined' || !sharedBgMusic) return;
-  sharedBgMusic.pause();
-}
-
-// Desbloqueo pasivo global al primer gesto táctil o clic + Event listener para el trigger del video
-if (typeof window !== 'undefined') {
-  const handleFirstInteraction = () => {
-    unlockAudioContext();
-    window.removeEventListener('click', handleFirstInteraction);
-    window.removeEventListener('touchstart', handleFirstInteraction);
-  };
-  window.addEventListener('click', handleFirstInteraction, { once: true, passive: true });
-  window.addEventListener('touchstart', handleFirstInteraction, { once: true, passive: true });
-
-  window.addEventListener('gd_play_bg_music', () => {
-    startBackgroundMusic();
-  });
-}
-
-export function useAudioEngine() {
-  const playSfx = useCallback((freqOrSound: number | string = 660) => {
+export const useAudioEngine = () => {
+  const [isMuted, setIsMuted] = useState<boolean>(() => {
     try {
-      const { master, sfx } = getAudioSettings();
-      const factor = (master / 100) * (sfx / 100);
-      if (factor <= 0.001) return; // Mute
+      return localStorage.getItem(AUDIO_MUTED_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
 
-      if (typeof freqOrSound === 'string') {
-        const audio = new Audio();
-        audio.src = freqOrSound === 'heavy_laser'
-          ? "https://assets.mixkit.co/active_storage/sfx/2759/2759-84.wav"
-          : "https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav";
-        audio.volume = Math.min(1, Math.max(0, 0.25 * factor));
-        audio.play().catch(() => {});
-      } else {
-        const ctx = getSharedAudioContext();
-        if (!ctx) return;
-        if (ctx.state === 'suspended') {
-          ctx.resume().catch(() => {});
+  const [volume, setVolumeState] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(AUDIO_VOLUME_KEY);
+      return saved !== null ? parseFloat(saved) : 0.8;
+    } catch {
+      return 0.8;
+    }
+  });
+
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    const handleAudioEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ isMuted?: boolean; volume?: number }>;
+      if (customEvent.detail) {
+        if (typeof customEvent.detail.isMuted === 'boolean') {
+          setIsMuted(customEvent.detail.isMuted);
         }
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freqOrSound, ctx.currentTime);
-        const peakGain = 0.12 * factor;
-        gain.gain.setValueAtTime(peakGain, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.2);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.2);
+        if (typeof customEvent.detail.volume === 'number') {
+          setVolumeState(customEvent.detail.volume);
+        }
       }
-    } catch (_) {}
+    };
+
+    window.addEventListener('gd_audio_settings_changed', handleAudioEvent);
+    return () => window.removeEventListener('gd_audio_settings_changed', handleAudioEvent);
   }, []);
 
-  return {
-    playSfx,
-    getAudioSettings,
-    saveAudioSettings,
-    unlockAudioContext,
-    startBackgroundMusic,
-    pauseBackgroundMusic
-  };
-}
+  const toggleMute = useCallback(() => {
+    setIsMuted((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(AUDIO_MUTED_KEY, String(next));
+      } catch (err) {
+        console.warn('[AUDIO] Error guardando estado de mute:', err);
+      }
+      window.dispatchEvent(
+        new CustomEvent('gd_audio_settings_changed', { detail: { isMuted: next, volume } })
+      );
+      return next;
+    });
+  }, [volume]);
+
+  const setMuted = useCallback((muted: boolean) => {
+    setIsMuted(muted);
+    try {
+      localStorage.setItem(AUDIO_MUTED_KEY, String(muted));
+    } catch (err) {
+      console.warn('[AUDIO] Error guardando estado de mute:', err);
+    }
+    window.dispatchEvent(
+      new CustomEvent('gd_audio_settings_changed', { detail: { isMuted: muted, volume } })
+    );
+  }, [volume]);
+
+  const setVolume = useCallback((newVol: number) => {
+    const clamped = Math.max(0, Math.min(1, newVol));
+    setVolumeState(clamped);
+    try {
+      localStorage.setItem(AUDIO_VOLUME_KEY, String(clamped));
+    } catch (err) {
+      console.warn('[AUDIO] Error guardando volumen:', err);
+    }
+    window.dispatchEvent(
+      new CustomEvent('gd_audio_settings_changed', { detail: { isMuted, volume: clamped } })
+    );
+  }, [isMuted]);
+
+  const playSfx = useCallback((soundOrFreq?: number | string) => {
+    if (isMuted || volume <= 0 || soundOrFreq === undefined || soundOrFreq === null) return;
+
+    try {
+      if (!audioCtxRef.current) {
+        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtxRef.current = new AudioContextClass();
+        }
+      }
+
+      const ctx = audioCtxRef.current;
+      if (!ctx) return;
+
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+
+      if (typeof soundOrFreq === 'number') {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = soundOrFreq > 800 ? 'sine' : soundOrFreq > 400 ? 'triangle' : 'sawtooth';
+        osc.frequency.setValueAtTime(soundOrFreq, ctx.currentTime);
+
+        gain.gain.setValueAtTime(volume * 0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.14);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start();
+        osc.stop(ctx.currentTime + 0.14);
+      } else if (typeof soundOrFreq === 'string') {
+        if (soundOrFreq.startsWith('http://') || soundOrFreq.startsWith('https://') || soundOrFreq.startsWith('/')) {
+          const audio = new Audio(soundOrFreq);
+          audio.volume = volume;
+          audio.play().catch(() => {});
+        } else {
+          const sfxMap: Record<string, { freq: number; type: OscillatorType; dur: number }> = {
+            laser_success: { freq: 880, type: 'sine', dur: 0.12 },
+            click: { freq: 440, type: 'triangle', dur: 0.08 },
+            error: { freq: 180, type: 'sawtooth', dur: 0.25 },
+            warp: { freq: 1200, type: 'sine', dur: 0.3 }
+          };
+
+          const config = sfxMap[soundOrFreq] || { freq: 520, type: 'sine', dur: 0.1 };
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          osc.type = config.type;
+          osc.frequency.setValueAtTime(config.freq, ctx.currentTime);
+
+          gain.gain.setValueAtTime(volume * 0.12, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + config.dur);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc.start();
+          osc.stop(ctx.currentTime + config.dur);
+        }
+      }
+    } catch {
+      // Ignorar bloqueos de directiva de autoplay del navegador
+    }
+  }, [isMuted, volume]);
+
+  return { isMuted, volume, toggleMute, setMuted, setVolume, playSfx };
+};
 
 export default useAudioEngine;

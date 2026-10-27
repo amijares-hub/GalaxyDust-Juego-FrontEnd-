@@ -11,14 +11,12 @@ import { useUpdater } from './hooks/useUpdater';
 function AppContent() {
   const { user, logout, isInitializing } = useAuth();
   const [isPreloaderFinished, setIsPreloaderFinished] = useState(false);
-  const [hasSeenIntro, setHasSeenIntro] = useState<boolean>(() => {
-    return !!sessionStorage.getItem('gd_intro_seen');
-  });
+  const [hasCompletedIntro, setHasCompletedIntro] = useState<boolean>(false);
 
-  // 🔄 Verifica actualizaciones al arrancar (solo en Tauri Desktop)
+  // 🔄 Verifica actualizaciones (Tauri Desktop)
   useUpdater();
 
-  // 🚀 Forzar Giro y Pantalla Completa Automáticos (Zero Click)
+  // 🚀 Forzar Giro y Pantalla Completa Automáticos
   useEffect(() => {
     if (window.screen?.orientation && 'lock' in window.screen.orientation) {
       (window.screen.orientation as any).lock('landscape').catch(() => {});
@@ -43,12 +41,12 @@ function AppContent() {
     };
   }, []);
 
-  // Si el intro ya fue visto en esta sesión (por ejemplo tras un F5), activar la música en el primer clic
+  // 🎵 Activar música de fondo tan pronto se entra a Login o al juego
   useEffect(() => {
-    if (user && isPreloaderFinished && hasSeenIntro) {
+    if (hasCompletedIntro || user) {
       window.dispatchEvent(new CustomEvent('gd_play_bg_music'));
     }
-  }, [user, isPreloaderFinished, hasSeenIntro]);
+  }, [hasCompletedIntro, user]);
 
   if (isInitializing) {
     return (
@@ -61,28 +59,29 @@ function AppContent() {
     );
   }
 
+  // 1. USUARIO YA CONECTADO ("Recuérdame"):
+  // Pasa directo a la precarga y al juego sin mostrar la intro
   if (user) {
-    // 1. Precarga multimedia
     if (!isPreloaderFinished) {
       return <GamePreloader onComplete={() => setIsPreloaderFinished(true)} />;
     }
 
-    // 2. Cinemática Intro oficial con trigger a la música de fondo
-    if (!hasSeenIntro) {
-      return (
-        <IntroVideo
-          onEnded={() => {
-            sessionStorage.setItem('gd_intro_seen', 'true');
-            setHasSeenIntro(true);
-          }}
-        />
-      );
-    }
-
-    // 3. Homepage oficial del juego
     return <Homepage user={user as any} onLogout={logout} />;
   }
 
+  // 2. USUARIO NO CONECTADO:
+  // Se reproduce la cinemática a pantalla completa antes de mostrar el login
+  if (!hasCompletedIntro) {
+    return (
+      <IntroVideo
+        onEnded={() => setHasCompletedIntro(true)}
+        onComplete={() => setHasCompletedIntro(true)}
+        onSkip={() => setHasCompletedIntro(true)}
+      />
+    );
+  }
+
+  // 3. Pantalla de Autenticación / Registro
   return <AuthView />;
 }
 

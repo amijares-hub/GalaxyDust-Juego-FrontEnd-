@@ -10,7 +10,7 @@ import { InventoryView } from '../components/InventoryView';
 import { AllianceView } from '../components/AllianceView';
 import { CanView, GalaxyFrame } from '../components/CanView';
 import { ProfileView } from '../components/ProfileView';
-import { NotificationsView, isOfficialComunicado } from '../components/NotificationsView';
+import { NotificationsView } from '../components/NotificationsView';
 import { MissionView } from '../components/MissionView';
 import { SettingsModal } from '../components/SettingsModal';
 import { TutorialOverlay } from '../components/tutorial/TutorialOverlay';
@@ -73,7 +73,6 @@ const resolveAvatarUrl = (rawUrl?: string): string => {
   return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/galaxy-assets/${clean.replace(/^\//, '')}`;
 };
 
-// Helpers para almacenamiento persistente anti-bucle
 const getNotifiedExpeditionIds = (userId: string): Set<string> => {
   try {
     const stored = localStorage.getItem(`notified_expeditions_${userId}`);
@@ -99,29 +98,29 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
   const cards: SectorCard[] = useMemo(() => [
     { 
       id: "expedition", 
-      title: t('hub.expedition_title'), 
-      description: t('hub.expedition_desc'), 
+      title: t('hub.expedition_title', 'EXPEDICIÓN'), 
+      description: t('hub.expedition_desc', 'Adéntrate en lo desconocido. Explora clústeres, recolecta recursos y domina sectores estelares.'), 
       imageSrc: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20(Ambientes%20)/13.jpg", 
       targetWindow: "expeditions" 
     },
     { 
       id: "alliance", 
-      title: t('hub.alliance_title'), 
-      description: t('hub.alliance_desc'), 
+      title: t('hub.alliance_title', 'ALIANZA'), 
+      description: t('hub.alliance_desc', 'Coordina tu flota, expande tu dominio y forja imperios galácticos.'), 
       imageSrc: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20(Ambientes%20)/Alliance%20depot.jpg", 
       targetWindow: "alliance" 
     },
     { 
       id: "market", 
-      title: t('hub.market_title'), 
-      description: t('hub.market_desc'), 
+      title: t('hub.market_title', 'MERCADO'), 
+      description: t('hub.market_desc', 'Comercia cargamentos, aceleradores y tecnología con otros comandantes.'), 
       imageSrc: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20(Ambientes%20)/17.jpg", 
       targetTab: "marketplace" 
     },
     { 
       id: "phantom", 
-      title: t('hub.phantom_title'), 
-      description: t('hub.phantom_desc'), 
+      title: t('hub.phantom_title', 'ESTACIÓN PHANTOM'), 
+      description: t('hub.phantom_desc', 'Intercambia cristales del vacío por planos tácticos y prototipos clasificados.'), 
       imageSrc: "https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Phatom%20Station/Skin%20Original/image%20(18).png", 
       targetTab: "phantom" 
     }
@@ -144,7 +143,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string>(user.avatarUrl || '');
   const [utcTime, setUtcTime] = useState<string>(miningService.getFormattedUtcTime());
 
-  // Hook maestro de notificaciones / comunicados oficiales
   const { unreadCount, refresh: refreshNotifications } = useNotifications();
 
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
@@ -166,8 +164,50 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
   const refreshNotificationsRef = useRef(refreshNotifications);
   refreshNotificationsRef.current = refreshNotifications;
 
-  // 🎯 Muestra SIEMPRE el aviso flotante Toast en pantalla, pero NUNCA suma +1 directo a la campana
-  // Solo se persiste en DB si es uno de los 5 Comunicados Oficiales permitidos
+  // ── 🛡️ AUTO-LOGOUT TRAS 30 MINUTOS DE INACTIVIDAD ──
+  useEffect(() => {
+    const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 Minutos exactos
+    let lastActivityTimestamp = Date.now();
+
+    const recordUserActivity = () => {
+      lastActivityTimestamp = Date.now();
+    };
+
+    const monitoredEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    monitoredEvents.forEach((evt) => {
+      window.addEventListener(evt, recordUserActivity, { passive: true });
+    });
+
+    const verifyActivityTimeout = async () => {
+      if (Date.now() - lastActivityTimestamp >= INACTIVITY_TIMEOUT_MS) {
+        console.warn('[SECURITY] Sesión cerrada automáticamente tras 30 minutos de inactividad.');
+        try {
+          await supabase.auth.signOut();
+        } catch (err) {
+          console.error('Error al cerrar sesión:', err);
+        }
+        onLogout();
+      }
+    };
+
+    const inactivityInterval = setInterval(verifyActivityTimeout, 30000);
+
+    const handleTabVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        verifyActivityTimeout();
+      }
+    };
+    document.addEventListener('visibilitychange', handleTabVisibility);
+
+    return () => {
+      monitoredEvents.forEach((evt) => {
+        window.removeEventListener(evt, recordUserActivity);
+      });
+      clearInterval(inactivityInterval);
+      document.removeEventListener('visibilitychange', handleTabVisibility);
+    };
+  }, [onLogout]);
+
   const handleTriggerNotification = async (text: string, payloadOrExpId?: any) => {
     const id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
     const newToast: ToastNotification = {
@@ -176,15 +216,12 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       timestamp: new Date().toLocaleTimeString()
     };
 
-    // 1. Mostrar Toast flotante para feedback inmediato
     setToasts(prev => [newToast, ...prev].slice(0, 4));
 
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 5500);
 
-    // 2. Separar notificaciones de UI vs Logs de Expedición
-    // Toasts de selección de inventario o avisos generales solo actualizan la interfaz visual y nunca realizan INSERT en BD
     const rawExpId = typeof payloadOrExpId === 'string'
       ? payloadOrExpId
       : payloadOrExpId && typeof payloadOrExpId === 'object'
@@ -192,13 +229,8 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
       : null;
 
     const validExpId = isValidUUID(rawExpId) ? rawExpId : null;
+    if (!validExpId) return;
 
-    // Si no cuenta con un expedition_id válido, concluye la ejecución sin persistir en BD
-    if (!validExpId) {
-      return;
-    }
-
-    // 3. Persistir en Supabase expedition_logs únicamente ante eventos con expedition_id verificado
     try {
       const authUserId = currentUserIdRef.current;
       if (!authUserId) return;
@@ -234,7 +266,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
 
       refreshNotificationsRef.current?.();
     } catch (err: any) {
-      console.warn("[NOTIFICATIONS] Error al persistir comunicado oficial:", err?.message || err);
+      console.warn('[NOTIFICATIONS] Error al persistir comunicado oficial:', err?.message || err);
     }
   };
 
@@ -249,7 +281,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
     return () => clearInterval(timer);
   }, []);
 
-  // Control estricto anti-duplicados al verificar vuelos terminados (en memoria, 0 peticiones HTTP a Auth por segundo)
   useEffect(() => {
     if (!activeFlights.length) return;
     const authUserId = currentUserIdRef.current;
@@ -377,7 +408,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         () => { if (isMounted) refreshNotificationsRef.current?.(); }
       );
 
-      // Re-sincronización pasiva solo cuando el jugador vuelve a enfocar la pestaña
       const handleVisibilityChange = () => {
         if (document.visibilityState === 'visible' && isMounted) {
           loadUserProfile(authUser.id);
@@ -440,7 +470,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         </AnimatePresence>
       </div>
 
-      {/* HEADER PRINCIPAL DE NAVEGACIÓN */}
+      {/* HEADER PRINCIPAL */}
       <Header
         userProfile={{
           ...user,
@@ -495,7 +525,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         onOpenProfile={() => { setActiveTab('home'); setActiveWindow('profile'); }}
       />
 
-      {/* BOTONES ACCESO RÁPIDO Y POPUPS */}
+      {/* BOTONES ACCESO RÁPIDO */}
       <div 
         className="fixed top-14 sm:top-16 flex flex-col items-center gap-1.5 sm:gap-2 z-30 font-mono"
         style={{ right: 'max(6px, env(safe-area-inset-right))' }}
@@ -517,7 +547,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           ) : null}
         </button>
 
-        {/* BOTÓN CAMPANA DE NOTIFICACIONES */}
         <button 
           onClick={() => {
             setShowNotificationsModal(true);
@@ -556,7 +585,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                 transition={{ duration: 0.35, ease: 'easeOut' }}
                 className="w-full h-full max-h-full flex flex-col justify-between p-2 sm:p-3 overflow-hidden"
               >
-                {/* ── GRID TÁCTICO AAA: 4 tarjetas viewport-fit, sin scroll ── */}
                 <div className="flex-1 grid grid-cols-4 gap-2.5 max-h-[calc(100%-1.75rem)] items-stretch w-full">
                   {cards.map((card, idx) => {
                     const isLocked = card.id === 'alliance';
@@ -577,20 +605,16 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                             }`}
                           innerPadding="p-0"
                         >
-                          {/* ── Fondo imagen ── */}
                           <div className="absolute inset-0 z-0 overflow-hidden rounded-[inherit]">
                             <img
                               src={card.imageSrc}
                               alt={card.title}
                               className="w-full h-full object-cover brightness-50 group-hover:scale-110 group-hover:brightness-70 transition-all duration-700"
                             />
-                            {/* Gradiente táctica inferior */}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-transparent" />
-                            {/* Scan-line top glow */}
                             <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-400/80 to-transparent group-hover:via-cyan-300 transition-colors duration-300 pointer-events-none" />
                           </div>
 
-                          {/* ── Cuerpo de la tarjeta ── */}
                           <div
                             onClick={() => {
                               if (isLocked) return;
@@ -599,16 +623,13 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                             }}
                             className="relative z-10 h-full w-full flex flex-col justify-between p-2 sm:p-3"
                           >
-                            {/* Header sector ID */}
                             <div className="flex items-center justify-between">
                               <span className="text-[7px] sm:text-[8px] font-mono font-black text-cyan-500/80 tracking-widest uppercase">
                                 {sectorLabels[idx]}
                               </span>
-                              {/* Indicador de estado */}
                               <span className={`w-1.5 h-1.5 rounded-full ${isLocked ? 'bg-zinc-600' : 'bg-cyan-400 animate-pulse shadow-[0_0_6px_rgba(6,182,212,0.8)]'}`} />
                             </div>
 
-                            {/* Título */}
                             <div className="mt-auto">
                               <h2 className="text-xs sm:text-sm font-black text-white uppercase tracking-widest leading-tight group-hover:text-cyan-300 transition-colors drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
                                 {card.title}
@@ -617,18 +638,16 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                                 {card.description}
                               </p>
 
-                              {/* CTA bar */}
                               {!isLocked && (
                                 <div className="mt-2 flex items-center gap-1 text-cyan-400 group-hover:text-cyan-200 transition-colors">
                                   <div className="h-[1px] flex-1 bg-cyan-500/40 group-hover:bg-cyan-400/70 transition-colors" />
-                                  <span className="text-[6.5px] sm:text-[7.5px] font-black uppercase tracking-widest">{t('hub.access')}</span>
+                                  <span className="text-[6.5px] sm:text-[7.5px] font-black uppercase tracking-widest">{t('hub.access', 'ACCEDER')}</span>
                                   <div className="h-[1px] w-3 bg-cyan-500/40 group-hover:bg-cyan-400/70 transition-colors" />
                                 </div>
                               )}
                             </div>
                           </div>
 
-                          {/* ── COMING SOON overlay ── */}
                           {isLocked && (
                             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none">
                               <motion.div
@@ -638,7 +657,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                                 className="bg-black/90 border border-cyan-500/40 rounded-lg px-3 py-2 flex flex-col items-center gap-1.5 shadow-[0_0_20px_rgba(6,182,212,0.25)] backdrop-blur-md"
                               >
                                 <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
-                                <span className="text-[7.5px] sm:text-[8.5px] font-black text-cyan-300 tracking-widest uppercase">{t('hub.coming_soon')}</span>
+                                <span className="text-[7.5px] sm:text-[8.5px] font-black text-cyan-300 tracking-widest uppercase">{t('hub.coming_soon', 'PRÓXIMAMENTE')}</span>
                               </motion.div>
                             </div>
                           )}
@@ -648,14 +667,13 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
                   })}
                 </div>
 
-                {/* HUD Footer Status Bar */}
                 <div className="h-6 shrink-0 flex justify-between items-center px-1 font-mono text-[8px] sm:text-[8.5px] text-cyan-400/80 uppercase border-t border-cyan-900/30">
                   <span className="flex items-center gap-1.5 font-bold">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#10b981]" />
-                    {t('hub.status_online')}
+                    {t('hub.status_online', 'ESTADO: SISTEMA EN LÍNEA')}
                   </span>
                   <span className="font-bold tracking-widest text-zinc-400">
-                    {t('hub.sector_label')}
+                    {t('hub.sector_label', 'SECTOR: 01 // HUB ALPHA')}
                   </span>
                 </div>
               </motion.div>
@@ -690,7 +708,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         </AnimatePresence>
       </main>
 
-      {/* VENTANA POPUP 1: EXPEDITIONS IN FLIGHT */}
+      {/* POPUP 1: EXPEDITIONS IN FLIGHT */}
       <AnimatePresence>
         {showFlightsModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-start sm:items-center justify-center p-2 pt-9 sm:p-4 sm:pt-4 overflow-hidden">
@@ -710,7 +728,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         )}
       </AnimatePresence>
 
-      {/* VENTANA POPUP 2: NOTIFICACIONES / COMUNICADOS */}
+      {/* POPUP 2: NOTIFICACIONES */}
       <AnimatePresence>
         {showNotificationsModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-start sm:items-center justify-center p-2 pt-9 sm:p-4 sm:pt-4 overflow-hidden">
@@ -728,7 +746,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         )}
       </AnimatePresence>
 
-      {/* VENTANA POPUP 3: AJUSTES (CONFIGURACIÓN) */}
+      {/* POPUP 3: AJUSTES */}
       <SettingsModal 
         isOpen={showSettingsModal} 
         onClose={() => setShowSettingsModal(false)} 
@@ -739,7 +757,6 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
         }}
       />
 
-      {/* TUTORIAL INTERACTIVO SCI-FI */}
       <TutorialOverlay
         isOpen={showTutorial}
         onClose={() => setShowTutorial(false)}

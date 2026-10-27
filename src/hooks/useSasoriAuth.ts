@@ -173,7 +173,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
 
       const { data: dbProfile } = await supabase
         .from('user_profiles')
-        .select('username, avatar_url')
+        .select('username, avatar_url, mfa_enabled')
         .eq('id', data.user.id)
         .maybeSingle();
 
@@ -211,14 +211,24 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     setSuccessMessage(null);
 
     try {
+      const defaultUsername = email.split('@')[0].trim().toUpperCase();
+      const metaPayload = {
+        username: metadata?.username || defaultUsername,
+        full_name: metadata?.full_name || defaultUsername,
+        ...metadata,
+      };
+
       const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
-        options: metadata ? { data: metadata } : undefined
+        options: {
+          data: metaPayload,
+          emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+        }
       });
       if (error) throw error;
 
-      if (data.user && data.user.identities?.length === 0) {
+      if (data.user && data.user.identities && data.user.identities.length === 0) {
         throw new Error('Esta firma digital ya se encuentra registrada en los servidores centrales.');
       }
 
@@ -229,7 +239,17 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
       return true;
     } catch (err: any) {
       setState('error');
-      setErrorMessage(err.message || 'FALLO EN EL REGISTRO • HANDSHAKE INTERRUMPIDO');
+      let friendlyMsg = err.message || 'FALLO EN EL REGISTRO • HANDSHAKE INTERRUMPIDO';
+
+      if (err.message?.includes('Database error saving new user')) {
+        friendlyMsg = 'ERROR EN BASE DE DATOS: Fallo en el trigger de creación de perfil (user_profiles). Revisa Postgres Logs en Supabase.';
+      } else if (err.message?.includes('weak_password') || err.message?.includes('Password')) {
+        friendlyMsg = 'CLAVE DÉBIL: Debe tener al menos 8 caracteres, mayúscula, minúscula, número y símbolo especial.';
+      } else if (err.message?.includes('already registered') || err.message?.includes('already been registered')) {
+        friendlyMsg = 'ESTE CORREO YA SE ENCUENTRA REGISTRADO EN EL SISTEMA.';
+      }
+
+      setErrorMessage(friendlyMsg);
       return false;
     }
   }, []);
@@ -287,7 +307,8 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     setErrorMessage(null);
 
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const authUser = session?.user;
       if (!authUser || !authUser.email) throw new Error('No se detectó sesión activa en el cliente.');
 
       const { error } = await supabase.auth.verifyOtp({
