@@ -5,18 +5,16 @@ import { Homepage } from './pages/Homepage';
 import { RefreshCw } from 'lucide-react';
 
 import { GamePreloader } from './components/GamePreloader';
-import { IntroVideo } from './components/IntroVideo';
 import { useUpdater } from './hooks/useUpdater';
 
 function AppContent() {
   const { user, logout, isInitializing } = useAuth();
   const [isPreloaderFinished, setIsPreloaderFinished] = useState(false);
-  const [hasCompletedIntro, setHasCompletedIntro] = useState<boolean>(false);
 
-  // 🔄 Verifica actualizaciones (Tauri Desktop)
+  // 🔄 Verifica actualizaciones al arrancar (solo en Tauri Desktop)
   useUpdater();
 
-  // 🚀 Forzar Giro y Pantalla Completa Automáticos
+  // 🚀 Forzar Giro y Pantalla Completa Automáticos (Zero Click)
   useEffect(() => {
     if (window.screen?.orientation && 'lock' in window.screen.orientation) {
       (window.screen.orientation as any).lock('landscape').catch(() => {});
@@ -41,13 +39,14 @@ function AppContent() {
     };
   }, []);
 
-  // 🎵 Activar música de fondo tan pronto se entra a Login o al juego
+  // Activar música ambiental cuando el usuario esté conectado y termine el preloader
   useEffect(() => {
-    if (hasCompletedIntro || user) {
+    if (user && isPreloaderFinished) {
       window.dispatchEvent(new CustomEvent('gd_play_bg_music'));
     }
-  }, [hasCompletedIntro, user]);
+  }, [user, isPreloaderFinished]);
 
+  // Pantalla de carga mientras se verifica la sesión en memoria
   if (isInitializing) {
     return (
       <div className="w-screen h-screen bg-[#0C0D0E] flex flex-col items-center justify-center text-cyan-500 font-mono space-y-4 select-none">
@@ -59,8 +58,8 @@ function AppContent() {
     );
   }
 
-  // 1. USUARIO YA CONECTADO ("Recuérdame"):
-  // Pasa directo a la precarga y al juego sin mostrar la intro
+  // 1. USUARIO CONECTADO ("Recuérdame" / Sesión activa):
+  // Va directo a la precarga y a la pantalla principal
   if (user) {
     if (!isPreloaderFinished) {
       return <GamePreloader onComplete={() => setIsPreloaderFinished(true)} />;
@@ -70,18 +69,7 @@ function AppContent() {
   }
 
   // 2. USUARIO NO CONECTADO:
-  // Se reproduce la cinemática a pantalla completa antes de mostrar el login
-  if (!hasCompletedIntro) {
-    return (
-      <IntroVideo
-        onEnded={() => setHasCompletedIntro(true)}
-        onComplete={() => setHasCompletedIntro(true)}
-        onSkip={() => setHasCompletedIntro(true)}
-      />
-    );
-  }
-
-  // 3. Pantalla de Autenticación / Registro
+  // Directo a la interfaz de Login / Registro sin video
   return <AuthView />;
 }
 

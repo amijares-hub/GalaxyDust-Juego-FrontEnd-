@@ -166,7 +166,7 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
 
   // ── 🛡️ AUTO-LOGOUT TRAS 30 MINUTOS DE INACTIVIDAD ──
   useEffect(() => {
-    const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 Minutos exactos
+    const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
     let lastActivityTimestamp = Date.now();
 
     const recordUserActivity = () => {
@@ -514,7 +514,10 @@ export const Homepage: React.FC<HomepageProps> = ({ user, onLogout }) => {
           else if (tab === 'MARKET') { setActiveTab('marketplace'); setActiveWindow('home'); }
           else if (tab === 'PHANTOM') { setActiveTab('phantom'); setActiveWindow('home'); }
           else if (tab === 'INVENTORY') { setActiveTab('inventory'); setActiveWindow('home'); }
-          else if (tab === 'MISSION') { setActiveTab('mission'); setActiveWindow('home'); }
+          else if (tab === 'MISSION') { 
+            // 🔒 Pestaña bloqueada en el Header
+            return; 
+          }
         }}
         unreadNotificationsCount={unreadCount}
         onOpenNotifications={() => {

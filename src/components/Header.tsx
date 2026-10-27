@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Settings, User } from 'lucide-react';
+import { Bell, Settings, User, Lock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface HeaderProps {
@@ -127,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'CAN', label: t('nav.can') },
     { id: 'EXPEDITIONS', label: t('nav.expedition') },
     { id: 'INVENTORY', label: t('nav.inventory') },
-    { id: 'MISSION', label: t('nav.mission') },
+    { id: 'MISSION', label: t('nav.mission'), locked: true },
   ];
 
   return (
@@ -175,6 +175,20 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 px-1 shrink min-w-0 h-full flex-1">
         {tabs.map(tab => {
           const isActive = isTabActive(activeTab, tab.id);
+          const isLocked = (tab as any).locked;
+
+          if (isLocked) {
+            return (
+              <button
+                key={tab.id}
+                disabled
+                className="text-xs sm:text-sm font-bold tracking-wider px-3 sm:px-4 py-1.5 rounded-md uppercase whitespace-nowrap shrink-0 bg-black/40 text-zinc-600 border border-zinc-800/60 cursor-not-allowed opacity-50 flex items-center gap-1.5 select-none"
+              >
+                <Lock className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          }
 
           return (
             <button
