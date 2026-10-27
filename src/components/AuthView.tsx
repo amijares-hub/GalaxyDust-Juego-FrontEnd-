@@ -18,6 +18,7 @@ export const AuthView: React.FC = () => {
     errorMessage,
     successMessage,
     showNewPasswordModal,
+    user,
     setScreen,
     submitLogin,
     submitRegister,
@@ -66,40 +67,42 @@ export const AuthView: React.FC = () => {
     generateCaptcha();
   }, [activeTab]);
 
-  // 🛡️ Detección e intercambio de sesión robusta al montar AuthView
+  // ─── DETECCIÓN MULTI-CAPA DE FLUJO DE RECUPERACIÓN ───
+  const urlParams = new URLSearchParams(
+    typeof window !== 'undefined' ? window.location.search : ''
+  );
+  const isRecoveryFlow =
+    urlParams.get('recovery') === 'true' ||
+    (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) ||
+    showNewPasswordModal === true ||
+    user?.mustResetPassword === true;
+
+  // Efecto 1: Ir a reset_password de forma SÍNCRONA e inmediata si se detecta flujo de recuperación
   useEffect(() => {
-    const initRecoverySession = async () => {
-      if (typeof window === 'undefined') return;
+    if (isRecoveryFlow && screen !== 'reset_password') {
+      setScreen('reset_password');
+    }
+  }, [isRecoveryFlow, screen, setScreen]);
 
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
-      const hash = window.location.hash;
+  // Efecto 2: Intercambio PKCE en background — si Supabase envía ?code=, intercambiar por sesión
+  useEffect(() => {
+    const params = new URLSearchParams(
+      typeof window !== 'undefined' ? window.location.search : ''
+    );
+    const code = params.get('code');
+    if (!code) return;
 
-      // Flujo PKCE: Supabase envía ?code=... — requiere intercambio explícito
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (!error) {
-          setScreen('reset_password');
-        }
-        // Limpiar el código de la URL para evitar re-procesamiento
-        window.history.replaceState({}, document.title, window.location.pathname);
-        return;
-      }
-
-      // Flujo implícito: hash contiene #access_token=... o #type=recovery
-      if (hash.includes('type=recovery') || hash.includes('access_token')) {
-        setScreen('reset_password');
-        return;
-      }
-
-      // Fallback: showNewPasswordModal activado desde useSasoriAuth (must_reset_password)
-      if (showNewPasswordModal) {
+    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+      if (!error) {
         setScreen('reset_password');
       }
-    };
-
-    initRecoverySession();
-  }, [showNewPasswordModal, setScreen]);
+      // Preservar ?recovery=true al limpiar el ?code= para no perder el indicador
+      if (typeof window !== 'undefined') {
+        const cleanUrl = window.location.pathname + '?recovery=true';
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+    });
+  }, []); // Solo al montar
 
   // Temporizador regresivo de 10 segundos tras registro exitoso
   useEffect(() => {

@@ -96,7 +96,8 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
           window.location.hash.includes('reset-password') ||
           window.location.hash.includes('type=recovery') ||
           window.location.search.includes('type=recovery') ||
-          window.location.search.includes('code=')
+          window.location.search.includes('code=') ||
+          window.location.search.includes('recovery=true')
         );
 
         const { data: { session } } = await supabase.auth.getSession();
@@ -147,7 +148,8 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
         window.location.hash.includes('type=recovery') ||
         window.location.hash.includes('reset-password') ||
         window.location.search.includes('type=recovery') ||
-        window.location.search.includes('code=')
+        window.location.search.includes('code=') ||
+        window.location.search.includes('recovery=true')
       );
 
       if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && isRecoveryUrl)) {
@@ -403,7 +405,9 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     setSuccessMessage(null);
     try {
       const cleanEmail = email.trim();
-      const redirectUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const redirectUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/?recovery=true`
+        : '/?recovery=true';
       const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
         redirectTo: redirectUrl,
       });
