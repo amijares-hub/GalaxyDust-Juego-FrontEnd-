@@ -249,8 +249,22 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
     return () => clearInterval(timer);
   }, [isRegisteredSuccess, countdown]);
 
-  // Expiración de "Recuérdame" (7 días)
+  // Expiración de "Recuérdame" (7 días) - PROTEGIDO: NUNCA CERRAR SESIÓN EN RECUPERACIÓN
   useEffect(() => {
+    if (isRecoveryFlow || hasUrlError) return;
+    if (typeof window !== 'undefined') {
+      const search = window.location.search;
+      const hash = window.location.hash;
+      if (
+        search.includes('code=') ||
+        search.includes('recovery=true') ||
+        hash.includes('type=recovery') ||
+        hash.includes('access_token')
+      ) {
+        return;
+      }
+    }
+
     const checkRememberMeExpiration = async () => {
       const isRemembered = localStorage.getItem('gd_remember_me') === 'true';
       const expireTime = localStorage.getItem('gd_remember_expire');
@@ -262,16 +276,11 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
           await supabase.auth.signOut();
           setLocalError('Tu sesión de 7 días ha expirado. Inicia sesión de nuevo.');
         }
-      } else {
-        const sessionActive = sessionStorage.getItem('gd_active_session');
-        if (!sessionActive) {
-          await supabase.auth.signOut();
-        }
       }
     };
 
     checkRememberMeExpiration();
-  }, []);
+  }, [isRecoveryFlow, hasUrlError]);
 
   const handleReturnToLogin = () => {
     setIsRegisteredSuccess(false);
@@ -307,18 +316,18 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
       return;
     }
 
-    // Asegurar la sesión si recoverySession está presente
+    // Asegurar la sesión antes de actualizar: verificar si tenemos tokens en el estado o en Supabase
     let currentSession = recoverySession;
-    if (!currentSession) {
-      const { data: sessionData } = await supabase.auth.getSession();
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData?.session) {
       currentSession = sessionData.session;
-    } else {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session && recoverySession.access_token && recoverySession.refresh_token) {
-        await supabase.auth.setSession({
-          access_token: recoverySession.access_token,
-          refresh_token: recoverySession.refresh_token,
-        });
+    } else if (recoverySession?.access_token && recoverySession?.refresh_token) {
+      const { data: setSessionData } = await supabase.auth.setSession({
+        access_token: recoverySession.access_token,
+        refresh_token: recoverySession.refresh_token,
+      });
+      if (setSessionData?.session) {
+        currentSession = setSessionData.session;
       }
     }
 
@@ -332,6 +341,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
           .eq('user_id', userId);
       }
       if (typeof window !== 'undefined') {
+        sessionStorage.setItem('gd_active_session', 'true');
         window.history.replaceState({}, document.title, '/');
         window.location.href = '/';
       }
@@ -712,14 +722,14 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
 
                   {(localError || errorMessage) && (
                     <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 p-2 rounded-lg mt-0.5">
-                      <AlertCircle className="w-3 h-3 text-red-500 flex-shrink-0" />
+                      <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
                       <span className="text-[9px] font-mono text-red-400 uppercase leading-tight tracking-wider">{localError || errorMessage}</span>
                     </div>
                   )}
 
                   {successMessage && (
                     <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-lg mt-0.5">
-                      <ShieldCheck className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
                       <span className="text-[9px] font-mono text-emerald-400 uppercase leading-tight tracking-wider">{successMessage}</span>
                     </div>
                   )}
