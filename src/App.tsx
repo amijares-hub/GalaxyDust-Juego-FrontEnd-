@@ -10,12 +10,20 @@ import { useUpdater } from './hooks/useUpdater';
 function AppContent() {
   const { user, logout, isInitializing, screen, showNewPasswordModal } = useAuth();
   const [isPreloaderFinished, setIsPreloaderFinished] = useState(false);
+  const [initTimeout, setInitTimeout] = useState(false);
 
   // 🔄 Verifica actualizaciones al arrancar (solo en Tauri Desktop)
   useUpdater();
 
+  // ⏱️ TIMEOUT DE SEGURIDAD: Máximo 2 segundos en inicialización; si no responde, desbloquea la pantalla
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitTimeout(true);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // 1. PRIORIDAD ABSOLUTA: SI ES RECUPERACIÓN DE CONTRASEÑA, RENDERIZAR AuthView DE INMEDIATO
-  // Queda terminantemente prohibido mostrar el Preloader ("SINCRONIZANDO ESTADO C.A.N...") en este modo.
   const isRecoveryMode = typeof window !== 'undefined' && (
     window.location.search.includes('code=') ||
     window.location.search.includes('recovery=true') ||
@@ -51,7 +59,7 @@ function AppContent() {
     };
   }, []);
 
-  // Activar música ambiental cuando el usuario esté conectado, no tenga bloqueo de clave, no esté en recuperación y termine el preloader
+  // Activar música ambiental cuando el usuario esté conectado y termine el preloader
   useEffect(() => {
     if (user && !user.mustResetPassword && !showNewPasswordModal && screen !== 'reset_password' && !isRecoveryMode && isPreloaderFinished) {
       window.dispatchEvent(new CustomEvent('gd_play_bg_music'));
@@ -59,13 +67,12 @@ function AppContent() {
   }, [user, user?.mustResetPassword, showNewPasswordModal, screen, isRecoveryMode, isPreloaderFinished]);
 
   // 1. SI ES RECUPERACIÓN DE CONTRASEÑA: Renderizar AuthView de inmediato
-  // Queda terminantemente prohibido mostrar el Preloader ("SINCRONIZANDO ESTADO C.A.N...") en este modo.
   if (isRecoveryMode) {
     return <AuthView initialScreen="reset_password" />;
   }
 
-  // 2. Comprobaciones habituales del juego: Pantalla de carga mientras se verifica la sesión en memoria
-  if (isInitializing) {
+  // 2. Pantalla de carga: solo mientras isInitializing sea true Y no haya saltado el timeout
+  if (isInitializing && !initTimeout) {
     return (
       <div className="w-screen h-screen bg-[#0C0D0E] flex flex-col items-center justify-center text-cyan-500 font-mono space-y-4 select-none">
         <RefreshCw className="w-8 h-8 animate-spin" />
@@ -76,7 +83,7 @@ function AppContent() {
     );
   }
 
-  // 3. USUARIO CONECTADO ("Recuérdame" / Sesión activa):
+  // 3. USUARIO CONECTADO:
   if (user) {
     if (!isPreloaderFinished) {
       return <GamePreloader onComplete={() => setIsPreloaderFinished(true)} />;
