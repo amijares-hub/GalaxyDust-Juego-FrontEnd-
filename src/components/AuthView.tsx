@@ -7,8 +7,13 @@ import { supabase } from '../lib/supabase';
 import { GalaxyFrame } from './CanView';
 import { PasswordChecklist } from './PasswordChecklist';
 import { validatePassword, getPasswordValidationError } from '../utils/passwordValidator';
+import { ScreenState } from '../hooks/useSasoriAuth';
 
-export const AuthView: React.FC = () => {
+interface AuthViewProps {
+  initialScreen?: ScreenState;
+}
+
+export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
   const { t, i18n } = useTranslation();
   const currentLang = (i18n.language || 'es').startsWith('en') ? 'en' : 'es';
 
@@ -81,6 +86,7 @@ export const AuthView: React.FC = () => {
   );
 
   const isRecoveryFlow = !hasUrlError && (
+    initialScreen === 'reset_password' ||
     (typeof window !== 'undefined' && (
       window.location.search.includes('recovery=true') ||
       window.location.hash.includes('type=recovery') ||
@@ -89,8 +95,13 @@ export const AuthView: React.FC = () => {
     )) ||
     screen === 'reset_password' ||
     showNewPasswordModal === true ||
-    user?.mustResetPassword === true
+    Boolean(user?.mustResetPassword)
   );
+
+  // Pantalla activa garantizada: si es recuperación válida, forzar 'reset_password' sin destellos
+  const activeViewScreen = (isRecoveryFlow || initialScreen === 'reset_password') && !hasUrlError
+    ? 'reset_password'
+    : screen;
 
   // 🔴 Efecto 1: Detección Temprana de Errores de Supabase en la URL (AuthView.tsx)
   useEffect(() => {
@@ -281,7 +292,10 @@ export const AuthView: React.FC = () => {
           .update({ must_reset_password: false })
           .eq('user_id', data.user.id);
       }
-      window.location.href = '/';
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, document.title, '/');
+        window.location.href = '/';
+      }
     } else {
       setLocalError(translateSupabaseAuthError(error));
     }
@@ -463,7 +477,7 @@ export const AuthView: React.FC = () => {
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </motion.div>
-            ) : (screen === 'menu' || screen === 'login' || screen === 'register') && (
+            ) : (activeViewScreen === 'menu' || activeViewScreen === 'login' || activeViewScreen === 'register') && (
               /* ─── FASE 1: FORMULARIO DE ACCESO Y REGISTRO ─── */
               <motion.div
                 key="auth-form"
@@ -683,7 +697,7 @@ export const AuthView: React.FC = () => {
             )}
 
             {/* ─── FASE 2: VERIFICACIÓN MULTI-FACTOR (MFA) ─── */}
-            {screen === 'two_factor' && (
+            {activeViewScreen === 'two_factor' && (
               <motion.div
                 key="mfa-form"
                 initial={{ opacity: 0, x: 15 }}
@@ -737,7 +751,7 @@ export const AuthView: React.FC = () => {
             )}
 
             {/* ─── FASE RECUPERACIÓN DE CONTRASEÑA ─── */}
-            {screen === 'forgot_password' && (
+            {activeViewScreen === 'forgot_password' && (
               <motion.div
                 key="forgot-password-form"
                 initial={{ opacity: 0, x: 15 }}
@@ -822,7 +836,7 @@ export const AuthView: React.FC = () => {
             )}
 
             {/* ─── FASE 4: ESTABLECER NUEVA CONTRASEÑA ─── */}
-            {screen === 'reset_password' && (
+            {activeViewScreen === 'reset_password' && (
               <motion.div
                 key="reset-password-screen"
                 initial={{ opacity: 0, x: 15 }}

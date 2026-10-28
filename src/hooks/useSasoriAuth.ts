@@ -460,6 +460,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
         setSuccessMessage('CONTRASEÑA ACTUALIZADA CON ÉXITO');
 
         if (typeof window !== 'undefined') {
+          window.history.replaceState({}, document.title, '/');
           window.location.href = '/';
         }
         return true;
