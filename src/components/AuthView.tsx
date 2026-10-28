@@ -9,6 +9,29 @@ import { PasswordChecklist } from './PasswordChecklist';
 import { validatePassword, getPasswordValidationError } from '../utils/passwordValidator';
 import { ScreenState } from '../hooks/useSasoriAuth';
 
+// Traductor de errores de autenticación de Supabase a español claro
+const translateSupabaseAuthError = (err: any): string => {
+  if (!err) return 'Error desconocido al procesar la solicitud.';
+  const msg = typeof err === 'string' ? err : err.message || '';
+  const lower = msg.toLowerCase();
+  if (lower.includes('auth session missing') || lower.includes('session missing') || lower.includes('session_missing')) {
+    return 'La sesión de recuperación ha expirado o no está activa. Por favor solicita un nuevo enlace desde el login.';
+  }
+  if (lower.includes('password should be different')) {
+    return 'La nueva contraseña debe ser diferente a la anterior.';
+  }
+  if (lower.includes('password should be at least')) {
+    return 'La contraseña no cumple con la longitud mínima requerida (mínimo 8 caracteres).';
+  }
+  if (lower.includes('user not found')) {
+    return 'Usuario no encontrado en el sistema.';
+  }
+  if (lower.includes('rate limit') || lower.includes('too many requests')) {
+    return 'Has superado el límite de intentos. Por favor espera unos minutos.';
+  }
+  return msg || 'Error al actualizar la contraseña.';
+};
+
 interface AuthViewProps {
   initialScreen?: ScreenState;
 }
@@ -284,13 +307,29 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
       return;
     }
 
+    // Asegurar la sesión si recoverySession está presente
+    let currentSession = recoverySession;
+    if (!currentSession) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      currentSession = sessionData.session;
+    } else {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session && recoverySession.access_token && recoverySession.refresh_token) {
+        await supabase.auth.setSession({
+          access_token: recoverySession.access_token,
+          refresh_token: recoverySession.refresh_token,
+        });
+      }
+    }
+
     const { data, error } = await supabase.auth.updateUser({ password: cleanNew });
     if (!error) {
-      if (data?.user?.id) {
+      const userId = data?.user?.id || currentSession?.user?.id;
+      if (userId) {
         await supabase
           .from('user_profiles')
           .update({ must_reset_password: false })
-          .eq('user_id', data.user.id);
+          .eq('user_id', userId);
       }
       if (typeof window !== 'undefined') {
         window.history.replaceState({}, document.title, '/');
