@@ -6,14 +6,18 @@ import { RefreshCw } from 'lucide-react';
 
 import { GamePreloader } from './components/GamePreloader';
 import { useUpdater } from './hooks/useUpdater';
+import { useAudioEngine } from './hooks/useAudioEngine';
 
 function AppContent() {
+  // 🎵 Activa el motor de audio y registra los listeners de música de fondo (gd_play_bg_music)
+  useAudioEngine();
+
   const { user, logout, isInitializing, screen, showNewPasswordModal } = useAuth();
   const [isPreloaderFinished, setIsPreloaderFinished] = useState(false);
   const [initTimeout, setInitTimeout] = useState(false);
 
   // 🔄 Verifica actualizaciones al arrancar (solo en Tauri Desktop)
-  useUpdater();
+  useUpdater();[cite: 29]
 
   // ⏱️ TIMEOUT DE SEGURIDAD: Máximo 2 segundos en inicialización; si no responde, desbloquea la pantalla
   useEffect(() => {
@@ -21,7 +25,7 @@ function AppContent() {
       setInitTimeout(true);
     }, 2000);
     return () => clearTimeout(timer);
-  }, []);
+  }, []);[cite: 29]
 
   // 1. PRIORIDAD ABSOLUTA: SI ES RECUPERACIÓN DE CONTRASEÑA, RENDERIZAR AuthView DE INMEDIATO
   const isRecoveryMode = typeof window !== 'undefined' && (
@@ -32,7 +36,7 @@ function AppContent() {
     screen === 'reset_password' ||
     showNewPasswordModal === true ||
     Boolean(user?.mustResetPassword)
-  );
+  );[cite: 29]
 
   // 🚀 Forzar Giro y Pantalla Completa Automáticos (Zero Click)
   useEffect(() => {
@@ -57,18 +61,18 @@ function AppContent() {
       window.removeEventListener('click', autoLockFullscreen);
       window.removeEventListener('touchstart', autoLockFullscreen);
     };
-  }, []);
+  }, []);[cite: 29]
 
   // Activar música ambiental cuando el usuario esté conectado y termine el preloader
   useEffect(() => {
     if (user && !user.mustResetPassword && !showNewPasswordModal && screen !== 'reset_password' && !isRecoveryMode && isPreloaderFinished) {
       window.dispatchEvent(new CustomEvent('gd_play_bg_music'));
     }
-  }, [user, user?.mustResetPassword, showNewPasswordModal, screen, isRecoveryMode, isPreloaderFinished]);
+  }, [user, user?.mustResetPassword, showNewPasswordModal, screen, isRecoveryMode, isPreloaderFinished]);[cite: 29]
 
   // 1. SI ES RECUPERACIÓN DE CONTRASEÑA: Renderizar AuthView de inmediato
   if (isRecoveryMode) {
-    return <AuthView initialScreen="reset_password" />;
+    return <AuthView initialScreen="reset_password" />;[cite: 29]
   }
 
   // 2. Pantalla de carga: solo mientras isInitializing sea true Y no haya saltado el timeout
@@ -80,20 +84,20 @@ function AppContent() {
           Sincronizando Estado C.A.N...
         </div>
       </div>
-    );
+    );[cite: 29]
   }
 
   // 3. USUARIO CONECTADO:
   if (user) {
     if (!isPreloaderFinished) {
-      return <GamePreloader onComplete={() => setIsPreloaderFinished(true)} />;
+      return <GamePreloader onComplete={() => setIsPreloaderFinished(true)} />;[cite: 29]
     }
 
-    return <Homepage user={user as any} onLogout={logout} />;
+    return <Homepage user={user as any} onLogout={logout} />;[cite: 29]
   }
 
   // 4. USUARIO NO CONECTADO:
-  return <AuthView />;
+  return <AuthView />;[cite: 29]
 }
 
 export default function App() {
@@ -101,5 +105,5 @@ export default function App() {
     <AuthProvider>
       <AppContent />
     </AuthProvider>
-  );
+  );[cite: 29]
 }

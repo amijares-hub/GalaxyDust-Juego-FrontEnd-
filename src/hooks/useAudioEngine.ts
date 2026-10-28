@@ -3,7 +3,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 const AUDIO_MUTED_KEY = 'gd_audio_muted';
 const AUDIO_VOLUME_KEY = 'gd_audio_volume';
 
-export const useAudioEngine = () => {
+// 🎵 URL oficial de la música de fondo de GalaxyDust
+export const DEFAULT_BGM_URL = 'https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20music/GD%20MainMenu%201.0.mp3';
+
+export const useAudioEngine = (defaultBgmUrl: string = DEFAULT_BGM_URL) => {
   const [isMuted, setIsMuted] = useState<boolean>(() => {
     try {
       return localStorage.getItem(AUDIO_MUTED_KEY) === 'true';
@@ -22,8 +25,83 @@ export const useAudioEngine = () => {
   });
 
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const bgMusicRef = useRef<HTMLAudioElement | null>(null);
 
+  // 1. INICIALIZAR ELEMENTO DE MÚSICA DE FONDO (BGM)
   useEffect(() => {
+    if (!bgMusicRef.current && typeof window !== 'undefined') {
+      const bgAudio = new Audio(defaultBgmUrl);
+      bgAudio.loop = true;
+      bgAudio.preload = 'auto';
+      bgAudio.volume = isMuted ? 0 : volume * 0.5;
+      bgMusicRef.current = bgAudio;
+    }
+
+    return () => {
+      if (bgMusicRef.current) {
+        bgMusicRef.current.pause();
+        bgMusicRef.current = null;
+      }
+    };
+  }, [defaultBgmUrl]);
+
+  // 2. SINCRONIZAR VOLUMEN Y SILENCIO EN TIEMPO REAL
+  useEffect(() => {
+    if (bgMusicRef.current) {
+      bgMusicRef.current.muted = isMuted;
+      bgMusicRef.current.volume = isMuted ? 0 : volume * 0.5;
+    }
+  }, [isMuted, volume]);
+
+  // 3. REPRODUCIR MÚSICA DE FONDO CON BYPASS DE POLÍTICA AUTOPLAY
+  const playBgMusic = useCallback((customUrl?: string) => {
+    if (!bgMusicRef.current) return;
+
+    if (customUrl && bgMusicRef.current.src !== customUrl) {
+      bgMusicRef.current.src = customUrl;
+    }
+
+    const audio = bgMusicRef.current;
+    audio.muted = isMuted;
+    audio.volume = isMuted ? 0 : volume * 0.5;
+
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {
+        // Si el navegador bloquea el autoplay antes de la interacción del jugador,
+        // se activa al primer clic o pulsación en cualquier parte de la pantalla
+        const unlockAudio = () => {
+          audio.play().catch(() => {});
+          window.removeEventListener('click', unlockAudio);
+          window.removeEventListener('touchstart', unlockAudio);
+          window.removeEventListener('keydown', unlockAudio);
+        };
+        window.addEventListener('click', unlockAudio, { once: true });
+        window.addEventListener('touchstart', unlockAudio, { once: true });
+        window.addEventListener('keydown', unlockAudio, { once: true });
+      });
+    }
+  }, [isMuted, volume]);
+
+  // 4. DETENER MÚSICA DE FONDO
+  const stopBgMusic = useCallback(() => {
+    if (bgMusicRef.current) {
+      bgMusicRef.current.pause();
+      bgMusicRef.current.currentTime = 0;
+    }
+  }, []);
+
+  // 5. ESCUCHADORES DE EVENTOS GLOBALES
+  useEffect(() => {
+    const handlePlayMusic = (e: Event) => {
+      const customEvent = e as CustomEvent<{ url?: string }>;
+      playBgMusic(customEvent.detail?.url);
+    };
+
+    const handleStopMusic = () => {
+      stopBgMusic();
+    };
+
     const handleAudioEvent = (e: Event) => {
       const customEvent = e as CustomEvent<{ isMuted?: boolean; volume?: number }>;
       if (customEvent.detail) {
@@ -36,9 +114,16 @@ export const useAudioEngine = () => {
       }
     };
 
+    window.addEventListener('gd_play_bg_music', handlePlayMusic);
+    window.addEventListener('gd_stop_bg_music', handleStopMusic);
     window.addEventListener('gd_audio_settings_changed', handleAudioEvent);
-    return () => window.removeEventListener('gd_audio_settings_changed', handleAudioEvent);
-  }, []);
+
+    return () => {
+      window.removeEventListener('gd_play_bg_music', handlePlayMusic);
+      window.removeEventListener('gd_stop_bg_music', handleStopMusic);
+      window.removeEventListener('gd_audio_settings_changed', handleAudioEvent);
+    };
+  }, [playBgMusic, stopBgMusic]);
 
   const toggleMute = useCallback(() => {
     setIsMuted((prev) => {
@@ -80,6 +165,7 @@ export const useAudioEngine = () => {
     );
   }, [isMuted]);
 
+  // 6. EFECTOS DE SONIDO (SFX)
   const playSfx = useCallback((soundOrFreq?: number | string) => {
     if (isMuted || volume <= 0 || soundOrFreq === undefined || soundOrFreq === null) return;
 
@@ -144,11 +230,11 @@ export const useAudioEngine = () => {
         }
       }
     } catch {
-      // Ignorar bloqueos de directiva de autoplay del navegador
+      // Directiva de autoplay
     }
   }, [isMuted, volume]);
 
-  return { isMuted, volume, toggleMute, setMuted, setVolume, playSfx };
+  return { isMuted, volume, toggleMute, setMuted, setVolume, playSfx, playBgMusic, stopBgMusic };
 };
 
 export default useAudioEngine;
