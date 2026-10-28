@@ -55,6 +55,10 @@ export const AuthView: React.FC = () => {
   const [captchaNum2, setCaptchaNum2] = useState(0);
   const [userCaptchaInput, setUserCaptchaInput] = useState('');
 
+  // Sesión de recuperación capturada localmente (hash implícito o PKCE)
+  const [recoverySession, setRecoverySession] = useState<any>(null);
+  const [isSessionLoading, setIsSessionLoading] = useState<boolean>(false);
+
   const loading = state === 'authenticating' || state === 'registering' || state === 'verifying_2fa' || state === 'resetting';
 
   const generateCaptcha = () => {
@@ -84,25 +88,73 @@ export const AuthView: React.FC = () => {
     }
   }, [isRecoveryFlow, screen, setScreen]);
 
-  // Efecto 2: Intercambio PKCE en background — si Supabase envía ?code=, intercambiar por sesión
+  // Efecto 2: Captura y activación de sesión de recuperación (hash, PKCE, sesión existente)
   useEffect(() => {
-    const params = new URLSearchParams(
-      typeof window !== 'undefined' ? window.location.search : ''
-    );
-    const code = params.get('code');
-    if (!code) return;
+    const establishRecoverySession = async () => {
+      try {
+        setIsSessionLoading(true);
+        const hash = window.location.hash;
+        const urlParams = new URLSearchParams(window.location.search);
 
-    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-      if (!error) {
+        // Caso A: Token implícito en el Hash (#access_token=...&refresh_token=...)
+        if (hash && (hash.includes('access_token') || hash.includes('type=recovery'))) {
+          const hashParams = new URLSearchParams(hash.startsWith('#') ? hash.substring(1) : hash);
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          if (accessToken && refreshToken) {
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            if (!error && data?.session) {
+              setRecoverySession(data.session);
+              setScreen('reset_password');
+              return;
+            }
+          }
+        }
+
+        // Caso B: Código PKCE (?code=...)
+        const code = urlParams.get('code');
+        if (code) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          if (!error && data?.session) {
+            setRecoverySession(data.session);
+            setScreen('reset_password');
+            // Preservar ?recovery=true al limpiar el ?code=
+            window.history.replaceState({}, document.title, window.location.pathname + '?recovery=true');
+            return;
+          }
+        }
+
+        // Caso C: Sesión ya establecida en el cliente de Supabase
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setRecoverySession(session);
+          if (urlParams.get('recovery') === 'true' || hash.includes('type=recovery')) {
+            setScreen('reset_password');
+          }
+        }
+      } catch (err) {
+        console.error('Error al establecer sesión de recuperación:', err);
+      } finally {
+        setIsSessionLoading(false);
+      }
+    };
+
+    establishRecoverySession();
+  }, []); // Solo al montar
+
+  // Efecto 3: Escucha reactiva de eventos de autenticación de Supabase
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+        setRecoverySession(session);
         setScreen('reset_password');
       }
-      // Preservar ?recovery=true al limpiar el ?code= para no perder el indicador
-      if (typeof window !== 'undefined') {
-        const cleanUrl = window.location.pathname + '?recovery=true';
-        window.history.replaceState({}, document.title, cleanUrl);
-      }
     });
-  }, []); // Solo al montar
+    return () => subscription.unsubscribe();
+  }, [setScreen]);
 
   // Temporizador regresivo de 10 segundos tras registro exitoso
   useEffect(() => {
@@ -175,11 +227,37 @@ export const AuthView: React.FC = () => {
       return;
     }
 
-    const success = await submitUpdatePassword(cleanNew);
-    if (success) {
-      setNewPassword('');
-      setConfirmNewPassword('');
+    // Verificar sesión: primero el estado local, luego Supabase como fallback
+    let currentSession = recoverySession;
+    if (!currentSession) {
+      const { data } = await supabase.auth.getSession();
+      currentSession = data.session;
     }
+
+    if (!currentSession) {
+      setLocalError('No se detectó una sesión de recuperación activa. Por favor solicita un nuevo enlace desde el login.');
+      return;
+    }
+
+    // Actualizar contraseña directamente con sesión garantizada
+    const { data, error: updateError } = await supabase.auth.updateUser({ password: cleanNew });
+    if (updateError) {
+      setLocalError(updateError.message);
+      return;
+    }
+
+    // Desactivar must_reset_password en user_profiles
+    const userId = currentSession.user?.id || data?.user?.id;
+    if (userId) {
+      await supabase
+        .from('user_profiles')
+        .update({ must_reset_password: false })
+        .eq('user_id', userId);
+    }
+
+    // Limpiar URL y reinicializar la app con sesión limpia
+    window.history.replaceState({}, document.title, window.location.pathname);
+    window.location.href = '/';
   };
 
   const handleTabChange = (tab: 'login' | 'register') => {
@@ -810,10 +888,10 @@ export const AuthView: React.FC = () => {
 
                   <button
                     type="submit"
-                    disabled={loading || !validatePassword(newPassword, confirmNewPassword).isValid}
+                    disabled={loading || isSessionLoading || !validatePassword(newPassword, confirmNewPassword).isValid}
                     className="mt-1 w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold uppercase tracking-[0.15em] text-xs rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    {loading ? (
+                    {(loading || isSessionLoading) ? (
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       <span>ACTUALIZAR CONTRASEÑA Y ENTRAR</span>
