@@ -58,6 +58,7 @@ export const AuthView: React.FC = () => {
   // Sesión de recuperación capturada localmente (hash implícito o PKCE)
   const [recoverySession, setRecoverySession] = useState<any>(null);
   const [isSessionLoading, setIsSessionLoading] = useState<boolean>(false);
+  const [expiredLinkError, setExpiredLinkError] = useState<string | null>(null);
 
   const loading = state === 'authenticating' || state === 'registering' || state === 'verifying_2fa' || state === 'resetting';
 
@@ -71,18 +72,50 @@ export const AuthView: React.FC = () => {
     generateCaptcha();
   }, [activeTab]);
 
-  // ─── DETECCIÓN MULTI-CAPA DE FLUJO DE RECUPERACIÓN ───
-  const urlParams = new URLSearchParams(
-    typeof window !== 'undefined' ? window.location.search : ''
+  // ─── DETECCIÓN DE ERRORES Y FLUJO DE RECUPERACIÓN ───
+  const hasUrlError = typeof window !== 'undefined' && (
+    window.location.hash.includes('error=access_denied') ||
+    window.location.hash.includes('error_code=otp_expired') ||
+    window.location.search.includes('error=access_denied') ||
+    window.location.search.includes('error_code=otp_expired')
   );
-  const isRecoveryFlow =
-    urlParams.get('recovery') === 'true' ||
-    (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) ||
-    showNewPasswordModal === true ||
-    user?.mustResetPassword === true;
 
-  // Efecto 1: Ir a reset_password de forma SÍNCRONA e inmediata si se detecta flujo de recuperación
+  const isRecoveryFlow = !hasUrlError && (
+    (typeof window !== 'undefined' && (
+      window.location.search.includes('recovery=true') ||
+      window.location.hash.includes('type=recovery') ||
+      window.location.hash.includes('access_token') ||
+      window.location.search.includes('code=')
+    )) ||
+    screen === 'reset_password' ||
+    showNewPasswordModal === true ||
+    user?.mustResetPassword === true
+  );
+
+  // 🔴 Efecto 1: Detección Temprana de Errores de Supabase en la URL (AuthView.tsx)
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const hash = window.location.hash;
+    const search = window.location.search;
+
+    if (
+      hash.includes('error=access_denied') ||
+      hash.includes('error_code=otp_expired') ||
+      search.includes('error=access_denied') ||
+      search.includes('error_code=otp_expired')
+    ) {
+      setExpiredLinkError(
+        'El enlace de recuperación ha expirado o ya fue utilizado. ' +
+        'Si solicitaste varios correos, asegúrate de abrir únicamente el más reciente.'
+      );
+      setActiveTab('login');
+      setScreen('login');
+      // Limpiar URL para evitar estados corruptos
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
     if (isRecoveryFlow && screen !== 'reset_password') {
       setScreen('reset_password');
     }
@@ -93,8 +126,21 @@ export const AuthView: React.FC = () => {
     const establishRecoverySession = async () => {
       try {
         setIsSessionLoading(true);
+        if (typeof window === 'undefined') return;
+
         const hash = window.location.hash;
-        const urlParams = new URLSearchParams(window.location.search);
+        const search = window.location.search;
+        const urlParams = new URLSearchParams(search);
+
+        // Si hay error en la URL, detener la ejecución de inmediato
+        if (
+          hash.includes('error=access_denied') ||
+          hash.includes('error_code=otp_expired') ||
+          search.includes('error=access_denied') ||
+          search.includes('error_code=otp_expired')
+        ) {
+          return;
+        }
 
         // Caso A: Token implícito en el Hash (#access_token=...&refresh_token=...)
         if (hash && (hash.includes('access_token') || hash.includes('type=recovery'))) {
@@ -121,7 +167,6 @@ export const AuthView: React.FC = () => {
           if (!error && data?.session) {
             setRecoverySession(data.session);
             setScreen('reset_password');
-            // Preservar ?recovery=true al limpiar el ?code=
             window.history.replaceState({}, document.title, window.location.pathname + '?recovery=true');
             return;
           }
@@ -143,18 +188,19 @@ export const AuthView: React.FC = () => {
     };
 
     establishRecoverySession();
-  }, []); // Solo al montar
+  }, [setScreen]);
 
-  // Efecto 3: Escucha reactiva de eventos de autenticación de Supabase
+  // Efecto 3: Intercambio Seguro de Tokens vía onAuthStateChange
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+      const isRecovery = event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && isRecoveryFlow);
+      if (isRecovery && session) {
         setRecoverySession(session);
         setScreen('reset_password');
       }
     });
     return () => subscription.unsubscribe();
-  }, [setScreen]);
+  }, [isRecoveryFlow, setScreen]);
 
   // Temporizador regresivo de 10 segundos tras registro exitoso
   useEffect(() => {
@@ -227,37 +273,18 @@ export const AuthView: React.FC = () => {
       return;
     }
 
-    // Verificar sesión: primero el estado local, luego Supabase como fallback
-    let currentSession = recoverySession;
-    if (!currentSession) {
-      const { data } = await supabase.auth.getSession();
-      currentSession = data.session;
+    const { data, error } = await supabase.auth.updateUser({ password: cleanNew });
+    if (!error) {
+      if (data?.user?.id) {
+        await supabase
+          .from('user_profiles')
+          .update({ must_reset_password: false })
+          .eq('user_id', data.user.id);
+      }
+      window.location.href = '/';
+    } else {
+      setLocalError(translateSupabaseAuthError(error));
     }
-
-    if (!currentSession) {
-      setLocalError('No se detectó una sesión de recuperación activa. Por favor solicita un nuevo enlace desde el login.');
-      return;
-    }
-
-    // Actualizar contraseña directamente con sesión garantizada
-    const { data, error: updateError } = await supabase.auth.updateUser({ password: cleanNew });
-    if (updateError) {
-      setLocalError(updateError.message);
-      return;
-    }
-
-    // Desactivar must_reset_password en user_profiles
-    const userId = currentSession.user?.id || data?.user?.id;
-    if (userId) {
-      await supabase
-        .from('user_profiles')
-        .update({ must_reset_password: false })
-        .eq('user_id', userId);
-    }
-
-    // Limpiar URL y reinicializar la app con sesión limpia
-    window.history.replaceState({}, document.title, window.location.pathname);
-    window.location.href = '/';
   };
 
   const handleTabChange = (tab: 'login' | 'register') => {
@@ -445,6 +472,16 @@ export const AuthView: React.FC = () => {
                 exit={{ opacity: 0, x: 15 }}
                 transition={{ duration: 0.2 }}
               >
+                {/* ─── ALERTA DE ENLACE EXPIRADO ─── */}
+                {expiredLinkError && (
+                  <div className="flex items-start gap-2.5 bg-red-500/15 border border-red-500/40 p-3 rounded-xl mb-3 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+                    <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                    <span className="text-[9.5px] font-mono text-red-300 leading-relaxed tracking-wider font-semibold">
+                      {expiredLinkError}
+                    </span>
+                  </div>
+                )}
+
                 {/* Selector de Pestañas */}
                 <div className="flex w-full mb-3 sm:mb-4 relative">
                   <div className="flex-1 text-center">

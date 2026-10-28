@@ -58,6 +58,29 @@ export interface UseSasoriAuthReturn {
   resetAuthStatus: () => void;
 }
 
+export const checkIsRecoveryUrl = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const hash = window.location.hash;
+  const search = window.location.search;
+
+  // Detección de errores tempranos de Supabase:
+  if (
+    hash.includes('error=access_denied') ||
+    hash.includes('error_code=otp_expired') ||
+    search.includes('error=access_denied') ||
+    search.includes('error_code=otp_expired')
+  ) {
+    return false;
+  }
+
+  return (
+    hash.includes('type=recovery') ||
+    hash.includes('access_token') ||
+    search.includes('code=') ||
+    search.includes('recovery=true')
+  );
+};
+
 export const fetchUserProfileFromDb = async (userId: string) => {
   const { data: p1 } = await supabase
     .from('user_profiles')
@@ -77,14 +100,15 @@ export const fetchUserProfileFromDb = async (userId: string) => {
 };
 
 export function useSasoriAuth(): UseSasoriAuthReturn {
-  const [screen, setScreenState] = useState<ScreenState>('menu');
+  const isInitialRecovery = checkIsRecoveryUrl();
+  const [screen, setScreenState] = useState<ScreenState>(() => (isInitialRecovery ? 'reset_password' : 'menu'));
   const [state, setState] = useState<AuthState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [tempEmail, setTempEmail] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
-  const [showNewPasswordModal, setShowNewPasswordModal] = useState<boolean>(false);
+  const [showNewPasswordModal, setShowNewPasswordModal] = useState<boolean>(() => isInitialRecovery);
 
   // 🛡️ HIDRATACIÓN Y CENTINELA DE SESIÓN ZERO-TRUST
   useEffect(() => {
@@ -92,13 +116,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
 
     const hydrateActiveSession = async () => {
       try {
-        const isRecoveryUrl = typeof window !== 'undefined' && (
-          window.location.hash.includes('reset-password') ||
-          window.location.hash.includes('type=recovery') ||
-          window.location.search.includes('type=recovery') ||
-          window.location.search.includes('code=') ||
-          window.location.search.includes('recovery=true')
-        );
+        const isRecoveryUrl = checkIsRecoveryUrl();
 
         const { data: { session } } = await supabase.auth.getSession();
 
@@ -144,13 +162,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     hydrateActiveSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      const isRecoveryUrl = typeof window !== 'undefined' && (
-        window.location.hash.includes('type=recovery') ||
-        window.location.hash.includes('reset-password') ||
-        window.location.search.includes('type=recovery') ||
-        window.location.search.includes('code=') ||
-        window.location.search.includes('recovery=true')
-      );
+      const isRecoveryUrl = checkIsRecoveryUrl();
 
       if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && isRecoveryUrl)) {
         setShowNewPasswordModal(true);
@@ -202,6 +214,10 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
   }, []);
 
   const setScreen = useCallback((newScreen: ScreenState) => {
+    // Si la URL actual es de recuperación y se intenta cambiar a otra pantalla distinta de 'reset_password', proteger el estado
+    if (checkIsRecoveryUrl() && newScreen !== 'reset_password') {
+      return;
+    }
     setScreenState(newScreen);
     setState('idle');
     setErrorMessage(null);
@@ -428,50 +444,33 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
-      // 🛡️ Verificar sesión activa ANTES de llamar updateUser
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setState('error');
-        setErrorMessage('No se detectó una sesión de recuperación activa. Por favor solicita un nuevo enlace desde el login.');
-        return false;
-      }
-
       const { data, error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw error;
-
-      // Usar session.user.id como fuente de verdad garantizada
-      const activeUserId = data?.user?.id || session.user.id;
-      if (activeUserId) {
-        const { error: pErr } = await supabase
-          .from('user_profiles')
-          .update({ must_reset_password: false })
-          .eq('user_id', activeUserId);
-
-        if (pErr) {
+      if (!error) {
+        if (data?.user?.id) {
           await supabase
             .from('user_profiles')
             .update({ must_reset_password: false })
-            .eq('id', activeUserId);
+            .eq('user_id', data.user.id);
         }
-      }
 
-      setUser((prev) => (prev ? { ...prev, mustResetPassword: false } : null));
-      setShowNewPasswordModal(false);
-      setScreenState('homepage');
-      setState('connected');
-      setSuccessMessage('CONTRASEÑA ACTUALIZADA CON ÉXITO');
+        setUser((prev) => (prev ? { ...prev, mustResetPassword: false } : null));
+        setShowNewPasswordModal(false);
+        setScreenState('homepage');
+        setState('connected');
+        setSuccessMessage('CONTRASEÑA ACTUALIZADA CON ÉXITO');
 
-      // Limpiar URL solo DESPUÉS del éxito
-      if (typeof window !== 'undefined') {
-        window.history.replaceState({}, document.title, window.location.pathname);
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
+        return true;
       }
-      return true;
+      throw error;
     } catch (err: any) {
       setState('error');
       setErrorMessage(translateSupabaseAuthError(err));
       return false;
     }
-  }, [user]);
+  }, []);
 
   // 8. CIERRE DE SESIÓN
   const logout = useCallback(async () => {

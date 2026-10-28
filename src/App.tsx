@@ -6,7 +6,6 @@ import { RefreshCw } from 'lucide-react';
 
 import { GamePreloader } from './components/GamePreloader';
 import { useUpdater } from './hooks/useUpdater';
-import { NewPasswordModal } from './components/NewPasswordModal';
 
 function AppContent() {
   const { user, logout, isInitializing, screen, showNewPasswordModal } = useAuth();
@@ -63,6 +62,19 @@ function AppContent() {
   const isPasswordResetRequired = Boolean(screen === 'reset_password' || showNewPasswordModal || user?.mustResetPassword);
 
   if (isPasswordResetRequired) {
+    return <AuthView />;
+  }
+
+  // 🌐 Detección global de URL de recuperación — failsafe independiente del estado del hook
+  // Configura la detección de recuperación en el punto de entrada de la aplicación
+  const isRecoveryUrl = typeof window !== 'undefined' && (
+    window.location.hash.includes('type=recovery') ||
+    window.location.hash.includes('access_token') ||
+    window.location.search.includes('code=') ||
+    window.location.search.includes('recovery=true')
+  );
+
+  if (isRecoveryUrl) {
     return <AuthView />;
   }
 
