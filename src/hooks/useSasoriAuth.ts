@@ -114,7 +114,25 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [showNewPasswordModal, setShowNewPasswordModal] = useState<boolean>(() => isInitialRecovery);
 
-  // 🛡️ HIDRATACIÓN DE SESIÓN CON TIMEOUT
+  // Helper para construir el perfil del usuario de forma segura
+  const buildUserProfile = (authUser: any, dbProfile: any): UserProfile => {
+    const email = authUser.email || '';
+    const username = dbProfile?.username || authUser.raw_user_meta_data?.username || email.split('@')[0].toUpperCase() || 'PILOTO';
+    return {
+      id: authUser.id,
+      email,
+      name: username,
+      provider: (authUser.app_metadata?.provider || 'password') as any,
+      registrationDate: dbProfile?.created_at ? new Date(dbProfile.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      mfaEnabled: dbProfile?.mfa_enabled ?? false,
+      verified: true,
+      avatarUrl: dbProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${email}`,
+      assignedToken: 'GD-SEC-' + authUser.id.slice(0, 8).toUpperCase(),
+      mustResetPassword: Boolean(dbProfile?.must_reset_password),
+    };
+  };
+
+  // 🛡️ HIDRATACIÓN DE SESIÓN INICIAL (Sin bloquear renderizado)
   useEffect(() => {
     let isMounted = true;
 
@@ -127,22 +145,10 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
           const dbProfile = await fetchUserProfileFromDb(session.user.id);
           if (!isMounted) return;
 
-          const mustReset = Boolean(dbProfile?.must_reset_password);
+          const loadedProfile = buildUserProfile(session.user, dbProfile);
+          setUser(loadedProfile);
 
-          setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            name: dbProfile?.username || session.user.email?.split('@')[0].toUpperCase() || 'PILOTO',
-            provider: (session.user.app_metadata.provider || 'password') as any,
-            registrationDate: dbProfile?.created_at ? new Date(dbProfile.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-            mfaEnabled: dbProfile?.mfa_enabled ?? false,
-            verified: true,
-            avatarUrl: dbProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${session.user.email}`,
-            assignedToken: 'GD-SEC-' + session.user.id.slice(0, 8).toUpperCase(),
-            mustResetPassword: mustReset,
-          });
-
-          if (isRecoveryUrl || mustReset) {
+          if (isRecoveryUrl || loadedProfile.mustResetPassword) {
             setShowNewPasswordModal(true);
             setScreenState('reset_password');
           } else {
@@ -168,50 +174,43 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
 
     hydrateActiveSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      const isRecoveryUrl = checkIsRecoveryUrl();
-
-      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && isRecoveryUrl)) {
-        setShowNewPasswordModal(true);
-        setScreenState('reset_password');
-      }
-
-      if (event === 'SIGNED_OUT' && isMounted) {
-        setUser(null);
-        setScreenState('login');
-        setState('idle');
-        setShowNewPasswordModal(false);
-        setIsInitializing(false);
-      } else if (event === 'SIGNED_IN' && session?.user && isMounted) {
-        const dbProfile = await fetchUserProfileFromDb(session.user.id);
+    // ⚡ DESACOPLAMIENTO ANTI-DEADLOCK:
+    // onAuthStateChange se ejecuta dentro del Web Lock de Gotrue.
+    // Usamos setTimeout(0) para ejecutar las consultas de perfil en el siguiente ciclo,
+    // liberando el lock de inmediato y evitando deadlocks con supabase.from()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setTimeout(async () => {
         if (!isMounted) return;
+        const isRecoveryUrl = checkIsRecoveryUrl();
 
-        const mustReset = Boolean(dbProfile?.must_reset_password);
-        if (mustReset || isRecoveryUrl) {
+        if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && isRecoveryUrl)) {
           setShowNewPasswordModal(true);
           setScreenState('reset_password');
         }
 
-        const provider = session.user.app_metadata?.provider || 'password';
-        setUser({
-          id: session.user.id,
-          email: session.user.email || '',
-          name: dbProfile?.username || session.user.email?.split('@')[0].toUpperCase() || 'PILOTO',
-          provider: provider as any,
-          registrationDate: dbProfile?.created_at ? new Date(dbProfile.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          mfaEnabled: dbProfile?.mfa_enabled ?? false,
-          verified: true,
-          avatarUrl: dbProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${session.user.email}`,
-          assignedToken: 'GD-SEC-' + session.user.id.slice(0, 8).toUpperCase(),
-          mustResetPassword: mustReset,
-        });
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setScreenState('login');
+          setState('idle');
+          setShowNewPasswordModal(false);
+          setIsInitializing(false);
+        } else if (event === 'SIGNED_IN' && session?.user) {
+          const dbProfile = await fetchUserProfileFromDb(session.user.id);
+          if (!isMounted) return;
 
-        if (!mustReset && !isRecoveryUrl) {
-          setScreenState('homepage');
-          setState('connected');
+          const loadedProfile = buildUserProfile(session.user, dbProfile);
+          setUser(loadedProfile);
+
+          if (loadedProfile.mustResetPassword || isRecoveryUrl) {
+            setShowNewPasswordModal(true);
+            setScreenState('reset_password');
+          } else {
+            setScreenState('homepage');
+            setState('connected');
+          }
+          setIsInitializing(false);
         }
-        setIsInitializing(false);
-      }
+      }, 0);
     });
 
     return () => {
@@ -230,47 +229,43 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     setSuccessMessage(null);
   }, []);
 
-  // 1. INICIAR SESIÓN CON TIMEOUT SEGURO (Nunca se queda colgado)
+  // 1. INICIAR SESIÓN DIRECTO Y FLUIDO (Sin timeout que mate la petición)
   const submitLogin = useCallback(async (email: string, password: string, rememberMe: boolean) => {
     setState('authenticating');
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
-      const loginPromise = supabase.auth.signInWithPassword({ email, password });
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Tiempo de espera agotado al conectar con el servidor.')), 8000)
-      );
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email: email.trim(), 
+        password: password.trim() 
+      });
 
-      const { data, error } = (await Promise.race([loginPromise, timeoutPromise])) as any;
       if (error) throw error;
+      if (!data?.user) throw new Error('No se recibió usuario válido del servidor.');
 
       setTempEmail(email);
 
-      const dbProfile = await fetchUserProfileFromDb(data.user.id);
-      const mustReset = Boolean(dbProfile?.must_reset_password);
+      // Obtener perfil en base de datos (con fallback seguro)
+      let dbProfile = null;
+      try {
+        dbProfile = await fetchUserProfileFromDb(data.user.id);
+      } catch (e) {
+        console.warn('Advertencia al consultar user_profiles:', e);
+      }
+
+      const loadedProfile = buildUserProfile(data.user, dbProfile);
+      setUser(loadedProfile);
 
       if ((dbProfile as any)?.mfa_enabled) {
         setScreenState('two_factor');
         setState('idle');
         setSuccessMessage('CREDENCIALES CORRECTAS • COMPILANDO VERIFICACIÓN MULTIFACTOR');
+      } else if (loadedProfile.mustResetPassword) {
+        setShowNewPasswordModal(true);
+        setScreenState('reset_password');
+        setState('idle');
       } else {
-        const loadedProfile: UserProfile = {
-          id: data.user.id,
-          email: data.user.email || '',
-          name: dbProfile?.username || data.user.email?.split('@')[0].toUpperCase() || 'PILOTO',
-          provider: 'password',
-          registrationDate: new Date().toISOString().split('T')[0],
-          mfaEnabled: false,
-          verified: true,
-          avatarUrl: dbProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${data.user.email}`,
-          assignedToken: 'GD-SEC-' + data.user.id.slice(0, 8).toUpperCase(),
-          mustResetPassword: mustReset,
-        };
-        setUser(loadedProfile);
-        if (mustReset) {
-          setShowNewPasswordModal(true);
-        }
         setScreenState('homepage');
         setState('connected');
       }
@@ -395,27 +390,16 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
       }
 
       const dbProfile = await fetchUserProfileFromDb(authUser.id);
-      const mustReset = Boolean(dbProfile?.must_reset_password);
-
-      const loadedProfile: UserProfile = {
-        id: authUser.id,
-        email: authUser.email || '',
-        name: dbProfile?.username || authUser.email.split('@')[0].toUpperCase(),
-        provider: (authUser.app_metadata.provider || 'password') as any,
-        registrationDate: dbProfile?.created_at ? new Date(dbProfile.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        mfaEnabled: true,
-        verified: true,
-        avatarUrl: dbProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${authUser.email}`,
-        assignedToken: 'GD-SEC-' + authUser.id.slice(0, 8).toUpperCase(),
-        mustResetPassword: mustReset,
-      };
+      const loadedProfile = buildUserProfile(authUser, dbProfile);
 
       setUser(loadedProfile);
-      if (mustReset) {
+      if (loadedProfile.mustResetPassword) {
         setShowNewPasswordModal(true);
+        setScreenState('reset_password');
+      } else {
+        setScreenState('homepage');
+        setState('connected');
       }
-      setScreenState('homepage');
-      setState('connected');
       setSuccessMessage('ACCESO CONCEDIDO • PERFIL MAESTRO INYECTADO');
       return true;
     } catch (err: any) {
