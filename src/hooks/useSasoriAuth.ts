@@ -63,7 +63,6 @@ export const checkIsRecoveryUrl = (): boolean => {
   const hash = window.location.hash;
   const search = window.location.search;
 
-  // Detección de errores tempranos de Supabase:
   if (
     hash.includes('error=access_denied') ||
     hash.includes('error_code=otp_expired') ||
@@ -82,26 +81,31 @@ export const checkIsRecoveryUrl = (): boolean => {
 };
 
 export const fetchUserProfileFromDb = async (userId: string) => {
-  const { data: p1 } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .eq('id', userId)
-    .maybeSingle();
+  try {
+    const { data: p2 } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
 
-  if (p1) return p1;
+    if (p2) return p2;
 
-  const { data: p2 } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle();
+    const { data: p1 } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
 
-  return p2;
+    return p1;
+  } catch (err) {
+    console.error('Error al consultar user_profiles:', err);
+    return null;
+  }
 };
 
 export function useSasoriAuth(): UseSasoriAuthReturn {
   const isInitialRecovery = checkIsRecoveryUrl();
-  const [screen, setScreenState] = useState<ScreenState>(() => (isInitialRecovery ? 'reset_password' : 'menu'));
+  const [screen, setScreenState] = useState<ScreenState>(() => (isInitialRecovery ? 'reset_password' : 'login'));
   const [state, setState] = useState<AuthState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -110,14 +114,13 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [showNewPasswordModal, setShowNewPasswordModal] = useState<boolean>(() => isInitialRecovery);
 
-  // 🛡️ HIDRATACIÓN Y CENTINELA DE SESIÓN ZERO-TRUST
+  // 🛡️ HIDRATACIÓN DE SESIÓN CON TIMEOUT
   useEffect(() => {
     let isMounted = true;
 
     const hydrateActiveSession = async () => {
       try {
         const isRecoveryUrl = checkIsRecoveryUrl();
-
         const { data: { session } } = await supabase.auth.getSession();
 
         if (session && session.user && isMounted) {
@@ -149,12 +152,16 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
         } else if (isRecoveryUrl) {
           setShowNewPasswordModal(true);
           setScreenState('reset_password');
+        } else {
+          setScreenState('login');
+          setState('idle');
         }
       } catch (err) {
         console.error("Error al hidratar sesión activa:", err);
       } finally {
         if (isMounted) {
           setIsInitializing(false);
+          setState('idle');
         }
       }
     };
@@ -171,7 +178,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
 
       if (event === 'SIGNED_OUT' && isMounted) {
         setUser(null);
-        setScreenState('menu');
+        setScreenState('login');
         setState('idle');
         setShowNewPasswordModal(false);
         setIsInitializing(false);
@@ -214,7 +221,6 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
   }, []);
 
   const setScreen = useCallback((newScreen: ScreenState) => {
-    // Si la URL actual es de recuperación y se intenta cambiar a otra pantalla distinta de 'reset_password', proteger el estado
     if (checkIsRecoveryUrl() && newScreen !== 'reset_password') {
       return;
     }
@@ -224,14 +230,19 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     setSuccessMessage(null);
   }, []);
 
-  // 1. INICIAR SESIÓN CON SUPABASE AUTH
+  // 1. INICIAR SESIÓN CON TIMEOUT SEGURO (Nunca se queda colgado)
   const submitLogin = useCallback(async (email: string, password: string, rememberMe: boolean) => {
     setState('authenticating');
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const loginPromise = supabase.auth.signInWithPassword({ email, password });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Tiempo de espera agotado al conectar con el servidor.')), 8000)
+      );
+
+      const { data, error } = (await Promise.race([loginPromise, timeoutPromise])) as any;
       if (error) throw error;
 
       setTempEmail(email);
@@ -271,7 +282,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     }
   }, []);
 
-  // 2. REGISTRO DE NUEVOS PILOTOS
+  // 2. REGISTRO
   const submitRegister = useCallback(async (email: string, password: string, metadata?: any) => {
     setState('registering');
     setErrorMessage(null);
@@ -331,7 +342,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     }
   }, []);
 
-  // 4. VERIFICACIÓN SMTP DE EMAIL ZERO-TRUST VÍA SUPABASE OTP
+  // 4. VERIFICACIÓN SMTP DE EMAIL
   const verifyEmailCode = useCallback(async (code: string) => {
     setState('verifying_email');
     setErrorMessage(null);
@@ -353,12 +364,12 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
       return true;
     } catch (err: any) {
       setState('error');
-      setErrorMessage(err.message || 'CÓDIGO DE VERIFICACIÓN INVÁLIDO O EXSPIRADO');
+      setErrorMessage(err.message || 'CÓDIGO DE VERIFICACIÓN INVÁLIDO O EXPIRADO');
       return false;
     }
   }, [tempEmail]);
 
-  // 5. RESOLUCIÓN DE SEGUNDO FACTOR (OTP) ZERO-TRUST
+  // 5. RESOLUCIÓN DE SEGUNDO FACTOR (MFA)
   const verifyTwoFA = useCallback(async (code: string) => {
     setState('verifying_2fa');
     setErrorMessage(null);
@@ -438,7 +449,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     }
   }, []);
 
-  // 7. ACTUALIZAR CONTRASEÑA TRAS RECUPERACIÓN O BLOQUEO MUST_RESET_PASSWORD
+  // 7. ACTUALIZAR CONTRASEÑA
   const submitUpdatePassword = useCallback(async (newPassword: string) => {
     setState('resetting');
     setErrorMessage(null);
@@ -479,7 +490,7 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     setUser(null);
     setTempEmail('');
     setShowNewPasswordModal(false);
-    setScreenState('menu');
+    setScreenState('login');
     setState('idle');
     setErrorMessage(null);
     setSuccessMessage(null);
