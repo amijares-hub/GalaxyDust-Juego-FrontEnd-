@@ -20,7 +20,7 @@ export const supabase = createClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      flowType: 'pkce' // Garantiza compatibilidad con flujos de autenticación modernos y seguros
+      flowType: 'implicit' // Permite validación universal de tokens sin dependencia de code_verifier cruzado
     },
     realtime: {
       params: {

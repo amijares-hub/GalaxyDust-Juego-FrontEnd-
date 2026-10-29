@@ -15,7 +15,7 @@ const translateSupabaseAuthError = (err: any): string => {
   const msg = typeof err === 'string' ? err : err.message || '';
   const lower = msg.toLowerCase();
   if (lower.includes('auth session missing') || lower.includes('session missing') || lower.includes('session_missing')) {
-    return 'La sesión de recuperación ha expirado o no está activa. Por favor solicita un nuevo enlace desde el login.';
+    return 'La sesión de recuperación ha expirado o no está activa. Por favor solicita un nuevo enlace desde el formulario de recuperación.';
   }
   if (lower.includes('password should be different')) {
     return 'La nueva contraseña debe ser diferente a la anterior.';
@@ -108,13 +108,13 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
     window.location.search.includes('error_code=otp_expired')
   );
 
-  const isRecoveryFlow = !hasUrlError && (
+  const isRecoveryFlow = !hasUrlError && !expiredLinkError && (
     initialScreen === 'reset_password' ||
     (typeof window !== 'undefined' && (
       window.location.search.includes('recovery=true') ||
       window.location.hash.includes('type=recovery') ||
       window.location.hash.includes('access_token') ||
-      window.location.search.includes('code=')
+      (window.location.search.includes('code=') && !expiredLinkError)
     )) ||
     screen === 'reset_password' ||
     showNewPasswordModal === true ||
@@ -122,11 +122,11 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
   );
 
   // Pantalla activa garantizada: si es recuperación válida, forzar 'reset_password' sin destellos
-  const activeViewScreen = (isRecoveryFlow || initialScreen === 'reset_password') && !hasUrlError
+  const activeViewScreen = (isRecoveryFlow || initialScreen === 'reset_password') && !hasUrlError && !expiredLinkError
     ? 'reset_password'
     : screen;
 
-  // 🔴 Efecto 1: Detección Temprana de Errores de Supabase en la URL (AuthView.tsx)
+  // 🔴 Efecto 1: Detección Temprana de Errores de Supabase en la URL
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -145,7 +145,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
       );
       setActiveTab('login');
       setScreen('login');
-      // Limpiar URL para evitar estados corruptos
       window.history.replaceState({}, document.title, window.location.pathname);
       return;
     }
@@ -155,29 +154,37 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
     }
   }, [isRecoveryFlow, screen, setScreen]);
 
-  // Efecto 2: Captura y activación de sesión de recuperación (hash, PKCE, sesión existente)
+  // 🔵 Efecto 2: Captura y activación de sesión de recuperación (hash, PKCE, sesión existente)
   useEffect(() => {
     const establishRecoverySession = async () => {
+      if (typeof window === 'undefined') return;
+
+      const hash = window.location.hash;
+      const search = window.location.search;
+      const urlParams = new URLSearchParams(search);
+
+      // Si hay error en la URL, detener la ejecución de inmediato
+      if (
+        hash.includes('error=access_denied') ||
+        hash.includes('error_code=otp_expired') ||
+        search.includes('error=access_denied') ||
+        search.includes('error_code=otp_expired')
+      ) {
+        return;
+      }
+
+      const hasCode = Boolean(urlParams.get('code'));
+      const hasHashToken = hash && (hash.includes('access_token') || hash.includes('type=recovery'));
+
+      if (!hasCode && !hasHashToken && !urlParams.get('recovery')) {
+        return;
+      }
+
       try {
         setIsSessionLoading(true);
-        if (typeof window === 'undefined') return;
-
-        const hash = window.location.hash;
-        const search = window.location.search;
-        const urlParams = new URLSearchParams(search);
-
-        // Si hay error en la URL, detener la ejecución de inmediato
-        if (
-          hash.includes('error=access_denied') ||
-          hash.includes('error_code=otp_expired') ||
-          search.includes('error=access_denied') ||
-          search.includes('error_code=otp_expired')
-        ) {
-          return;
-        }
 
         // Caso A: Token implícito en el Hash (#access_token=...&refresh_token=...)
-        if (hash && (hash.includes('access_token') || hash.includes('type=recovery'))) {
+        if (hasHashToken) {
           const hashParams = new URLSearchParams(hash.startsWith('#') ? hash.substring(1) : hash);
           const accessToken = hashParams.get('access_token');
           const refreshToken = hashParams.get('refresh_token');
@@ -189,6 +196,13 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
             if (!error && data?.session) {
               setRecoverySession(data.session);
               setScreen('reset_password');
+              return;
+            } else if (error) {
+              console.error('Error al establecer sesión desde hash:', error);
+              setExpiredLinkError('El token de recuperación es inválido o ha expirado. Solicita un nuevo enlace.');
+              setActiveTab('login');
+              setScreen('login');
+              window.history.replaceState({}, document.title, window.location.pathname);
               return;
             }
           }
@@ -202,6 +216,16 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
             setRecoverySession(data.session);
             setScreen('reset_password');
             window.history.replaceState({}, document.title, window.location.pathname + '?recovery=true');
+            return;
+          } else {
+            console.error('Error al intercambiar código PKCE:', error);
+            setExpiredLinkError(
+              'El enlace de recuperación ha expirado, ya fue utilizado o se solicitó desde otra aplicación. ' +
+              'Por favor solicita un nuevo enlace de recuperación.'
+            );
+            setActiveTab('login');
+            setScreen('login');
+            window.history.replaceState({}, document.title, window.location.pathname);
             return;
           }
         }
@@ -251,7 +275,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
 
   // Expiración de "Recuérdame" (7 días) - PROTEGIDO: NUNCA CERRAR SESIÓN EN RECUPERACIÓN
   useEffect(() => {
-    if (isRecoveryFlow || hasUrlError) return;
+    if (isRecoveryFlow || hasUrlError || expiredLinkError) return;
     if (typeof window !== 'undefined') {
       const search = window.location.search;
       const hash = window.location.hash;
@@ -280,7 +304,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
     };
 
     checkRememberMeExpiration();
-  }, [isRecoveryFlow, hasUrlError]);
+  }, [isRecoveryFlow, hasUrlError, expiredLinkError]);
 
   const handleReturnToLogin = () => {
     setIsRegisteredSuccess(false);
@@ -329,6 +353,11 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
       if (setSessionData?.session) {
         currentSession = setSessionData.session;
       }
+    }
+
+    if (!currentSession) {
+      setLocalError('No hay una sesión activa de recuperación. Por favor solicita un nuevo enlace desde el inicio de sesión.');
+      return;
     }
 
     const { data, error } = await supabase.auth.updateUser({ password: cleanNew });
@@ -526,7 +555,21 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </motion.div>
-            ) : (activeViewScreen === 'menu' || activeViewScreen === 'login' || activeViewScreen === 'register') && (
+            ) : isSessionLoading ? (
+              /* ─── FASE CARGA DE SESIÓN DE RECUPERACIÓN ─── */
+              <motion.div
+                key="recovery-loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center py-8 gap-3 font-mono text-cyan-400"
+              >
+                <RefreshCw className="w-8 h-8 animate-spin" />
+                <span className="text-xs uppercase tracking-widest text-center">
+                  Validando credenciales de recuperación...
+                </span>
+              </motion.div>
+            ) : (activeViewScreen === 'menu' || activeViewScreen === 'login' || activeViewScreen === 'register') ? (
               /* ─── FASE 1: FORMULARIO DE ACCESO Y REGISTRO ─── */
               <motion.div
                 key="auth-form"
@@ -535,7 +578,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
                 exit={{ opacity: 0, x: 15 }}
                 transition={{ duration: 0.2 }}
               >
-                {/* ─── ALERTA DE ENLACE EXPIRADO ─── */}
+                {/* ─── ALERTA DE ENLACE EXPIRADO O INVÁLIDO ─── */}
                 {expiredLinkError && (
                   <div className="flex items-start gap-2.5 bg-red-500/15 border border-red-500/40 p-3 rounded-xl mb-3 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
                     <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
@@ -743,10 +786,8 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
                   </button>
                 </form>
               </motion.div>
-            )}
-
-            {/* ─── FASE 2: VERIFICACIÓN MULTI-FACTOR (MFA) ─── */}
-            {activeViewScreen === 'two_factor' && (
+            ) : activeViewScreen === 'two_factor' ? (
+              /* ─── FASE 2: VERIFICACIÓN MULTI-FACTOR (MFA) ─── */
               <motion.div
                 key="mfa-form"
                 initial={{ opacity: 0, x: 15 }}
@@ -797,10 +838,8 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
                   </div>
                 </form>
               </motion.div>
-            )}
-
-            {/* ─── FASE RECUPERACIÓN DE CONTRASEÑA ─── */}
-            {activeViewScreen === 'forgot_password' && (
+            ) : activeViewScreen === 'forgot_password' ? (
+              /* ─── FASE RECUPERACIÓN DE CONTRASEÑA ─── */
               <motion.div
                 key="forgot-password-form"
                 initial={{ opacity: 0, x: 15 }}
@@ -882,10 +921,8 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
                   </button>
                 </form>
               </motion.div>
-            )}
-
-            {/* ─── FASE 4: ESTABLECER NUEVA CONTRASEÑA ─── */}
-            {activeViewScreen === 'reset_password' && (
+            ) : activeViewScreen === 'reset_password' ? (
+              /* ─── FASE 4: ESTABLECER NUEVA CONTRASEÑA ─── */
               <motion.div
                 key="reset-password-screen"
                 initial={{ opacity: 0, x: 15 }}
@@ -1009,7 +1046,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
                   </button>
                 </form>
               </motion.div>
-            )}
+            ) : null}
 
           </AnimatePresence>
           </div>
