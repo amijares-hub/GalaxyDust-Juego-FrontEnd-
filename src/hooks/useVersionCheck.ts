@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 // Versión actual del cliente — sincronizada con package.json / tauri.conf.json
-export const CLIENT_VERSION = '1.1.2';
+export const CLIENT_VERSION = '1.1.3';
 
 /**
  * Compara dos strings SemVer (MAJOR.MINOR.PATCH).

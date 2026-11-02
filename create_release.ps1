@@ -1,13 +1,14 @@
-# Script automatizado para publicar GitHub Release v1.1.2 con los binarios oficiales
+# Script automatizado para publicar GitHub Release v1.1.3 con los binarios oficiales
 Write-Host "Verificando inicio de sesión en GitHub CLI..." -ForegroundColor Cyan
 
-$version = "1.1.2"
-$tag = "v1.1.2"
-$title = "Galaxy Dust Online v1.1.2"
-$notes = "Release oficial v1.1.2 de Galaxy Dust Online con parches de seguridad RLS en base de datos, corrección del flujo de restablecimiento de contraseñas y sincronización de versión cliente multiplataforma (Windows y Android)."
+$version = "1.1.3"
+$tag = "v1.1.3"
+$title = "Galaxy Dust Online v1.1.3"
+$notes = "Release oficial v1.1.3 de Galaxy Dust Online con parches de seguridad RLS en base de datos, corrección del flujo de restablecimiento de contraseñas y sincronización de versión cliente multiplataforma (Windows y Android)."
 
 # Rutas de los binarios oficiales
 $exeAsset = "src-tauri\target\release\bundle\nsis\GalaxyDust_${version}_x64-setup.exe"
+$sigAsset = "src-tauri\target\release\bundle\nsis\GalaxyDust_${version}_x64-setup.exe.sig"
 $apkAsset = "GalaxyDust_${version}.apk"
 $latestJson = "latest.json"
 
@@ -18,7 +19,7 @@ if (-not (Test-Path $exeAsset)) {
         $exeAsset = $altExe.FullName
     } else {
         Write-Error "No se encontró el instalador de Windows: $exeAsset"
-        Write-Host "Verifica que el ejecutable esté compilado en src-tauri o tenga el número 1.1.2 en su nombre." -ForegroundColor Yellow
+        Write-Host "Verifica que el ejecutable esté compilado en src-tauri o tenga el número 1.1.3 en su nombre." -ForegroundColor Yellow
         exit 1
     }
 }
@@ -30,7 +31,7 @@ if (-not (Test-Path $apkAsset)) {
         $apkAsset = $altApk.Name
     } else {
         Write-Error "No se encontró el APK de Android: $apkAsset"
-        Write-Host "Asegúrate de tener el archivo GalaxyDust_1.1.2.apk en la raíz del proyecto." -ForegroundColor Yellow
+        Write-Host "Asegúrate de tener el archivo GalaxyDust_1.1.3.apk en la raíz del proyecto." -ForegroundColor Yellow
         exit 1
     }
 }
@@ -41,6 +42,10 @@ Write-Host "  -> Android : $apkAsset" -ForegroundColor Gray
 
 # Preparar lista de assets para la Release
 $assetsToUpload = @($exeAsset, $apkAsset)
+if (Test-Path $sigAsset) {
+    Write-Host "  -> Signature : $sigAsset" -ForegroundColor Gray
+    $assetsToUpload += $sigAsset
+}
 if (Test-Path $latestJson) {
     Write-Host "  -> Updater : $latestJson" -ForegroundColor Gray
     $assetsToUpload += $latestJson
