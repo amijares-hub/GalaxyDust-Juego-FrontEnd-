@@ -118,3 +118,4 @@ export const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({ latestVersio
     </div>
   );
 };
+

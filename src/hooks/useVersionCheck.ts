@@ -64,3 +64,4 @@ export function useVersionCheck(): VersionCheckResult {
 
   return { showUpdateModal, latestVersion, isMaintenance, maintenanceMessage };
 }
+
