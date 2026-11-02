@@ -7,12 +7,17 @@ import { RefreshCw } from 'lucide-react';
 import { GamePreloader } from './components/GamePreloader';
 import { useUpdater } from './hooks/useUpdater';
 import { useAudioEngine } from './hooks/useAudioEngine';
+import { useVersionCheck } from './hooks/useVersionCheck';
+import { ForceUpdateModal } from './components/ForceUpdateModal';
 
 function AppContent() {
   // Activa el motor de audio y registra los listeners de música de fondo (gd_play_bg_music)
   useAudioEngine();
 
   const { user, logout, isInitializing, screen, showNewPasswordModal } = useAuth();
+
+  // Verificación de versión contra Supabase (app_system_config)
+  const { showUpdateModal, latestVersion } = useVersionCheck();
   const [isPreloaderFinished, setIsPreloaderFinished] = useState(false);
   const [initTimeout, setInitTimeout] = useState(false);
 
@@ -26,6 +31,11 @@ function AppContent() {
     }, 2000);
     return () => clearTimeout(timer);
   }, []);
+
+  // 0. PRIORIDAD MÁXIMA: Versión obsoleta — bloquear TODO el juego
+  if (showUpdateModal) {
+    return <ForceUpdateModal latestVersion={latestVersion} />;
+  }
 
   // 1. PRIORIDAD ABSOLUTA: SI ES RECUPERACIÓN DE CONTRASEÑA, RENDERIZAR AuthView DE INMEDIATO
   const isRecoveryMode = typeof window !== 'undefined' && (
