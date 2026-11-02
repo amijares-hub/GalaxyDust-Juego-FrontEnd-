@@ -1,0 +1,15 @@
+{
+  "version": "v1.1.1",
+  "notes": "Parche 1.1.1: corrección de autenticación, economía de perfiles, inventario y audio",
+  "pub_date": "2026-10-28T22:51:25.608Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUQVJTemRUQzh4NHhjdk8zZkViQXVHdERnSXNoeTRSVy9SYWZEZ3c4NzlHV2JMM2h3UVpvdTUvZFdNT2VEUUdGK2YxdTZNZDJPLzNsVVErdzJ4R283ZEcyZm9WaU1jNVE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzMjI3ODU3CWZpbGU6R2FsYXh5RHVzdF8xLjEuMV94NjQtc2V0dXAuZXhlCXZlcnNpb246MS4xLjEKZnJVa3VVenBlTjcxS1hjNStaaXN5OWNNK1VZR3VPbUc5UGlMQUF4U3lJWmN5WVg3SjNyS0h4cXRYR2k0dWMwNzBCeFk2VVZ1SEdEbHRYdTlNZHorRHc9PQo=",
+      "url": "https://github.com/amijares-hub/GalaxyDust-Juego-FrontEnd-/releases/download/v1.1.1/GalaxyDust_1.1.1_x64-setup.exe"
+    },
+    "x86_64-pc-windows-msvc": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUQVJTemRUQzh4NHhjdk8zZkViQXVHdERnSXNoeTRSVy9SYWZEZ3c4NzlHV2JMM2h3UVpvdTUvZFdNT2VEUUdGK2YxdTZNZDJPLzNsVVErdzJ4R283ZEcyZm9WaU1jNVE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzMjI3ODU3CWZpbGU6R2FsYXh5RHVzdF8xLjEuMV94NjQtc2V0dXAuZXhlCXZlcnNpb246MS4xLjEKZnJVa3VVenBlTjcxS1hjNStaaXN5OWNNK1VZR3VPbUc5UGlMQUF4U3lJWmN5WVg3SjNyS0h4cXRYR2k0dWMwNzBCeFk2VVZ1SEdEbHRYdTlNZHorRHc9PQo=",
+      "url": "https://github.com/amijares-hub/GalaxyDust-Juego-FrontEnd-/releases/download/v1.1.1/GalaxyDust_1.1.1_x64-setup.exe"
+    }
+  }
+}
