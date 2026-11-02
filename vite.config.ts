@@ -5,6 +5,9 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // CRUCIAL para Tauri en producción: WebView2 carga assets con el
+    // protocolo custom tauri://localhost — las rutas deben ser relativas.
+    base: './',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

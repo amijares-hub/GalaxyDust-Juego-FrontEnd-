@@ -20,7 +20,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://qldjeysusithpblfrmtq.supabase.co; media-src 'self' data: blob: https://qldjeysusithpblfrmtq.supabase.co; connect-src 'self' wss://qldjeysusithpblfrmtq.supabase.co https://qldjeysusithpblfrmtq.supabase.co; font-src 'self' https://fonts.reown.com;",
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://qldjeysusithpblfrmtq.supabase.co; media-src 'self' data: blob: https://qldjeysusithpblfrmtq.supabase.co; connect-src 'self' wss://qldjeysusithpblfrmtq.supabase.co https://qldjeysusithpblfrmtq.supabase.co https://github.com https://objects.githubusercontent.com https://api.github.com; font-src 'self' data: https://fonts.reown.com",
       "freezePrototype": true
     }
   },

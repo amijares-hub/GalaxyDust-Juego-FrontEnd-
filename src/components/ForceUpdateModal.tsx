@@ -6,31 +6,69 @@ interface ForceUpdateModalProps {
   latestVersion: string;
 }
 
+/**
+ * Detecta si la app corre dentro de Tauri Desktop (WebView2).
+ * En este entorno, las APIs de navegador como CacheStorage y ServiceWorker
+ * pueden estar restringidas o lanzar excepciones de seguridad.
+ */
+const isTauriEnv = (): boolean =>
+  typeof window !== 'undefined' && '__TAURI__' in window;
+
 const handleForceUpdate = async (): Promise<void> => {
-  try {
-    // 1. Limpiar todos los caches del navegador (CacheStorage)
-    if ('caches' in window) {
-      const cacheNames = await caches.keys();
-      await Promise.all(cacheNames.map((name) => caches.delete(name)));
+  if (isTauriEnv()) {
+    // ── Entorno Tauri (WebView2) ───────────────────────────────────────────
+    // En WebView2, CacheStorage y ServiceWorker son irrelevantes: el bundle
+    // está embebido en el ejecutable. La actualización se delega al plugin
+    // updater de Tauri que ya está configurado en useUpdater.ts.
+    // Simplemente relanzamos la app para que useUpdater detecte la nueva versión.
+    try {
+      const { relaunch } = await import('@tauri-apps/plugin-process');
+      await relaunch();
+    } catch (e) {
+      console.warn('[ForceUpdateModal] relaunch no disponible, recargando WebView:', e);
+      // Fallback: forzar recarga de la WebView
+      window.location.reload();
     }
-    // 2. Desregistrar Service Workers activos para que descargue el nuevo bundle
-    if ('serviceWorker' in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      for (const registration of registrations) {
-        await registration.unregister();
+    return;
+  }
+
+  // ── Entorno Web (navegador estándar) ────────────────────────────────────
+  // Bloque 1: Limpiar CacheStorage (puede no existir en algunos contextos)
+  try {
+    if (typeof window !== 'undefined' && 'caches' in window) {
+      const cacheKeys = await window.caches.keys();
+      await Promise.all(cacheKeys.map((key) => window.caches.delete(key)));
+    }
+  } catch (e) {
+    console.warn('[ForceUpdateModal] CacheStorage no disponible en este entorno:', e);
+  }
+
+  // Bloque 2: Desregistrar Service Workers
+  try {
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const r of regs) {
+        await r.unregister();
       }
     }
-    // 3. Limpiar almacenamiento local temporal
-    localStorage.removeItem('app_cached_version');
-  } catch (err) {
-    console.warn('[ForceUpdateModal] Aviso al limpiar cache:', err);
+  } catch (e) {
+    console.warn('[ForceUpdateModal] ServiceWorker no disponible en este entorno:', e);
   }
-  // 4. Forzar recarga con bypass de cache (timestamp query)
+
+  // Bloque 3: Limpiar clave de versión local
+  try {
+    localStorage.removeItem('app_cached_version');
+  } catch (e) {
+    console.warn('[ForceUpdateModal] localStorage no disponible:', e);
+  }
+
+  // Forzar recarga con bypass de caché (query timestamp)
   window.location.replace(window.location.origin + '/?update=' + Date.now());
 };
 
 export const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({ latestVersion }) => {
-  const displayVersion = latestVersion || '1.0.5';
+  const displayVersion = latestVersion || '1.1.2';
+  const tauri = isTauriEnv();
 
   return (
     // Backdrop bloqueante — z-[9999] garantiza que esté sobre TODO el juego
@@ -106,9 +144,11 @@ export const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({ latestVersio
             ACTUALIZAR EL JUEGO AHORA
           </motion.button>
 
-          {/* Nota técnica */}
+          {/* Nota técnica — diferente según entorno */}
           <p className="text-center text-[9px] font-mono text-cyan-500/30 tracking-wider">
-            La aplicación limpiará la caché y recargará el nuevo bundle.
+            {tauri
+              ? 'El sistema descargará e instalará la nueva versión automáticamente.'
+              : 'La aplicación limpiará la caché y recargará el nuevo bundle.'}
           </p>
         </div>
 
@@ -118,4 +158,3 @@ export const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({ latestVersio
     </div>
   );
 };
-
