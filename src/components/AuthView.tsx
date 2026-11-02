@@ -126,6 +126,39 @@ export const AuthView: React.FC<AuthViewProps> = ({ initialScreen }) => {
     ? 'reset_password'
     : screen;
 
+  // ─── INYECCIÓN PKCE & AUTH LISTENER DE RECUPERACIÓN SUPABASE ───
+  useEffect(() => {
+    // 1. Si la URL contiene el código de intercambio PKCE de Supabase (?code=...)
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+        if (error) {
+          console.error("Error validando código PKCE:", error);
+        } else if (data?.session) {
+          setRecoverySession(data.session);
+          setScreen('reset_password');
+        }
+      });
+    }
+
+    // 2. Escuchar el evento oficial de recuperación de Supabase Auth
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log("Sesión de recuperación capturada correctamente.");
+        if (session) {
+          setRecoverySession(session);
+        }
+        setScreen('reset_password');
+        setIsSessionLoading(false);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [setScreen]);
+
   // 🔴 Efecto 1: Detección Temprana de Errores de Supabase en la URL
   useEffect(() => {
     if (typeof window === 'undefined') return;

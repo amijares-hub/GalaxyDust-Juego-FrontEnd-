@@ -415,12 +415,8 @@ export function useSasoriAuth(): UseSasoriAuthReturn {
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
-      const cleanEmail = email.trim();
-      const redirectUrl = typeof window !== 'undefined'
-        ? `${window.location.origin}/?recovery=true`
-        : '/?recovery=true';
-      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: redirectUrl,
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/`,
       });
       if (error) throw error;
       setState('idle');
