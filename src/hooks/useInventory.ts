@@ -209,18 +209,22 @@ export const useInventory = () => {
         const seedRel = ship.seed_ships;
         const seedFound = (seedShips || []).find((ss: any) => ss.id === ship.ship_id || ss.id === ship.seed_id || ss.id === ship.id_ship) || {};
         const seed = (seedRel && typeof seedRel === 'object' && Object.keys(seedRel).length > 0) ? seedRel : seedFound;
-        const shipName = seed.name || ship.seed_ships?.name || ship.name || ship.name_ship || ship.custom_name || `Nave #${ship.id}`;
+        // FIX: seed_ships usa "ship_name" como columna primaria, NO "name" (que es null en todos los rows)
+        const shipName = seed.ship_name || seed.name || ship.seed_ships?.ship_name || ship.seed_ships?.name || ship.name || ship.name_ship || ship.custom_name || `Nave #${ship.id}`;
         const realId = String(ship.id);
         const seedId = String(ship.id_ship || ship.ship_id || ship.seed_id || seed.id || '');
 
         combinedItems.push({
-          id: ship.id,
-          name: ship.seed_ships?.name || ship.name || shipName,
-          category: 'Spaceships',
-          seed_ships: ship.seed_ships || seed,
+          // ── spreads primero (seed luego ship), los campos explícitos de abajo los sobreescriben ──
           ...seed,
           ...ship,
+          // ── campos explícitos: tienen prioridad sobre los spreads ──
+          id: ship.id,
           seed_id: seedId,
+          category: 'Spaceships',
+          seed_ships: ship.seed_ships || seed,
+          // FIX: ship_name es la columna real en seed_ships; "name" es null
+          name: seed.ship_name || seed.name || ship.seed_ships?.ship_name || ship.seed_ships?.name || ship.name || shipName,
           fullname: shipName,
           type: 'Naves',
           rarity: seed.rarity || ship.rarity || 'COMMON',
@@ -235,6 +239,7 @@ export const useInventory = () => {
           unlocked: true,
           favorite: Boolean(ship.favorite),
           is_in_flight: checkIsInFlight(realId, seedId, shipName),
+          // FIX: image_url primero (URL completa de Supabase Storage); avatar_url suele ser ""
           avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || ship.image_url || ship.avatar_url),
           description: seed.description || ship.description || 'Sin especificaciones tácticas archivadas.',
           skills: seed.skills || ship.skills || [],

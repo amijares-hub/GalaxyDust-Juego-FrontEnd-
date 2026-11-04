@@ -37,7 +37,7 @@ const getShipStats = (char: any) => {
   const stats = char.tactical_stats || {};
 
   return {
-    name: raw.name || char.name || 'NAVE DESCONOCIDA',
+    name: raw.ship_name || raw.name || char.ship_name || char.name || 'NAVE DESCONOCIDA',
     description: raw.description || char.description || 'Sin especificaciones tácticas archivadas.',
     type: raw.type || char.type || 'Spaceships',
     company: raw.company || char.company || 'NOVA',
