@@ -184,7 +184,11 @@ export const useInventory = () => {
         safeQuery('seed_structures'),
         safeQuery('user_technologies', true),
         safeQuery('seed_technologies'),
-        safeQuery('user_badges_unlocked', true),
+        (async () => {
+          const fromBadges = await safeQuery('user_badges', true);
+          if (fromBadges && fromBadges.length > 0) return fromBadges;
+          return await safeQuery('user_badges_unlocked', true);
+        })(),
         safeQuery('seed_badges'),
         safeQuery('user_licenses', true),
         safeQuery('user_consumibles', true)
@@ -377,10 +381,17 @@ export const useInventory = () => {
 
       // Mapear Insignias (Badges)
       (userBadges || []).forEach((b: any) => {
-        const seed = (seedBadges || []).find((sb: any) => sb.id === b.badge_id || sb.id === b.seed_id) || {};
-        const badgeName = b.name || seed.name || b.badge_id || `Insignia #${b.id}`;
+        const badgeKey = b.badge_id || b.id_badge || b.seed_id || '';
+        const seed = (seedBadges || []).find((sb: any) => 
+          sb.id === badgeKey || 
+          sb.badge_id === badgeKey || 
+          String(sb.id) === String(b.badge_id) || 
+          String(sb.id) === String(b.id_badge) ||
+          String(sb.id_badge) === String(b.id_badge)
+        ) || {};
+        const badgeName = b.name || seed.name || seed.badge_name || seed.title || `Insignia #${b.id_badge || b.badge_id || b.id}`;
         const realId = String(b.id);
-        const seedId = String(b.badge_id || b.seed_id || seed.id || '');
+        const seedId = String(badgeKey || seed.id || '');
 
         combinedItems.push({
           id: realId,
@@ -390,15 +401,15 @@ export const useInventory = () => {
           category: 'Badges',
           type: 'Insignia',
           rarity: seed.rarity || 'RARE',
-          faction: seed.company || 'GD',
-          level: 1,
-          quantity: 1,
+          faction: seed.company || seed.collection || 'GD',
+          level: b.level || 1,
+          quantity: b.quantity || 1,
           unlocked: true,
           favorite: Boolean(b.favorite),
           is_in_flight: false,
-          avatar_url: resolveImageUrl(seed.image_url || b.image_url),
+          avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || b.image_url),
           description: seed.description || 'Insignia de honor y logro galáctico.',
-          power_score: seed.mining_bonus || 50
+          power_score: Number(seed.mining_bonus || seed.power_score || 50)
         });
       });
 
