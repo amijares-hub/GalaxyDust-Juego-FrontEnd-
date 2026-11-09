@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 export interface InventoryItem {
@@ -69,6 +69,19 @@ const resolveImageUrl = (rawUrl?: string): string => {
   return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/galaxy-assets/${clean.replace(/^\//, '')}`;
 };
 
+// Cache estático en memoria para las semillas maestras (evita re-descargar datos idénticos en cada navegación)
+let seedCache: {
+  ships?: any[];
+  tools?: any[];
+  astrobots?: any[];
+  structures?: any[];
+  technologies?: any[];
+  badges?: any[];
+  defenses?: any[];
+  blueprints?: any[];
+  consumables?: any[];
+} = {};
+
 export const useInventory = () => {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -83,26 +96,42 @@ export const useInventory = () => {
         setItems([]);
         return;
       }
-      
-      console.log("Cargando inventario para user:", user.id);
 
-      // 1. OBTENER EXPEDICIONES ACTIVAS EN VUELO
-      const { data: activeExpeditions } = await supabase
-        .from('active_expeditions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'LAUNCHED');
+      // Obtener el legacy_id del usuario para garantizar la compatibilidad dual (UUID y entero migrado)
+      let legacyId: number | null = null;
+      try {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('legacy_id')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (profile?.legacy_id) {
+          legacyId = Number(profile.legacy_id);
+        }
+      } catch (err) {
+        console.warn("No se pudo obtener legacy_id del perfil:", err);
+      }
 
-      // 2. OBTENER FLOTAS DEL USUARIO
-      const { data: userFleets } = await supabase
-        .from('fleets')
-        .select('*')
-        .eq('user_id', user.id);
+      // 1. OBTENER EXPEDICIONES ACTIVAS EN VUELO Y FLOTAS
+      const [expeditionsRes, fleetsRes] = await Promise.all([
+        supabase
+          .from('active_expeditions')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'LAUNCHED'),
+        supabase
+          .from('fleets')
+          .select('*')
+          .eq('user_id', user.id)
+      ]);
+
+      const activeExpeditions = expeditionsRes.data || [];
+      const userFleets = fleetsRes.data || [];
 
       const inFlightIds = new Set<string>();
       const inFlightNames = new Set<string>();
 
-      (activeExpeditions || []).forEach((exp: any) => {
+      activeExpeditions.forEach((exp: any) => {
         const deployed = exp.equipped_assets || exp.assets || exp.ships || [];
         if (Array.isArray(deployed)) {
           deployed.forEach((a: any) => {
@@ -131,12 +160,28 @@ export const useInventory = () => {
         }
       });
 
-      // Helper para consultas seguras
-      const safeQuery = async (tableName: string, filterUserId = false) => {
+      // Helper para consultas seguras con resolución dual de usuario (user_id UUID o id_user legacy)
+      const safeUserQuery = async (tableName: string) => {
         try {
-          let q = supabase.from(tableName).select('*');
-          if (filterUserId) q = q.eq('user_id', user.id);
-          const { data, error } = await q;
+          if (legacyId) {
+            const { data, error } = await supabase
+              .from(tableName)
+              .select('*')
+              .or(`user_id.eq.${user.id},id_user.eq.${legacyId}`);
+            if (!error && data) {
+              const seen = new Set();
+              return data.filter(item => {
+                if (seen.has(item.id)) return false;
+                seen.add(item.id);
+                return true;
+              });
+            }
+          }
+
+          const { data, error } = await supabase
+            .from(tableName)
+            .select('*')
+            .eq('user_id', user.id);
           if (error) return [];
           return data || [];
         } catch {
@@ -144,7 +189,22 @@ export const useInventory = () => {
         }
       };
 
-      // 3. CARGAR TODAS LAS TABLAS DE ACTIVOS DEL USUARIO (CONECTADO Y COMPLETO)
+      // Helper para semillas estáticas con memoria en caché
+      const fetchSeed = async (cacheKey: keyof typeof seedCache, tableName: string) => {
+        if (seedCache[cacheKey] && seedCache[cacheKey]!.length > 0) {
+          return seedCache[cacheKey]!;
+        }
+        try {
+          const { data } = await supabase.from(tableName).select('*');
+          if (data && data.length > 0) {
+            seedCache[cacheKey] = data;
+            return data;
+          }
+        } catch {}
+        return [];
+      };
+
+      // 2. CARGAR TODAS LAS TABLAS DE ACTIVOS RELACIONALES Y SEMILLAS EN PARALELO
       const [
         userShips,
         seedShips,
@@ -158,40 +218,72 @@ export const useInventory = () => {
         seedTech,
         userBadges,
         seedBadges,
+        userDefenses,
+        seedDefenses,
+        userBlueprints,
+        seedBlueprints,
         userLicenses,
-        userConsumables
+        userConsumables,
+        seedConsumables,
+        userRepairKits,
+        userQmps,
+        userMaterialicers,
+        userBags,
+        userTickets,
+        userPacks,
+        userEssentials
       ] = await Promise.all([
         (async () => {
           try {
-            const { data: shipsData, error: shipsErr } = await supabase
-              .from('user_ships')
-              .select('*, seed_ships(*)')
-              .eq('user_id', user.id);
-            if (!shipsErr && shipsData && shipsData.length > 0) {
-              return shipsData;
+            let q = supabase.from('user_ships').select('*, seed_ships(*)');
+            if (legacyId) {
+              q = q.or(`user_id.eq.${user.id},id_user.eq.${legacyId}`);
+            } else {
+              q = q.eq('user_id', user.id);
+            }
+            const { data, error } = await q;
+            if (!error && data && data.length > 0) {
+              const seen = new Set();
+              return data.filter(item => {
+                if (seen.has(item.id)) return false;
+                seen.add(item.id);
+                return true;
+              });
             }
           } catch (e) {
-            console.warn("Error en user_ships con relación seed_ships:", e);
+            console.warn("Fallo en user_ships con join seed_ships, reintentando consulta estándar:", e);
           }
-          return await safeQuery('user_ships', true);
+          return await safeUserQuery('user_ships');
         })(),
-        safeQuery('seed_ships'),
-        safeQuery('user_tools', true),
-        safeQuery('seed_tools'),
-        safeQuery('user_astrobots', true),
-        safeQuery('seed_astrobots'),
-        safeQuery('user_structures', true),
-        safeQuery('seed_structures'),
-        safeQuery('user_technologies', true),
-        safeQuery('seed_technologies'),
+        fetchSeed('ships', 'seed_ships'),
+        safeUserQuery('user_tools'),
+        fetchSeed('tools', 'seed_tools'),
+        safeUserQuery('user_astrobots'),
+        fetchSeed('astrobots', 'seed_astrobots'),
+        safeUserQuery('user_structures'),
+        fetchSeed('structures', 'seed_structures'),
+        safeUserQuery('user_technologies'),
+        fetchSeed('technologies', 'seed_technologies'),
         (async () => {
-          const fromBadges = await safeQuery('user_badges', true);
-          if (fromBadges && fromBadges.length > 0) return fromBadges;
-          return await safeQuery('user_badges_unlocked', true);
+          const badges = await safeUserQuery('user_badges');
+          if (badges && badges.length > 0) return badges;
+          return await safeUserQuery('user_badges_unlocked');
         })(),
-        safeQuery('seed_badges'),
-        safeQuery('user_licenses', true),
-        safeQuery('user_consumibles', true)
+        fetchSeed('badges', 'seed_badges'),
+        safeUserQuery('user_defenses'),
+        fetchSeed('defenses', 'seed_defenses'),
+        safeUserQuery('user_blueprints'),
+        fetchSeed('blueprints', 'seed_blueprints'),
+        safeUserQuery('user_licenses'),
+        safeUserQuery('user_consumibles'),
+        fetchSeed('consumables', 'seed_consumables'),
+        safeUserQuery('user_repair_kits'),
+        safeUserQuery('user_qmps'),
+        safeUserQuery('user_materialicers'),
+        safeUserQuery('user_bags'),
+        safeUserQuery('user_tickets'),
+        safeUserQuery('user_packs'),
+        safeUserQuery('user_essentials')
       ]);
 
       const combinedItems: InventoryItem[] = [];
@@ -208,30 +300,31 @@ export const useInventory = () => {
         );
       };
 
-      // Mapear Naves con seed_ships completo
+      // ── MAPEO DE NAVES (SPACESHIPS) ──
       (userShips || []).forEach((ship: any) => {
         const seedRel = ship.seed_ships;
-        const seedFound = (seedShips || []).find((ss: any) => ss.id === ship.ship_id || ss.id === ship.seed_id || ss.id === ship.id_ship) || {};
+        const seedFound = (seedShips || []).find((ss: any) => 
+          ss.id === ship.ship_id || 
+          ss.id === ship.seed_id || 
+          ss.id === ship.id_ship ||
+          ss.ship_id === ship.ship_id
+        ) || {};
         const seed = (seedRel && typeof seedRel === 'object' && Object.keys(seedRel).length > 0) ? seedRel : seedFound;
-        // FIX: seed_ships usa "ship_name" como columna primaria, NO "name" (que es null en todos los rows)
-        const shipName = seed.ship_name || seed.name || ship.seed_ships?.ship_name || ship.seed_ships?.name || ship.name || ship.name_ship || ship.custom_name || `Nave #${ship.id}`;
+        const shipName = seed.ship_name || seed.name || ship.seed_ships?.ship_name || ship.seed_ships?.name || ship.name_ship || ship.name || ship.custom_name || `Nave #${ship.id}`;
         const realId = String(ship.id);
         const seedId = String(ship.id_ship || ship.ship_id || ship.seed_id || seed.id || '');
 
         combinedItems.push({
-          // ── spreads primero (seed luego ship), los campos explícitos de abajo los sobreescriben ──
           ...seed,
           ...ship,
-          // ── campos explícitos: tienen prioridad sobre los spreads ──
-          id: ship.id,
+          id: realId,
           seed_id: seedId,
           category: 'Spaceships',
           seed_ships: ship.seed_ships || seed,
-          // FIX: ship_name es la columna real en seed_ships; "name" es null
-          name: seed.ship_name || seed.name || ship.seed_ships?.ship_name || ship.seed_ships?.name || ship.name || shipName,
+          name: shipName,
           fullname: shipName,
           type: 'Naves',
-          rarity: seed.rarity || ship.rarity || 'COMMON',
+          rarity: (seed.rarity || ship.rarity || 'COMMON').toUpperCase(),
           faction: seed.company || seed.faction || ship.company || ship.faction || 'NOVA',
           company: seed.company || ship.company || 'NOVA',
           collection: seed.collection || ship.collection || 'ESTÁNDAR',
@@ -243,7 +336,6 @@ export const useInventory = () => {
           unlocked: true,
           favorite: Boolean(ship.favorite),
           is_in_flight: checkIsInFlight(realId, seedId, shipName),
-          // FIX: image_url primero (URL completa de Supabase Storage); avatar_url suele ser ""
           avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || ship.image_url || ship.avatar_url),
           description: seed.description || ship.description || 'Sin especificaciones tácticas archivadas.',
           skills: seed.skills || ship.skills || [],
@@ -272,36 +364,108 @@ export const useInventory = () => {
         });
       });
 
-      // Mapear Herramientas
-      (userTools || []).forEach((t: any) => {
-        const seed = (seedTools || []).find((st: any) => st.id === t.tool_id || st.id === t.seed_id || st.tool_id === t.tool_id) || {};
-        const toolName = t.name || seed.name || seed.tool_name || seed.title || seed.id || `Tool #${t.id}`;
-        const realId = String(t.id);
-        const seedId = String(t.tool_id || t.seed_id || seed.id || '');
+      // ── MAPEO DE ESTRUCTURAS (STRUCTURES) ──
+      (userStructures || []).forEach((st: any) => {
+        const seed = (seedStructures || []).find((ss: any) => 
+          ss.id === st.structure_id || 
+          ss.id === st.seed_id || 
+          ss.id === st.id_structure ||
+          ss.building_id === st.building_id
+        ) || {};
+        const structName = st.name || seed.structure_name || seed.name || seed.title || `Estructura #${st.id}`;
+        const realId = String(st.id);
+        const seedId = String(st.structure_id || st.seed_id || seed.id || '');
 
         combinedItems.push({
           id: realId,
           seed_id: seedId,
-          name: toolName,
-          fullname: toolName,
-          category: 'Tools',
-          type: 'Herramientas',
-          rarity: seed.rarity || 'COMMON',
-          faction: seed.faction || 'GD',
-          level: t.level || 1,
-          quantity: t.quantity || 1,
+          name: structName,
+          fullname: structName,
+          category: 'Structures',
+          type: 'Estructuras',
+          rarity: (seed.rarity || 'COMMON').toUpperCase(),
+          faction: seed.company || seed.faction || 'GD',
+          level: st.current_level || st.lvl || st.level || 1,
+          quantity: st.quantity || 1,
           unlocked: true,
-          favorite: Boolean(t.favorite),
-          is_in_flight: checkIsInFlight(realId, seedId, toolName),
-          avatar_url: resolveImageUrl(seed.image_url || t.image_url),
-          description: seed.description || 'Herramienta de extracción de recursos.',
-          skills: seed.skills || []
+          favorite: Boolean(st.favorite),
+          is_in_flight: false,
+          avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || st.image_url),
+          description: seed.description || 'Infraestructura de defensa y desarrollo planetario.',
+          power_score: seed.power_score_base || 100
         });
       });
 
-      // Mapear Astrobots
+      // ── MAPEO DE DEFENSAS (DEFENSES) ──
+      (userDefenses || []).forEach((d: any) => {
+        const seed = (seedDefenses || []).find((sd: any) => 
+          sd.id === d.defense_id || 
+          sd.id === d.id_defense || 
+          sd.defense_id === d.defense_id
+        ) || {};
+        const defName = d.name || d.name_defense || seed.defense_name || seed.name || `Defensa #${d.id}`;
+        const realId = String(d.id);
+        const seedId = String(d.defense_id || d.id_defense || seed.id || '');
+
+        combinedItems.push({
+          id: realId,
+          seed_id: seedId,
+          name: defName,
+          fullname: defName,
+          category: 'Defense',
+          type: 'Defensas',
+          rarity: (seed.rarity || 'COMMON').toUpperCase(),
+          faction: seed.faction || 'GD',
+          level: d.level || 1,
+          quantity: d.quantity || 1,
+          unlocked: true,
+          favorite: Boolean(d.favorite),
+          is_in_flight: false,
+          avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || d.image_url),
+          description: seed.description || 'Sistema de defensa táctica orbital.',
+          power_score: seed.power_score_base || 50
+        });
+      });
+
+      // ── MAPEO DE TECNOLOGÍAS (TECHNOLOGY) ──
+      (userTech || []).forEach((tc: any) => {
+        const seed = (seedTech || []).find((st: any) => 
+          st.id === tc.technology_id || 
+          st.id === tc.seed_id || 
+          st.id === tc.id_technology ||
+          st.technology_id === tc.technology_id
+        ) || {};
+        const techName = tc.name || seed.technology_name || seed.name || seed.title || `Tecnología #${tc.id}`;
+        const realId = String(tc.id);
+        const seedId = String(tc.technology_id || tc.seed_id || seed.id || '');
+
+        combinedItems.push({
+          id: realId,
+          seed_id: seedId,
+          name: techName,
+          fullname: techName,
+          category: 'Tecnology',
+          type: 'Tecnología',
+          rarity: (seed.rarity || 'COMMON').toUpperCase(),
+          faction: seed.company || seed.faction || 'GD',
+          level: tc.current_level || tc.lvl || tc.level || 1,
+          quantity: tc.quantity || 1,
+          unlocked: true,
+          favorite: Boolean(tc.favorite),
+          is_in_flight: false,
+          avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || tc.image_url),
+          description: seed.description || 'Avance científico y militar para la flota.',
+          power_score: seed.power_score_base || 100
+        });
+      });
+
+      // ── MAPEO DE ASTROBOTS (ASTROBOTS) ──
       (userAstrobots || []).forEach((a: any) => {
-        const seed = (seedAstrobots || []).find((sa: any) => sa.id === a.astrobot_id || sa.id === a.seed_id) || {};
+        const seed = (seedAstrobots || []).find((sa: any) => 
+          sa.id === a.astrobot_id || 
+          sa.id === a.seed_id || 
+          sa.astrobot_id === a.astrobot_id
+        ) || {};
         const botName = a.name || seed.name || seed.astrobot_name || `Astrobot #${a.id}`;
         const realId = String(a.id);
         const seedId = String(a.astrobot_id || a.seed_id || seed.id || '');
@@ -313,7 +477,7 @@ export const useInventory = () => {
           fullname: botName,
           category: 'Astrobots',
           type: 'Astrobots',
-          rarity: seed.rarity || 'COMMON',
+          rarity: (seed.rarity || 'COMMON').toUpperCase(),
           faction: seed.company || seed.faction || 'GD',
           level: a.level || 1,
           quantity: a.quantity || 1,
@@ -325,61 +489,69 @@ export const useInventory = () => {
         });
       });
 
-      // Mapear Estructuras
-      (userStructures || []).forEach((st: any) => {
-        const seed = (seedStructures || []).find((ss: any) => ss.id === st.structure_id || ss.id === st.seed_id) || {};
-        const structName = st.name || seed.structure_name || seed.name || seed.title || st.structure_id || `Estructura #${st.id}`;
-        const realId = String(st.id);
-        const seedId = String(st.structure_id || st.seed_id || seed.id || '');
+      // ── MAPEO DE HERRAMIENTAS (TOOLS) ──
+      (userTools || []).forEach((t: any) => {
+        const seed = (seedTools || []).find((st: any) => 
+          st.id === t.tool_id || 
+          st.id === t.seed_id || 
+          st.tool_id === t.tool_id
+        ) || {};
+        const toolName = t.name || seed.name || seed.tool_name || seed.title || `Herramienta #${t.id}`;
+        const realId = String(t.id);
+        const seedId = String(t.tool_id || t.seed_id || seed.id || '');
 
         combinedItems.push({
           id: realId,
           seed_id: seedId,
-          name: structName,
-          fullname: structName,
-          category: 'Structures',
-          type: 'Estructuras',
-          rarity: seed.rarity || 'COMMON',
-          faction: seed.company || seed.faction || 'GD',
-          level: st.current_level || st.level || 1,
-          quantity: st.quantity || 1,
+          name: toolName,
+          fullname: toolName,
+          category: 'Tools',
+          type: 'Herramientas',
+          rarity: (seed.rarity || 'COMMON').toUpperCase(),
+          faction: seed.faction || 'GD',
+          level: t.level || 1,
+          quantity: t.quantity || 1,
           unlocked: true,
-          favorite: Boolean(st.favorite),
-          is_in_flight: false,
-          avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || st.image_url),
-          description: seed.description || 'Infraestructura de defensa y desarrollo planetario.',
-          power_score: seed.power_score_base || 100
+          favorite: Boolean(t.favorite),
+          is_in_flight: checkIsInFlight(realId, seedId, toolName),
+          avatar_url: resolveImageUrl(seed.image_url || t.image_url),
+          description: seed.description || 'Herramienta de extracción y mantenimiento.',
+          skills: seed.skills || []
         });
       });
 
-      // Mapear Tecnologías
-      (userTech || []).forEach((tc: any) => {
-        const seed = (seedTech || []).find((st: any) => st.id === tc.technology_id || st.id === tc.seed_id) || {};
-        const techName = tc.name || seed.technology_name || seed.name || seed.title || tc.technology_id || `Tecnología #${tc.id}`;
-        const realId = String(tc.id);
-        const seedId = String(tc.technology_id || tc.seed_id || seed.id || '');
+      // ── MAPEO DE PLANOS (BLUEPRINTS) ──
+      (userBlueprints || []).forEach((bp: any) => {
+        const seed = (seedBlueprints || []).find((sb: any) => 
+          sb.id === bp.blueprint_id || 
+          sb.id === bp.id_blueprint || 
+          sb.blueprint_id === bp.blueprint_id
+        ) || {};
+        const bpName = bp.name || seed.blueprint_name || seed.name || `Plano #${bp.id}`;
+        const realId = String(bp.id);
+        const seedId = String(bp.blueprint_id || bp.id_blueprint || seed.id || '');
 
         combinedItems.push({
           id: realId,
           seed_id: seedId,
-          name: techName,
-          fullname: techName,
-          category: 'Technologies',
-          type: 'Tecnología',
-          rarity: seed.rarity || 'COMMON',
-          faction: seed.company || seed.faction || 'GD',
-          level: tc.level || 1,
-          quantity: tc.quantity || 1,
+          name: bpName,
+          fullname: bpName,
+          category: 'Blueprints',
+          type: 'Planos',
+          rarity: (seed.rarity || bp.rarity || 'RARE').toUpperCase(),
+          faction: 'GD',
+          level: 1,
+          quantity: bp.uses || bp.quantity || 1,
           unlocked: true,
-          favorite: Boolean(tc.favorite),
+          favorite: Boolean(bp.favorite),
           is_in_flight: false,
-          avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || tc.image_url),
-          description: seed.description || 'Avance científico y militar para la flota.',
-          power_score: seed.power_score_base || 100
+          avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || bp.image_url),
+          description: seed.description || 'Esquema de construcción de alta precisión.',
+          power_score: 50
         });
       });
 
-      // Mapear Insignias (Badges)
+      // ── MAPEO DE INSIGNIAS (BADGES) ──
       (userBadges || []).forEach((b: any) => {
         const badgeKey = b.badge_id || b.id_badge || b.seed_id || '';
         const seed = (seedBadges || []).find((sb: any) => 
@@ -400,7 +572,7 @@ export const useInventory = () => {
           fullname: badgeName,
           category: 'Badges',
           type: 'Insignia',
-          rarity: seed.rarity || 'RARE',
+          rarity: (seed.rarity || 'RARE').toUpperCase(),
           faction: seed.company || seed.collection || 'GD',
           level: b.level || 1,
           quantity: b.quantity || 1,
@@ -408,12 +580,12 @@ export const useInventory = () => {
           favorite: Boolean(b.favorite),
           is_in_flight: false,
           avatar_url: resolveImageUrl(seed.image_url || seed.avatar_url || b.image_url),
-          description: seed.description || 'Insignia de honor y logro galáctico.',
+          description: seed.description || 'Insignia de honor y distinción militar.',
           power_score: Number(seed.mining_bonus || seed.power_score || 50)
         });
       });
 
-      // Mapear Licencias
+      // ── MAPEO DE LICENCIAS (LICENCIA) ──
       (userLicenses || []).forEach((l: any) => {
         const seed = l.seed_licenses || {};
         const licName = l.name || seed.name || `Licencia #${l.id}`;
@@ -427,7 +599,7 @@ export const useInventory = () => {
           fullname: licName,
           category: 'Licencia',
           type: 'Licencia',
-          rarity: seed.rarity || 'COMMON',
+          rarity: (seed.rarity || 'COMMON').toUpperCase(),
           faction: 'GD',
           level: 1,
           quantity: l.quantity || 1,
@@ -439,7 +611,7 @@ export const useInventory = () => {
         });
       });
 
-      // Mapear Consumibles
+      // ── MAPEO DE CONSUMIBLES GENÉRICOS (CONSUMIBLES) ──
       (userConsumables || []).forEach((co: any) => {
         const seed = co.seed_consumables || {};
         const consName = co.name || seed.name || `Consumible #${co.id}`;
@@ -453,7 +625,7 @@ export const useInventory = () => {
           fullname: consName,
           category: 'Consumibles',
           type: 'Consumibles',
-          rarity: seed.rarity || 'COMMON',
+          rarity: (seed.rarity || 'COMMON').toUpperCase(),
           faction: 'GD',
           level: 1,
           quantity: co.quantity || co.amount || 1,
@@ -465,9 +637,161 @@ export const useInventory = () => {
         });
       });
 
+      // ── MAPEO DE KITS DE REPARACIÓN (CONSUMIBLES) ──
+      (userRepairKits || []).forEach((rk: any) => {
+        const kitTier = rk.id_kit || 1;
+        const kitName = `Kit de Reparación T${kitTier}`;
+        const realId = `kit_${rk.id || `${rk.id_user}_${kitTier}`}`;
+
+        combinedItems.push({
+          id: realId,
+          name: kitName,
+          fullname: kitName,
+          category: 'Consumibles',
+          type: 'Kits Reparación',
+          rarity: kitTier === 3 ? 'EPIC' : kitTier === 2 ? 'RARE' : 'COMMON',
+          faction: 'GD',
+          level: kitTier,
+          quantity: rk.quantity || 1,
+          unlocked: true,
+          favorite: Boolean(rk.favorite),
+          is_in_flight: false,
+          avatar_url: resolveImageUrl(`Assets/Consumibles/kit_t${kitTier}.webp`),
+          description: `Restaura la integridad estructural de las naves dañadas (Tier ${kitTier}).`
+        });
+      });
+
+      // ── MAPEO DE MÓDULOS QMP (CONSUMIBLES) ──
+      (userQmps || []).forEach((qmp: any) => {
+        const qmpName = `Módulo QMP #${qmp.id_qmp || qmp.id}`;
+        const realId = `qmp_${qmp.id}`;
+
+        combinedItems.push({
+          id: realId,
+          name: qmpName,
+          fullname: qmpName,
+          category: 'Consumibles',
+          type: 'QMPs',
+          rarity: 'UNCOMMON',
+          faction: 'GD',
+          level: 1,
+          quantity: qmp.uses || 1,
+          unlocked: true,
+          favorite: Boolean(qmp.favorite),
+          is_in_flight: false,
+          avatar_url: resolveImageUrl('Assets/Consumibles/qmp.webp'),
+          description: 'Módulo de propulsión cuántica para saltos hiperespaciales.'
+        });
+      });
+
+      // ── MAPEO DE MATERIALIZADORES (CONSUMIBLES) ──
+      (userMaterialicers || []).forEach((mat: any) => {
+        const matName = `Materializador #${mat.id_materialicer || mat.id}`;
+        const realId = `mat_${mat.id}`;
+
+        combinedItems.push({
+          id: realId,
+          name: matName,
+          fullname: matName,
+          category: 'Consumibles',
+          type: 'Materializadores',
+          rarity: 'RARE',
+          faction: 'GD',
+          level: 1,
+          quantity: mat.uses || 1,
+          unlocked: true,
+          favorite: Boolean(mat.favorite),
+          is_in_flight: false,
+          avatar_url: resolveImageUrl('Assets/Consumibles/materialicer.webp'),
+          description: 'Dispositivo cuántico para síntesis y condensación de materia prima.'
+        });
+      });
+
+      // ── MAPEO DE BOLSAS, TICKETS, PACKS Y ESENCIALES ──
+      (userBags || []).forEach((bag: any) => {
+        const bagName = `Bolsa de Recursos #${bag.id_bag || bag.id}`;
+        combinedItems.push({
+          id: `bag_${bag.id}`,
+          name: bagName,
+          fullname: bagName,
+          category: 'Consumibles',
+          type: 'Bolsas',
+          rarity: 'COMMON',
+          faction: 'GD',
+          level: 1,
+          quantity: 1,
+          unlocked: true,
+          favorite: false,
+          is_in_flight: false,
+          avatar_url: resolveImageUrl('Assets/Consumibles/bag.webp'),
+          description: 'Contenedor hermético de materias primas recolectadas.'
+        });
+      });
+
+      (userTickets || []).forEach((tk: any) => {
+        const tkName = `Ticket de Acceso #${tk.id_ticket || tk.id}`;
+        combinedItems.push({
+          id: `tk_${tk.id}`,
+          name: tkName,
+          fullname: tkName,
+          category: 'Consumibles',
+          type: 'Tickets',
+          rarity: 'RARE',
+          faction: 'GD',
+          level: 1,
+          quantity: 1,
+          unlocked: true,
+          favorite: false,
+          is_in_flight: false,
+          avatar_url: resolveImageUrl('Assets/Consumibles/ticket.webp'),
+          description: 'Credencial de ingreso prioritario a eventos y bovedas.'
+        });
+      });
+
+      (userPacks || []).forEach((pk: any) => {
+        const pkName = `Pack Reclamable #${pk.id_pack || pk.id}`;
+        combinedItems.push({
+          id: `pack_${pk.id}`,
+          name: pkName,
+          fullname: pkName,
+          category: 'Consumibles',
+          type: 'Packs',
+          rarity: 'EPIC',
+          faction: 'GD',
+          level: 1,
+          quantity: 1,
+          unlocked: true,
+          favorite: false,
+          is_in_flight: false,
+          avatar_url: resolveImageUrl('Assets/Consumibles/pack.webp'),
+          description: 'Paquete de suministros estratégicos de la corporación.'
+        });
+      });
+
+      (userEssentials || []).forEach((es: any) => {
+        const esName = `Ítem Esencial #${es.id_essential || es.id}`;
+        combinedItems.push({
+          id: `ess_${es.id}`,
+          name: esName,
+          fullname: esName,
+          category: 'Consumibles',
+          type: 'Esenciales',
+          rarity: 'LEGENDARY',
+          faction: 'GD',
+          level: 1,
+          quantity: 1,
+          unlocked: true,
+          favorite: false,
+          is_in_flight: false,
+          avatar_url: resolveImageUrl('Assets/Consumibles/essential.webp'),
+          description: 'Componente vital para el funcionamiento del núcleo galáctico.'
+        });
+      });
+
       setItems(combinedItems);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error al construir inventario unificado:", err);
+      setError(err?.message || 'Error al conectar con la estación de inventario.');
     } finally {
       setLoading(false);
     }
@@ -475,7 +799,6 @@ export const useInventory = () => {
 
   const toggleFavorite = async (itemId: string) => {
     setItems(prev => prev.map(item => item.id === itemId ? { ...item, favorite: !item.favorite } : item));
-    return () => {};
   };
 
   useEffect(() => {
@@ -484,3 +807,5 @@ export const useInventory = () => {
 
   return { items, loading, error, refreshInventory: fetchInventory, toggleFavorite };
 };
+
+export default useInventory;

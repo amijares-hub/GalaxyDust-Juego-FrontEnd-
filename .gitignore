@@ -7,8 +7,14 @@ coverage/
 .env*
 !.env.example
 
-# 🔐 Claves criptográficas — NUNCA subir a Git
+# 🔐 Claves criptográficas y credenciales — NUNCA subir a Git
 keys/
 *.key
 *.keystore
 *.jks
+
+# 📊 Backups masivos y archivos de migración local
+*.csv
+*.tsv
+*.xlsx
+scripts/temp/

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
+  ChevronRight,
   Lock,
   Search,
   ChevronDown,
@@ -17,6 +18,8 @@ import { useInventory, type InventoryItem } from "../hooks/useInventory";
 import { useAudioEngine } from "../hooks/useAudioEngine";
 
 export type { InventoryItem } from "../hooks/useInventory";
+
+const ITEMS_PER_PAGE = 30;
 
 const resolveImageUrl = (rawUrl?: string): string => {
   if (!rawUrl || typeof rawUrl !== 'string' || rawUrl.trim() === '') {
@@ -227,6 +230,7 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, isSelected, onClick
             asset.unlocked === false ? "grayscale opacity-50 brightness-50" : ""
           }`}
           loading="lazy"
+          decoding="async"
           onError={(e) => {
             const target = e.target as HTMLImageElement;
             target.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
@@ -310,6 +314,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [showSkillsPopup, setShowSkillsPopup] = useState(false);
   const [fleets, setFleets] = useState<any[]>([]);
 
+  // Paginación táctica del almacén
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
   useEffect(() => {
     if (!selectedChar) {
       setShowSubModal(null);
@@ -375,6 +382,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
     return list;
   }, [characters, activeSidebarCategory, filterDropdown1, filterDropdown2, searchQuery, modsEnabled]);
+
+  // Reset de página al cambiar filtros o categorías
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeSidebarCategory, filterDropdown1, filterDropdown2, searchQuery, modsEnabled]);
+
+  const totalPages = Math.ceil(getFilteredCharacters.length / ITEMS_PER_PAGE) || 1;
+  const paginatedCharacters = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return getFilteredCharacters.slice(start, start + ITEMS_PER_PAGE);
+  }, [getFilteredCharacters, currentPage]);
 
   const handleToggleFavorite = (char: InventoryItem, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -453,9 +471,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       </div>
 
-      {/* ── 2. COLUMNA DERECHA: GRILLA DE ACTIVOS ── */}
+      {/* ── 2. COLUMNA DERECHA: GRILLA DE ACTIVOS Y PAGINACIÓN ── */}
       <div className="col-span-9 hud-panel hud-corners flex flex-col h-full min-h-0 p-2 overflow-hidden bg-[#05080c]/80 border border-cyan-500/30 rounded-xl shadow-xl">
         
+        {/* Cabecera y Filtros */}
         <div className="flex items-center justify-between gap-1.5 sm:gap-2 mb-2 pb-1.5 border-b border-cyan-500/20 text-xs shrink-0 flex-wrap sm:flex-nowrap">
           <div className="flex items-center gap-1.5">
             <div className="relative">
@@ -534,46 +553,77 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <FleetManager characters={characters as any} triggerNotification={triggerNotification} />
           </div>
         ) : (
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1.5 p-1.5 grid grid-cols-5 gap-2 sm:gap-2.5 content-start no-scrollbar">
-            {isLoading ? (
-              <div className="col-span-5 flex flex-col items-center justify-center h-full gap-2 text-cyan-500 py-12">
-                <div className="w-7 h-7 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
-                <span className="text-[9px] font-mono tracking-widest uppercase animate-pulse">{t('inventory.loading', 'CARGANDO ALMACÉN...')}</span>
+          <div className="flex-1 min-h-0 flex flex-col justify-between">
+            {/* Grilla con scroll independiente */}
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1.5 p-1.5 grid grid-cols-5 gap-2 sm:gap-2.5 content-start no-scrollbar">
+              {isLoading ? (
+                <div className="col-span-5 flex flex-col items-center justify-center h-full gap-2 text-cyan-500 py-12">
+                  <div className="w-7 h-7 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-[9px] font-mono tracking-widest uppercase animate-pulse">{t('inventory.loading', 'CARGANDO ALMACÉN...')}</span>
+                </div>
+              ) : paginatedCharacters.length === 0 ? (
+                <div className="col-span-5 flex items-center justify-center h-full text-zinc-500 text-[9px] font-mono uppercase tracking-widest py-12">
+                  {loadError ? (
+                    <span className="text-red-500 font-bold">{loadError}</span>
+                  ) : (
+                    modsEnabled ? t('inventory.empty_no_flight', 'NO HAY FLOTAS EN VUELO') : t('inventory.empty_no_assets', 'SIN ACTIVOS EN ESTA CATEGORÍA')
+                  )}
+                </div>
+              ) : (
+                paginatedCharacters.map((char, idx) => {
+                  const uniqueKey = `${char.category || 'asset'}-${char.id}-${idx}`;
+                  const isSelected = selectedChar?.id === char.id;
+                  const power = (char as any).power || char.power_score || (char as any).combat_power || (char as any).galactic_power || undefined;
+                  return (
+                    <AssetCard
+                      key={uniqueKey}
+                      isSelected={isSelected}
+                      onClick={() => { playSfx(char.sound); setSelectedChar(char); }}
+                      asset={{
+                        id: char.id,
+                        name: char.name,
+                        image: resolveImageUrl(char.avatar_url || (char as any).image_url),
+                        rarity: (char.rarity?.toUpperCase() || 'COMMON') as any,
+                        quantity: char.quantity || 1,
+                        category: getItemCategory(char),
+                        power,
+                        isInFlight: char.is_in_flight,
+                        unlocked: char.unlocked,
+                        level: char.level,
+                        favorite: char.favorite,
+                      }}
+                    />
+                  );
+                })
+              )}
+            </div>
+
+            {/* Barra de Paginación Táctica Anclada al Fondo */}
+            {totalPages > 1 && (
+              <div className="shrink-0 flex items-center justify-between pt-2 pb-1 border-t border-cyan-500/20 text-[9px] sm:text-[10px] text-cyan-400 font-mono">
+                <span>
+                  {t('inventory.showing', 'MOSTRANDO')} {(currentPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, getFilteredCharacters.length)} / {getFilteredCharacters.length}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); playSfx("laser_success"); }}
+                    className="px-2.5 py-1 bg-black/60 hover:bg-cyan-950/60 disabled:opacity-30 disabled:hover:bg-black/60 border border-cyan-500/40 rounded flex items-center gap-1 text-cyan-300 transition-colors cursor-pointer"
+                  >
+                    <ChevronLeft className="w-3 h-3" /> {t('inventory.prev', 'ANT')}
+                  </button>
+                  <span className="font-bold text-white px-1">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    disabled={currentPage >= totalPages}
+                    onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); playSfx("laser_success"); }}
+                    className="px-2.5 py-1 bg-black/60 hover:bg-cyan-950/60 disabled:opacity-30 disabled:hover:bg-black/60 border border-cyan-500/40 rounded flex items-center gap-1 text-cyan-300 transition-colors cursor-pointer"
+                  >
+                    {t('inventory.next', 'SIG')} <ChevronRight className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
-            ) : getFilteredCharacters.length === 0 ? (
-              <div className="col-span-5 flex items-center justify-center h-full text-zinc-500 text-[9px] font-mono uppercase tracking-widest py-12">
-                {loadError ? (
-                  <span className="text-red-500 font-bold">{loadError}</span>
-                ) : (
-                  modsEnabled ? t('inventory.empty_no_flight', 'NO HAY FLOTAS EN VUELO') : t('inventory.empty_no_assets', 'SIN ACTIVOS EN ESTA CATEGORÍA')
-                )}
-              </div>
-            ) : (
-              getFilteredCharacters.map((char, idx) => {
-                const uniqueKey = `${char.category || 'asset'}-${char.id}-${idx}`;
-                const isSelected = selectedChar?.id === char.id;
-                const power = (char as any).power || char.power_score || (char as any).combat_power || (char as any).galactic_power || undefined;
-                return (
-                  <AssetCard
-                    key={uniqueKey}
-                    isSelected={isSelected}
-                    onClick={() => { playSfx(char.sound); setSelectedChar(char); }}
-                    asset={{
-                      id: char.id,
-                      name: char.name,
-                      image: resolveImageUrl(char.avatar_url || (char as any).image_url),
-                      rarity: (char.rarity?.toUpperCase() || 'COMMON') as any,
-                      quantity: char.quantity || 1,
-                      category: getItemCategory(char),
-                      power,
-                      isInFlight: char.is_in_flight,
-                      unlocked: char.unlocked,
-                      level: char.level,
-                      favorite: char.favorite,
-                    }}
-                  />
-                );
-              })
             )}
           </div>
         )}
@@ -646,6 +696,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                               src={resolveImageUrl(selectedChar.avatar_url || (selectedChar as any).image_url)} 
                               alt={ship.name} 
                               className="max-h-full max-w-full object-contain filter drop-shadow-[0_4px_12px_rgba(6,182,212,0.4)]"
+                              loading="lazy"
+                              decoding="async"
                               onError={(e) => {
                                 const target = e.target as HTMLImageElement;
                                 target.onerror = null;
@@ -769,6 +821,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           src={resolveImageUrl(selectedChar.avatar_url || (selectedChar as any).image_url)} 
                           alt={selectedChar.name} 
                           className="w-full h-full object-cover" 
+                          loading="lazy"
+                          decoding="async"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.onerror = null;
