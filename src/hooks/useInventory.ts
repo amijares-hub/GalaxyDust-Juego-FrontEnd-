@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 
 export interface InventoryItem {
   id: string;
+  stacked_ids?: string[];
   seed_id?: string;
   name: string;
   fullname?: string;
@@ -55,21 +56,96 @@ export interface InventoryItem {
   gravitonAttack?: number;
 }
 
-const resolveImageUrl = (rawUrl?: string): string => {
+export const CDN_BASE_URL = 'https://pub-1bd09e3b60064904964a8775a482dc6d.r2.dev';
+
+export const FALLBACK_HOLOGRAM_SVG =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+      <rect width="200" height="200" rx="16" fill="#050b14"/>
+      <circle cx="100" cy="100" r="62" stroke="#06b6d4" stroke-opacity="0.25" stroke-width="1.5" stroke-dasharray="6 4"/>
+      <circle cx="100" cy="100" r="38" stroke="#22d3ee" stroke-opacity="0.4" stroke-width="1.5"/>
+      <polygon points="100,48 134,122 100,108 66,122" fill="#06b6d4" fill-opacity="0.2" stroke="#22d3ee" stroke-width="2"/>
+      <line x1="100" y1="36" x2="100" y2="164" stroke="#06b6d4" stroke-opacity="0.18" stroke-width="1"/>
+      <line x1="36" y1="100" x2="164" y2="100" stroke="#06b6d4" stroke-opacity="0.18" stroke-width="1"/>
+    </svg>`
+  );
+
+export const resolveImageUrl = (rawUrl?: string): string => {
   if (!rawUrl || typeof rawUrl !== 'string' || rawUrl.trim() === '') {
-    return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
+    return FALLBACK_HOLOGRAM_SVG;
   }
-  const clean = rawUrl.trim();
-  if (clean.startsWith('http://') || clean.startsWith('https://')) return clean;
+  let clean = rawUrl.trim();
 
-  if (clean.startsWith('Assets') || clean.startsWith('Monedas') || clean.includes('Assets%20para')) {
-    return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/${clean.replace(/^\//, '')}`;
+  if (clean.startsWith('data:')) return clean;
+
+  // Redirigir cualquier URL antigua de Supabase (object o render) hacia Cloudflare R2
+  if (clean.includes('qldjeysusithpblfrmtq.supabase.co')) {
+    clean = clean
+      .replace(
+        /https:\/\/qldjeysusithpblfrmtq\.supabase\.co\/storage\/v1\/render\/image\/public\/(galaxy-assets\/)?/,
+        `${CDN_BASE_URL}/`
+      )
+      .replace(
+        /https:\/\/qldjeysusithpblfrmtq\.supabase\.co\/storage\/v1\/object\/public\/(galaxy-assets\/)?/,
+        `${CDN_BASE_URL}/`
+      )
+      .replace(/\?width=.*$/, '');
+    return clean;
   }
 
-  return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/galaxy-assets/${clean.replace(/^\//, '')}`;
+  if (clean.startsWith('http://') || clean.startsWith('https://')) {
+    return clean;
+  }
+
+  const stripped = clean.replace(/^\/+/, '').replace(/^galaxy-assets\//, '');
+  return `${CDN_BASE_URL}/${stripped}`;
 };
 
-// Cache estático en memoria para las semillas maestras (evita re-descargar datos idénticos en cada navegación)
+// Agrupa todos los activos repetidos en una sola tarjeta con su cantidad total (x2, x10, x450...)
+const stackInventoryItems = (rawItems: InventoryItem[]): InventoryItem[] => {
+  const map = new Map<string, InventoryItem>();
+
+  for (const item of rawItems) {
+    const cat = (item.category || 'Other').trim().toLowerCase();
+    const type = (item.type || '').trim().toLowerCase();
+    const canonicalKey =
+      item.seed_id && item.seed_id.trim() !== ''
+        ? item.seed_id.trim().toLowerCase()
+        : (item.name || item.id).trim().toLowerCase();
+    const lvl = Number(item.level || 1);
+    const flightFlag = item.is_in_flight ? '1' : '0';
+
+    const stackKey = `${cat}::${type}::${canonicalKey}::lvl${lvl}::f${flightFlag}`;
+
+    const existing = map.get(stackKey);
+    if (!existing) {
+      map.set(stackKey, {
+        ...item,
+        quantity: Number(item.quantity || 1),
+        stacked_ids:
+          item.stacked_ids && item.stacked_ids.length > 0
+            ? [...item.stacked_ids]
+            : [item.id],
+      });
+    } else {
+      existing.quantity += Number(item.quantity || 1);
+      if (item.favorite) existing.favorite = true;
+      if (item.stacked_ids && item.stacked_ids.length > 0) {
+        existing.stacked_ids!.push(...item.stacked_ids);
+      } else {
+        existing.stacked_ids!.push(item.id);
+      }
+    }
+  }
+
+  // Ordenar mostrando primero los stacks más numerosos o favoritos
+  return Array.from(map.values()).sort((a, b) => {
+    if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
+    return (b.quantity || 1) - (a.quantity || 1);
+  });
+};
+
 let seedCache: {
   ships?: any[];
   tools?: any[];
@@ -97,7 +173,6 @@ export const useInventory = () => {
         return;
       }
 
-      // Obtener el legacy_id del usuario para garantizar la compatibilidad dual (UUID y entero migrado)
       let legacyId: number | null = null;
       try {
         const { data: profile } = await supabase
@@ -109,10 +184,9 @@ export const useInventory = () => {
           legacyId = Number(profile.legacy_id);
         }
       } catch (err) {
-        console.warn("No se pudo obtener legacy_id del perfil:", err);
+        console.warn('No se pudo obtener legacy_id del perfil:', err);
       }
 
-      // 1. OBTENER EXPEDICIONES ACTIVAS EN VUELO Y FLOTAS
       const [expeditionsRes, fleetsRes] = await Promise.all([
         supabase
           .from('active_expeditions')
@@ -136,6 +210,9 @@ export const useInventory = () => {
         if (Array.isArray(deployed)) {
           deployed.forEach((a: any) => {
             if (a.id) inFlightIds.add(String(a.id).trim().toLowerCase());
+            if (Array.isArray(a.stacked_ids)) {
+              a.stacked_ids.forEach((sid: string) => inFlightIds.add(String(sid).trim().toLowerCase()));
+            }
             if (a.seed_id) inFlightIds.add(String(a.seed_id).trim().toLowerCase());
             if (a.id_ship) inFlightIds.add(String(a.id_ship).trim().toLowerCase());
             if (a.name) inFlightNames.add(String(a.name).trim().toLowerCase());
@@ -152,6 +229,9 @@ export const useInventory = () => {
             ];
             fleetMembers.forEach((a: any) => {
               if (a.id) inFlightIds.add(String(a.id).trim().toLowerCase());
+              if (Array.isArray(a.stacked_ids)) {
+                a.stacked_ids.forEach((sid: string) => inFlightIds.add(String(sid).trim().toLowerCase()));
+              }
               if (a.seed_id) inFlightIds.add(String(a.seed_id).trim().toLowerCase());
               if (a.id_ship) inFlightIds.add(String(a.id_ship).trim().toLowerCase());
               if (a.name) inFlightNames.add(String(a.name).trim().toLowerCase());
@@ -160,36 +240,41 @@ export const useInventory = () => {
         }
       });
 
-      // Helper para consultas seguras con resolución dual de usuario (user_id UUID o id_user legacy)
-      const safeUserQuery = async (tableName: string) => {
+      // Descarga paginada por lotes de 1.000 para no cortar inventarios grandes
+      const safeUserQuery = async (tableName: string, selectClause = '*') => {
+        const allRows: any[] = [];
+        const pageSize = 1000;
+        let from = 0;
+
         try {
-          if (legacyId) {
-            const { data, error } = await supabase
-              .from(tableName)
-              .select('*')
-              .or(`user_id.eq.${user.id},id_user.eq.${legacyId}`);
-            if (!error && data) {
-              const seen = new Set();
-              return data.filter(item => {
-                if (seen.has(item.id)) return false;
-                seen.add(item.id);
-                return true;
-              });
+          while (true) {
+            let query = supabase.from(tableName).select(selectClause).range(from, from + pageSize - 1);
+            if (legacyId) {
+              query = query.or(`user_id.eq.${user.id},id_user.eq.${legacyId}`);
+            } else {
+              query = query.eq('user_id', user.id);
             }
+
+            const { data, error } = await query;
+            if (error || !data || data.length === 0) break;
+
+            allRows.push(...data);
+            if (data.length < pageSize) break;
+            from += pageSize;
           }
 
-          const { data, error } = await supabase
-            .from(tableName)
-            .select('*')
-            .eq('user_id', user.id);
-          if (error) return [];
-          return data || [];
+          const seen = new Set();
+          return allRows.filter((item) => {
+            if (!item.id) return true;
+            if (seen.has(item.id)) return false;
+            seen.add(item.id);
+            return true;
+          });
         } catch {
-          return [];
+          return allRows;
         }
       };
 
-      // Helper para semillas estáticas con memoria en caché
       const fetchSeed = async (cacheKey: keyof typeof seedCache, tableName: string) => {
         if (seedCache[cacheKey] && seedCache[cacheKey]!.length > 0) {
           return seedCache[cacheKey]!;
@@ -204,7 +289,6 @@ export const useInventory = () => {
         return [];
       };
 
-      // 2. CARGAR TODAS LAS TABLAS DE ACTIVOS RELACIONALES Y SEMILLAS EN PARALELO
       const [
         userShips,
         seedShips,
@@ -224,7 +308,6 @@ export const useInventory = () => {
         seedBlueprints,
         userLicenses,
         userConsumables,
-        seedConsumables,
         userRepairKits,
         userQmps,
         userMaterialicers,
@@ -234,26 +317,9 @@ export const useInventory = () => {
         userEssentials
       ] = await Promise.all([
         (async () => {
-          try {
-            let q = supabase.from('user_ships').select('*, seed_ships(*)');
-            if (legacyId) {
-              q = q.or(`user_id.eq.${user.id},id_user.eq.${legacyId}`);
-            } else {
-              q = q.eq('user_id', user.id);
-            }
-            const { data, error } = await q;
-            if (!error && data && data.length > 0) {
-              const seen = new Set();
-              return data.filter(item => {
-                if (seen.has(item.id)) return false;
-                seen.add(item.id);
-                return true;
-              });
-            }
-          } catch (e) {
-            console.warn("Fallo en user_ships con join seed_ships, reintentando consulta estándar:", e);
-          }
-          return await safeUserQuery('user_ships');
+          const joined = await safeUserQuery('user_ships', '*, seed_ships(*)');
+          if (joined.length > 0) return joined;
+          return await safeUserQuery('user_ships', '*');
         })(),
         fetchSeed('ships', 'seed_ships'),
         safeUserQuery('user_tools'),
@@ -276,7 +342,6 @@ export const useInventory = () => {
         fetchSeed('blueprints', 'seed_blueprints'),
         safeUserQuery('user_licenses'),
         safeUserQuery('user_consumibles'),
-        fetchSeed('consumables', 'seed_consumables'),
         safeUserQuery('user_repair_kits'),
         safeUserQuery('user_qmps'),
         safeUserQuery('user_materialicers'),
@@ -300,19 +365,36 @@ export const useInventory = () => {
         );
       };
 
-      // ── MAPEO DE NAVES (SPACESHIPS) ──
+      // 1. Naves
       (userShips || []).forEach((ship: any) => {
         const seedRel = ship.seed_ships;
-        const seedFound = (seedShips || []).find((ss: any) => 
-          ss.id === ship.ship_id || 
-          ss.id === ship.seed_id || 
-          ss.id === ship.id_ship ||
-          ss.ship_id === ship.ship_id
-        ) || {};
-        const seed = (seedRel && typeof seedRel === 'object' && Object.keys(seedRel).length > 0) ? seedRel : seedFound;
-        const shipName = seed.ship_name || seed.name || ship.seed_ships?.ship_name || ship.seed_ships?.name || ship.name_ship || ship.name || ship.custom_name || `Nave #${ship.id}`;
+        const seedFound =
+          (seedShips || []).find(
+            (ss: any) =>
+              ss.id === ship.ship_id ||
+              ss.id === ship.seed_id ||
+              ss.id === ship.id_ship ||
+              ss.ship_id === ship.ship_id
+          ) || {};
+        const seed =
+          seedRel && typeof seedRel === 'object' && Object.keys(seedRel).length > 0
+            ? seedRel
+            : seedFound;
+
+        const rawShipName = ship.name_ship || ship.name || ship.custom_name || '';
+        const isGenericNickname =
+          !rawShipName ||
+          !isNaN(Number(rawShipName)) ||
+          ['sin uso', 'en uso', 'reserva', 'idle'].includes(rawShipName.trim().toLowerCase());
+
+        const shipName =
+          seed.ship_name ||
+          seed.name ||
+          ship.seed_ships?.ship_name ||
+          (!isGenericNickname ? rawShipName : `Nave #${ship.id_ship || ship.ship_id || ship.id}`);
+
         const realId = String(ship.id);
-        const seedId = String(ship.id_ship || ship.ship_id || ship.seed_id || seed.id || '');
+        const seedId = String(seed.ship_id || seed.id || ship.ship_id || ship.id_ship || shipName);
 
         combinedItems.push({
           ...seed,
@@ -364,17 +446,19 @@ export const useInventory = () => {
         });
       });
 
-      // ── MAPEO DE ESTRUCTURAS (STRUCTURES) ──
+      // 2. Estructuras
       (userStructures || []).forEach((st: any) => {
-        const seed = (seedStructures || []).find((ss: any) => 
-          ss.id === st.structure_id || 
-          ss.id === st.seed_id || 
-          ss.id === st.id_structure ||
-          ss.building_id === st.building_id
-        ) || {};
-        const structName = st.name || seed.structure_name || seed.name || seed.title || `Estructura #${st.id}`;
+        const seed =
+          (seedStructures || []).find(
+            (ss: any) =>
+              ss.id === st.structure_id ||
+              ss.id === st.seed_id ||
+              ss.id === st.id_structure ||
+              ss.building_id === st.building_id
+          ) || {};
+        const structName = st.name || seed.structure_name || seed.name || seed.title || `Estructura #${st.structure_id || st.id_structure || st.id}`;
         const realId = String(st.id);
-        const seedId = String(st.structure_id || st.seed_id || seed.id || '');
+        const seedId = String(seed.id || st.structure_id || st.id_structure || structName);
 
         combinedItems.push({
           id: realId,
@@ -396,16 +480,18 @@ export const useInventory = () => {
         });
       });
 
-      // ── MAPEO DE DEFENSAS (DEFENSES) ──
+      // 3. Defensas
       (userDefenses || []).forEach((d: any) => {
-        const seed = (seedDefenses || []).find((sd: any) => 
-          sd.id === d.defense_id || 
-          sd.id === d.id_defense || 
-          sd.defense_id === d.defense_id
-        ) || {};
-        const defName = d.name || d.name_defense || seed.defense_name || seed.name || `Defensa #${d.id}`;
+        const seed =
+          (seedDefenses || []).find(
+            (sd: any) =>
+              sd.id === d.defense_id ||
+              sd.id === d.id_defense ||
+              sd.defense_id === d.defense_id
+          ) || {};
+        const defName = d.name || d.name_defense || seed.defense_name || seed.name || `Defensa #${d.defense_id || d.id_defense || d.id}`;
         const realId = String(d.id);
-        const seedId = String(d.defense_id || d.id_defense || seed.id || '');
+        const seedId = String(seed.id || d.defense_id || d.id_defense || defName);
 
         combinedItems.push({
           id: realId,
@@ -427,17 +513,19 @@ export const useInventory = () => {
         });
       });
 
-      // ── MAPEO DE TECNOLOGÍAS (TECHNOLOGY) ──
+      // 4. Tecnologías
       (userTech || []).forEach((tc: any) => {
-        const seed = (seedTech || []).find((st: any) => 
-          st.id === tc.technology_id || 
-          st.id === tc.seed_id || 
-          st.id === tc.id_technology ||
-          st.technology_id === tc.technology_id
-        ) || {};
-        const techName = tc.name || seed.technology_name || seed.name || seed.title || `Tecnología #${tc.id}`;
+        const seed =
+          (seedTech || []).find(
+            (st: any) =>
+              st.id === tc.technology_id ||
+              st.id === tc.seed_id ||
+              st.id === tc.id_technology ||
+              st.technology_id === tc.technology_id
+          ) || {};
+        const techName = tc.name || seed.technology_name || seed.name || seed.title || `Tecnología #${tc.technology_id || tc.id_technology || tc.id}`;
         const realId = String(tc.id);
-        const seedId = String(tc.technology_id || tc.seed_id || seed.id || '');
+        const seedId = String(seed.id || tc.technology_id || tc.id_technology || techName);
 
         combinedItems.push({
           id: realId,
@@ -459,16 +547,18 @@ export const useInventory = () => {
         });
       });
 
-      // ── MAPEO DE ASTROBOTS (ASTROBOTS) ──
+      // 5. Astrobots
       (userAstrobots || []).forEach((a: any) => {
-        const seed = (seedAstrobots || []).find((sa: any) => 
-          sa.id === a.astrobot_id || 
-          sa.id === a.seed_id || 
-          sa.astrobot_id === a.astrobot_id
-        ) || {};
-        const botName = a.name || seed.name || seed.astrobot_name || `Astrobot #${a.id}`;
+        const seed =
+          (seedAstrobots || []).find(
+            (sa: any) =>
+              sa.id === a.astrobot_id ||
+              sa.id === a.seed_id ||
+              sa.astrobot_id === a.astrobot_id
+          ) || {};
+        const botName = a.name || seed.name || seed.astrobot_name || `Astrobot #${a.astrobot_id || a.id_astrobot || a.id}`;
         const realId = String(a.id);
-        const seedId = String(a.astrobot_id || a.seed_id || seed.id || '');
+        const seedId = String(seed.id || a.astrobot_id || a.id_astrobot || botName);
 
         combinedItems.push({
           id: realId,
@@ -489,16 +579,18 @@ export const useInventory = () => {
         });
       });
 
-      // ── MAPEO DE HERRAMIENTAS (TOOLS) ──
+      // 6. Herramientas
       (userTools || []).forEach((t: any) => {
-        const seed = (seedTools || []).find((st: any) => 
-          st.id === t.tool_id || 
-          st.id === t.seed_id || 
-          st.tool_id === t.tool_id
-        ) || {};
-        const toolName = t.name || seed.name || seed.tool_name || seed.title || `Herramienta #${t.id}`;
+        const seed =
+          (seedTools || []).find(
+            (st: any) =>
+              st.id === t.tool_id ||
+              st.id === t.seed_id ||
+              st.tool_id === t.tool_id
+          ) || {};
+        const toolName = t.name || seed.name || seed.tool_name || seed.title || `Herramienta #${t.tool_id || t.id_tool || t.id}`;
         const realId = String(t.id);
-        const seedId = String(t.tool_id || t.seed_id || seed.id || '');
+        const seedId = String(seed.id || t.tool_id || t.id_tool || toolName);
 
         combinedItems.push({
           id: realId,
@@ -520,16 +612,18 @@ export const useInventory = () => {
         });
       });
 
-      // ── MAPEO DE PLANOS (BLUEPRINTS) ──
+      // 7. Blueprints
       (userBlueprints || []).forEach((bp: any) => {
-        const seed = (seedBlueprints || []).find((sb: any) => 
-          sb.id === bp.blueprint_id || 
-          sb.id === bp.id_blueprint || 
-          sb.blueprint_id === bp.blueprint_id
-        ) || {};
-        const bpName = bp.name || seed.blueprint_name || seed.name || `Plano #${bp.id}`;
+        const seed =
+          (seedBlueprints || []).find(
+            (sb: any) =>
+              sb.id === bp.blueprint_id ||
+              sb.id === bp.id_blueprint ||
+              sb.blueprint_id === bp.blueprint_id
+          ) || {};
+        const bpName = bp.name || seed.blueprint_name || seed.name || `Plano #${bp.blueprint_id || bp.id_blueprint || bp.id}`;
         const realId = String(bp.id);
-        const seedId = String(bp.blueprint_id || bp.id_blueprint || seed.id || '');
+        const seedId = String(seed.id || bp.blueprint_id || bp.id_blueprint || bpName);
 
         combinedItems.push({
           id: realId,
@@ -551,19 +645,21 @@ export const useInventory = () => {
         });
       });
 
-      // ── MAPEO DE INSIGNIAS (BADGES) ──
+      // 8. Insignias
       (userBadges || []).forEach((b: any) => {
         const badgeKey = b.badge_id || b.id_badge || b.seed_id || '';
-        const seed = (seedBadges || []).find((sb: any) => 
-          sb.id === badgeKey || 
-          sb.badge_id === badgeKey || 
-          String(sb.id) === String(b.badge_id) || 
-          String(sb.id) === String(b.id_badge) ||
-          String(sb.id_badge) === String(b.id_badge)
-        ) || {};
+        const seed =
+          (seedBadges || []).find(
+            (sb: any) =>
+              sb.id === badgeKey ||
+              sb.badge_id === badgeKey ||
+              String(sb.id) === String(b.badge_id) ||
+              String(sb.id) === String(b.id_badge) ||
+              String(sb.id_badge) === String(b.id_badge)
+          ) || {};
         const badgeName = b.name || seed.name || seed.badge_name || seed.title || `Insignia #${b.id_badge || b.badge_id || b.id}`;
         const realId = String(b.id);
-        const seedId = String(badgeKey || seed.id || '');
+        const seedId = String(seed.id || badgeKey || badgeName);
 
         combinedItems.push({
           id: realId,
@@ -585,12 +681,12 @@ export const useInventory = () => {
         });
       });
 
-      // ── MAPEO DE LICENCIAS (LICENCIA) ──
+      // 9. Licencias
       (userLicenses || []).forEach((l: any) => {
         const seed = l.seed_licenses || {};
-        const licName = l.name || seed.name || `Licencia #${l.id}`;
+        const licName = l.name || seed.name || `Licencia #${l.license_id || l.id}`;
         const realId = String(l.id);
-        const seedId = String(l.license_id || seed.id || '');
+        const seedId = String(seed.id || l.license_id || licName);
 
         combinedItems.push({
           id: realId,
@@ -611,12 +707,12 @@ export const useInventory = () => {
         });
       });
 
-      // ── MAPEO DE CONSUMIBLES GENÉRICOS (CONSUMIBLES) ──
+      // 10. Consumibles generales
       (userConsumables || []).forEach((co: any) => {
         const seed = co.seed_consumables || {};
-        const consName = co.name || seed.name || `Consumible #${co.id}`;
+        const consName = co.name || seed.name || `Consumible #${co.consumable_id || co.id}`;
         const realId = String(co.id);
-        const seedId = String(co.consumable_id || seed.id || '');
+        const seedId = String(seed.id || co.consumable_id || consName);
 
         combinedItems.push({
           id: realId,
@@ -637,7 +733,7 @@ export const useInventory = () => {
         });
       });
 
-      // ── MAPEO DE KITS DE REPARACIÓN (CONSUMIBLES) ──
+      // 11. Kits de reparación
       (userRepairKits || []).forEach((rk: any) => {
         const kitTier = rk.id_kit || 1;
         const kitName = `Kit de Reparación T${kitTier}`;
@@ -645,6 +741,7 @@ export const useInventory = () => {
 
         combinedItems.push({
           id: realId,
+          seed_id: `repair_kit_${kitTier}`,
           name: kitName,
           fullname: kitName,
           category: 'Consumibles',
@@ -661,13 +758,14 @@ export const useInventory = () => {
         });
       });
 
-      // ── MAPEO DE MÓDULOS QMP (CONSUMIBLES) ──
+      // 12. QMPs
       (userQmps || []).forEach((qmp: any) => {
-        const qmpName = `Módulo QMP #${qmp.id_qmp || qmp.id}`;
-        const realId = `qmp_${qmp.id}`;
+        const qmpCode = qmp.id_qmp || 1;
+        const qmpName = `Módulo QMP #${qmpCode}`;
 
         combinedItems.push({
-          id: realId,
+          id: `qmp_${qmp.id}`,
+          seed_id: `qmp_${qmpCode}`,
           name: qmpName,
           fullname: qmpName,
           category: 'Consumibles',
@@ -684,13 +782,14 @@ export const useInventory = () => {
         });
       });
 
-      // ── MAPEO DE MATERIALIZADORES (CONSUMIBLES) ──
+      // 13. Materializadores
       (userMaterialicers || []).forEach((mat: any) => {
-        const matName = `Materializador #${mat.id_materialicer || mat.id}`;
-        const realId = `mat_${mat.id}`;
+        const matCode = mat.id_materialicer || 1;
+        const matName = `Materializador #${matCode}`;
 
         combinedItems.push({
-          id: realId,
+          id: `mat_${mat.id}`,
+          seed_id: `materialicer_${matCode}`,
           name: matName,
           fullname: matName,
           category: 'Consumibles',
@@ -707,11 +806,13 @@ export const useInventory = () => {
         });
       });
 
-      // ── MAPEO DE BOLSAS, TICKETS, PACKS Y ESENCIALES ──
+      // 14. Bolsas, Tickets, Packs y Esenciales
       (userBags || []).forEach((bag: any) => {
-        const bagName = `Bolsa de Recursos #${bag.id_bag || bag.id}`;
+        const code = bag.id_bag || 1;
+        const bagName = `Bolsa de Recursos #${code}`;
         combinedItems.push({
           id: `bag_${bag.id}`,
+          seed_id: `bag_${code}`,
           name: bagName,
           fullname: bagName,
           category: 'Consumibles',
@@ -729,9 +830,11 @@ export const useInventory = () => {
       });
 
       (userTickets || []).forEach((tk: any) => {
-        const tkName = `Ticket de Acceso #${tk.id_ticket || tk.id}`;
+        const code = tk.id_ticket || 1;
+        const tkName = `Ticket de Acceso #${code}`;
         combinedItems.push({
           id: `tk_${tk.id}`,
+          seed_id: `ticket_${code}`,
           name: tkName,
           fullname: tkName,
           category: 'Consumibles',
@@ -744,14 +847,16 @@ export const useInventory = () => {
           favorite: false,
           is_in_flight: false,
           avatar_url: resolveImageUrl('Assets/Consumibles/ticket.webp'),
-          description: 'Credencial de ingreso prioritario a eventos y bovedas.'
+          description: 'Credencial de ingreso prioritario a eventos y bóvedas.'
         });
       });
 
       (userPacks || []).forEach((pk: any) => {
-        const pkName = `Pack Reclamable #${pk.id_pack || pk.id}`;
+        const code = pk.id_pack || 1;
+        const pkName = `Pack Reclamable #${code}`;
         combinedItems.push({
           id: `pack_${pk.id}`,
+          seed_id: `pack_${code}`,
           name: pkName,
           fullname: pkName,
           category: 'Consumibles',
@@ -769,9 +874,11 @@ export const useInventory = () => {
       });
 
       (userEssentials || []).forEach((es: any) => {
-        const esName = `Ítem Esencial #${es.id_essential || es.id}`;
+        const code = es.id_essential || 1;
+        const esName = `Ítem Esencial #${code}`;
         combinedItems.push({
           id: `ess_${es.id}`,
+          seed_id: `essential_${code}`,
           name: esName,
           fullname: esName,
           category: 'Consumibles',
@@ -788,9 +895,10 @@ export const useInventory = () => {
         });
       });
 
-      setItems(combinedItems);
+      // Apilar todos los repetidos en tarjetas consolidadas
+      setItems(stackInventoryItems(combinedItems));
     } catch (err: any) {
-      console.error("Error al construir inventario unificado:", err);
+      console.error('Error al construir inventario unificado:', err);
       setError(err?.message || 'Error al conectar con la estación de inventario.');
     } finally {
       setLoading(false);
@@ -798,7 +906,13 @@ export const useInventory = () => {
   }, []);
 
   const toggleFavorite = async (itemId: string) => {
-    setItems(prev => prev.map(item => item.id === itemId ? { ...item, favorite: !item.favorite } : item));
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId || item.stacked_ids?.includes(itemId)
+          ? { ...item, favorite: !item.favorite }
+          : item
+      )
+    );
   };
 
   useEffect(() => {

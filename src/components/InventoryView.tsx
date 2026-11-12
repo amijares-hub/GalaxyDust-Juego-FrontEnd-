@@ -14,25 +14,39 @@ import { Button } from "./ui/joly-button";
 import { FleetManager } from "./FleetManager";
 import { Scroller } from "./ui/Scroller";
 import { supabase } from "../lib/supabase";
-import { useInventory, type InventoryItem } from "../hooks/useInventory";
+import {
+  useInventory,
+  resolveImageUrl,
+  FALLBACK_HOLOGRAM_SVG,
+  type InventoryItem
+} from "../hooks/useInventory";
 import { useAudioEngine } from "../hooks/useAudioEngine";
 
 export type { InventoryItem } from "../hooks/useInventory";
 
 const ITEMS_PER_PAGE = 30;
 
-const resolveImageUrl = (rawUrl?: string): string => {
-  if (!rawUrl || typeof rawUrl !== 'string' || rawUrl.trim() === '') {
-    return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
-  }
-  const clean = rawUrl.trim();
-  if (clean.startsWith('http://') || clean.startsWith('https://')) return clean;
+const handleSmartImgError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+  const target = e.currentTarget;
+  const currentSrc = target.src;
 
-  if (clean.startsWith('Assets') || clean.startsWith('Monedas') || clean.includes('Assets%20para')) {
-    return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/${clean.replace(/^\//, '')}`;
+  if (currentSrc.startsWith('data:')) return;
+
+  // Intentar alternar mayúsculas/minúsculas en la extensión (.png <-> .PNG) una vez
+  if (!target.dataset.retriedCase) {
+    target.dataset.retriedCase = 'true';
+    if (currentSrc.endsWith('.png')) {
+      target.src = currentSrc.slice(0, -4) + '.PNG';
+      return;
+    }
+    if (currentSrc.endsWith('.PNG')) {
+      target.src = currentSrc.slice(0, -4) + '.png';
+      return;
+    }
   }
 
-  return `https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/galaxy-assets/${clean.replace(/^\//, '')}`;
+  target.onerror = null;
+  target.src = FALLBACK_HOLOGRAM_SVG;
 };
 
 const getShipStats = (char: any) => {
@@ -48,15 +62,15 @@ const getShipStats = (char: any) => {
     rarity: raw.rarity || char.rarity || 'COMMON',
     size: raw.size || char.size || 'MEDIUM',
     engine: raw.engine || char.engine || 'WARP DRIVE CLASS I',
-    
+
     cargo: Number(raw.cargo ?? char.cargo ?? stats.cargo ?? 0),
     production: Number(raw.production ?? char.production ?? stats.production ?? 0),
-    
+
     health: Number(raw.health ?? char.health ?? raw.hp ?? stats.hp ?? 0),
     shield: Number(raw.shield ?? char.shield ?? stats.shield ?? 0),
     defense: Number(raw.defense ?? char.defense ?? stats.defense ?? 0),
     speed: Number(raw.speed ?? char.speed ?? stats.speed ?? 0),
-    
+
     attack: Number(raw.attack ?? char.attack ?? stats.attack ?? stats.kinetic_attack ?? 0),
     ionAttack: Number(raw.ion_attack ?? raw.ionAttack ?? char.ion_attack ?? stats.ionic_attack ?? 0),
     laserAttack: Number(raw.laser_attack ?? raw.laserAttack ?? char.laser_attack ?? stats.laser_attack ?? 0),
@@ -185,7 +199,7 @@ interface AssetCardProps {
 
 export const AssetCard: React.FC<AssetCardProps> = ({ asset, isSelected, onClick }) => {
   const rarity = (asset.rarity?.toUpperCase() || 'COMMON') as 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY' | 'EXCLUSIVE';
-  
+
   const rarityStyles: Record<string, string> = {
     COMMON: 'border-slate-600/50 text-slate-300 shadow-slate-950/40',
     RARE: 'border-cyan-500/60 text-cyan-400 shadow-cyan-950/40',
@@ -197,6 +211,9 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, isSelected, onClick
   const activeBorder = isSelected
     ? 'border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.6)] ring-1 ring-cyan-400'
     : (rarityStyles[rarity] || rarityStyles.COMMON);
+
+  const qty = asset.quantity || 1;
+  const isStacked = qty > 1;
 
   return (
     <div
@@ -212,11 +229,17 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, isSelected, onClick
       `}
     >
       <div className="shrink-0 h-5 px-1.5 flex items-center justify-between z-10 bg-[#04080e]/95 border-b border-cyan-500/20">
-        <span className="text-[7.5px] sm:text-[8px] font-mono tracking-wider uppercase text-cyan-400 font-bold truncate max-w-[65%]">
+        <span className="text-[7.5px] sm:text-[8px] font-mono tracking-wider uppercase text-cyan-400 font-bold truncate max-w-[60%]">
           {asset.category || 'ASSET'}
         </span>
-        <span className="text-[8px] sm:text-[8.5px] font-mono font-black px-1 py-0.5 rounded bg-black/90 border border-cyan-500/40 text-cyan-300 leading-none shadow">
-          x{asset.quantity || 1}
+        <span
+          className={`text-[8px] sm:text-[9px] font-mono font-black px-1.5 py-0.5 rounded leading-none shadow ${
+            isStacked
+              ? 'bg-amber-500/20 border border-amber-400/70 text-amber-300'
+              : 'bg-black/90 border border-cyan-500/40 text-cyan-300'
+          }`}
+        >
+          x{qty.toLocaleString()}
         </span>
       </div>
 
@@ -224,17 +247,14 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, isSelected, onClick
         <div className="absolute inset-0 bg-radial from-cyan-500/10 via-transparent to-transparent opacity-30 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
         <img
-          src={asset.image || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200'}
+          src={asset.image || FALLBACK_HOLOGRAM_SVG}
           alt={asset.name}
           className={`max-h-full max-w-full object-contain filter drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] group-hover:scale-105 transition-all duration-200 ${
             asset.unlocked === false ? "grayscale opacity-50 brightness-50" : ""
           }`}
           loading="lazy"
           decoding="async"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
-          }}
+          onError={handleSmartImgError}
         />
 
         {asset.isInFlight && (
@@ -314,7 +334,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [showSkillsPopup, setShowSkillsPopup] = useState(false);
   const [fleets, setFleets] = useState<any[]>([]);
 
-  // Paginación táctica del almacén
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   useEffect(() => {
@@ -374,7 +393,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       list = list.filter(
         (c) =>
           c.name.toLowerCase().includes(query) ||
-          c.fullname.toLowerCase().includes(query) ||
+          (c.fullname && c.fullname.toLowerCase().includes(query)) ||
           (c.category && c.category.toLowerCase().includes(query)) ||
           (c.faction && c.faction.toLowerCase().includes(query))
       );
@@ -383,10 +402,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     return list;
   }, [characters, activeSidebarCategory, filterDropdown1, filterDropdown2, searchQuery, modsEnabled]);
 
-  // Reset de página al cambiar filtros o categorías
   useEffect(() => {
     setCurrentPage(1);
   }, [activeSidebarCategory, filterDropdown1, filterDropdown2, searchQuery, modsEnabled]);
+
+  const totalUnitsCount = useMemo(
+    () => getFilteredCharacters.reduce((acc, item) => acc + (item.quantity || 1), 0),
+    [getFilteredCharacters]
+  );
 
   const totalPages = Math.ceil(getFilteredCharacters.length / ITEMS_PER_PAGE) || 1;
   const paginatedCharacters = useMemo(() => {
@@ -466,8 +489,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           })}
         </div>
 
-        <div className="shrink-0 border-t border-cyan-500/20 pt-1.5 text-[10px] text-cyan-400/70 font-mono tracking-wider uppercase truncate">
-          FILTERED ASSETS: {getFilteredCharacters.length} / {characters.length}
+        <div className="shrink-0 border-t border-cyan-500/20 pt-1.5 text-[9.5px] text-cyan-400/80 font-mono tracking-wider uppercase truncate">
+          STACKS: {getFilteredCharacters.length} • UNIDADES: {totalUnitsCount.toLocaleString()}
         </div>
       </div>
 
@@ -554,7 +577,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
         ) : (
           <div className="flex-1 min-h-0 flex flex-col justify-between">
-            {/* Grilla con scroll independiente */}
+            {/* Grilla de Activos Apilados */}
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1.5 p-1.5 grid grid-cols-5 gap-2 sm:gap-2.5 content-start no-scrollbar">
               {isLoading ? (
                 <div className="col-span-5 flex flex-col items-center justify-center h-full gap-2 text-cyan-500 py-12">
@@ -571,7 +594,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
               ) : (
                 paginatedCharacters.map((char, idx) => {
-                  const uniqueKey = `${char.category || 'asset'}-${char.id}-${idx}`;
+                  const uniqueKey = `${char.category || 'asset'}-${char.seed_id || char.id}-${idx}`;
                   const isSelected = selectedChar?.id === char.id;
                   const power = (char as any).power || char.power_score || (char as any).combat_power || (char as any).galactic_power || undefined;
                   return (
@@ -598,7 +621,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               )}
             </div>
 
-            {/* Barra de Paginación Táctica Anclada al Fondo */}
+            {/* Paginador Táctico Inferior */}
             {totalPages > 1 && (
               <div className="shrink-0 flex items-center justify-between pt-2 pb-1 border-t border-cyan-500/20 text-[9px] sm:text-[10px] text-cyan-400 font-mono">
                 <span>
@@ -646,6 +669,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="text-[7.5px] font-mono text-cyan-400 font-extrabold uppercase bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/40">
                       {getItemCategory(selectedChar).toUpperCase()} ASSET
+                    </span>
+                    <span className="text-[7.5px] font-mono text-amber-300 font-black uppercase bg-amber-950/70 px-2 py-0.5 rounded border border-amber-500/40">
+                      STOCK: x{(selectedChar.quantity || 1).toLocaleString()}
                     </span>
                     <button onClick={(e) => handleToggleFavorite(selectedChar, e)} className="text-amber-400 hover:scale-110 transition-transform font-mono text-[9px] font-bold cursor-pointer">
                       {selectedChar.favorite ? t('inventory.detail.favorited', '★ EN FAVORITOS') : t('inventory.detail.not_favorited', '☆ AÑADIR FAVORITO')}
@@ -698,14 +724,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                               className="max-h-full max-w-full object-contain filter drop-shadow-[0_4px_12px_rgba(6,182,212,0.4)]"
                               loading="lazy"
                               decoding="async"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.onerror = null;
-                                target.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
-                              }}
+                              onError={handleSmartImgError}
                             />
-                            <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/90 border border-cyan-400 text-cyan-300 font-mono font-bold text-[8px]">
-                              x{selectedChar.quantity || 1}
+                            <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/90 border border-amber-400 text-amber-300 font-mono font-bold text-[8px]">
+                              x{(selectedChar.quantity || 1).toLocaleString()}
                             </div>
                           </div>
 
@@ -823,14 +845,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           className="w-full h-full object-cover" 
                           loading="lazy"
                           decoding="async"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.onerror = null;
-                            target.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200';
-                          }}
+                          onError={handleSmartImgError}
                         />
-                        <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-cyan-950 border border-cyan-400 text-white font-mono font-black text-[8px] shadow">
-                          x{selectedChar.quantity}
+                        <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-cyan-950 border border-amber-400 text-amber-300 font-mono font-black text-[8px] shadow">
+                          x{(selectedChar.quantity || 1).toLocaleString()}
                         </div>
                       </div>
 

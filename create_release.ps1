@@ -1,10 +1,10 @@
-# Script automatizado para publicar GitHub Release v1.1.3 con los binarios oficiales
+# Script automatizado para publicar GitHub Release v1.1.4 con los binarios oficiales
 Write-Host "Verificando inicio de sesión en GitHub CLI..." -ForegroundColor Cyan
 
-$version = "1.1.3"
-$tag = "v1.1.3"
-$title = "Galaxy Dust Online v1.1.3"
-$notes = "Release oficial v1.1.3 de Galaxy Dust Online con parches de seguridad RLS en base de datos, corrección del flujo de restablecimiento de contraseñas y sincronización de versión cliente multiplataforma (Windows y Android)."
+$version = "1.1.4"
+$tag = "v1.1.4"
+$title = "Galaxy Dust Online v1.1.4"
+$notes = "Release oficial v1.1.4 de Galaxy Dust Online con autorización de Cloudflare R2 en Tauri CSP, soporte ampliado de assets y sincronización de versión cliente multiplataforma (Windows y Android)."
 
 # Rutas de los binarios oficiales
 $exeAsset = "src-tauri\target\release\bundle\nsis\GalaxyDust_${version}_x64-setup.exe"
@@ -19,7 +19,7 @@ if (-not (Test-Path $exeAsset)) {
         $exeAsset = $altExe.FullName
     } else {
         Write-Error "No se encontró el instalador de Windows: $exeAsset"
-        Write-Host "Verifica que el ejecutable esté compilado en src-tauri o tenga el número 1.1.3 en su nombre." -ForegroundColor Yellow
+        Write-Host "Verifica que el ejecutable esté compilado en src-tauri o tenga el número $version en su nombre." -ForegroundColor Yellow
         exit 1
     }
 }
@@ -31,7 +31,7 @@ if (-not (Test-Path $apkAsset)) {
         $apkAsset = $altApk.Name
     } else {
         Write-Error "No se encontró el APK de Android: $apkAsset"
-        Write-Host "Asegúrate de tener el archivo GalaxyDust_1.1.3.apk en la raíz del proyecto." -ForegroundColor Yellow
+        Write-Host "Asegúrate de tener el archivo GalaxyDust_${version}.apk en la raíz del proyecto." -ForegroundColor Yellow
         exit 1
     }
 }

@@ -1,15 +1,19 @@
 {
-  "version": "1.1.3",
-  "notes": "Release oficial v1.1.3 de Galaxy Dust Online con parches de WebView2 en producción (base relativa), CSP reforzado para updater, modal de actualización obligatoria blindado y compatibilidad multiplataforma (Windows y Android).",
-  "pub_date": "2026-11-02T13:16:25.067Z",
+  "version": "1.1.4",
+  "notes": "Release oficial v1.1.4 de Galaxy Dust Online con autorización de Cloudflare R2 en Tauri CSP, apilado de inventario, soporte ampliado de assets y sincronización de versión cliente multiplataforma (Windows y Android).",
+  "pub_date": "2026-11-12T13:31:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUQVJTemRUQzh4NDRiUm15dTN1OWEvNmNtcWZoNDluMWtMS1FveUdjSnBqR1MzK2JyTDdVcWIxRmNzM1JTNngxMFcyWFdnaWNDVDJnQ3ZHcnlzVUxKV3FvYndFM2xzU3drPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNjI1MzY5CWZpbGU6R2FsYXh5RHVzdF8xLjEuM194NjQtc2V0dXAuZXhlCXZlcnNpb246MS4xLjMKZkZFQmZyeFR5dDJzZ2RrcVRDQ2dqRFdTK3BkS0NjL0VOYlJGdG4wUVhJYm9qU25zTnhsdFRkb1Z2cVJSbG45bDRxM1ZyL2RjVlFzc29uWUtQOThzRHc9PQo=",
-      "url": "https://github.com/amijares-hub/GalaxyDust-Juego-FrontEnd-/releases/download/v1.1.3/GalaxyDust_1.1.3_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUQVJTemRUQzh4NDl5OWcvVldxZW0zbTVKUitpa21RYVRtampDYTNNOE4rWmNhaWYxejV2V2FXSGN6MEYzODljZjVPTHpMZk4vYXpBNjRqQk5oZUtESzBRYWtzWUx2UndFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0NDg5Nzg0CWZpbGU6R2FsYXh5RHVzdF8xLjEuNF94NjQtc2V0dXAuZXhlCXZlcnNpb246MS4xLjQKb3d2QlYybEc0YTRra3NzNGE0M3lmQm9MblJ2OFlWUFBiRG4wY3c1VWhKZUtDSytxdG9hQjVtYW94MlFCMmF3d3dwZDZ6dnVPYktWVG5NYmIvSVpxREE9PQo=",
+      "url": "https://github.com/amijares-hub/GalaxyDust-Juego-FrontEnd-/releases/download/v1.1.4/GalaxyDust_1.1.4_x64-setup.exe"
     },
     "x86_64-pc-windows-msvc": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUQVJTemRUQzh4NDRiUm15dTN1OWEvNmNtcWZoNDluMWtMS1FveUdjSnBqR1MzK2JyTDdVcWIxRmNzM1JTNngxMFcyWFdnaWNDVDJnQ3ZHcnlzVUxKV3FvYndFM2xzU3drPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNjI1MzY5CWZpbGU6R2FsYXh5RHVzdF8xLjEuM194NjQtc2V0dXAuZXhlCXZlcnNpb246MS4xLjMKZkZFQmZyeFR5dDJzZ2RrcVRDQ2dqRFdTK3BkS0NjL0VOYlJGdG4wUVhJYm9qU25zTnhsdFRkb1Z2cVJSbG45bDRxM1ZyL2RjVlFzc29uWUtQOThzRHc9PQo=",
-      "url": "https://github.com/amijares-hub/GalaxyDust-Juego-FrontEnd-/releases/download/v1.1.3/GalaxyDust_1.1.3_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUQVJTemRUQzh4NDl5OWcvVldxZW0zbTVKUitpa21RYVRtampDYTNNOE4rWmNhaWYxejV2V2FXSGN6MEYzODljZjVPTHpMZk4vYXpBNjRqQk5oZUtESzBRYWtzWUx2UndFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0NDg5Nzg0CWZpbGU6R2FsYXh5RHVzdF8xLjEuNF94NjQtc2V0dXAuZXhlCXZlcnNpb246MS4xLjQKb3d2QlYybEc0YTRra3NzNGE0M3lmQm9MblJ2OFlWUFBiRG4wY3c1VWhKZUtDSytxdG9hQjVtYW94MlFCMmF3d3dwZDZ6dnVPYktWVG5NYmIvSVpxREE9PQo=",
+      "url": "https://github.com/amijares-hub/GalaxyDust-Juego-FrontEnd-/releases/download/v1.1.4/GalaxyDust_1.1.4_x64-setup.exe"
+    },
+    "android-aarch64": {
+      "signature": "",
+      "url": "https://github.com/amijares-hub/GalaxyDust-Juego-FrontEnd-/releases/download/v1.1.4/GalaxyDust_1.1.4.apk"
     }
   }
 }
