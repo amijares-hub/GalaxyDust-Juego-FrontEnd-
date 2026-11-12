@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { AlertTriangle, RefreshCw, Download, ExternalLink } from 'lucide-react';
 
@@ -18,16 +18,14 @@ const isAndroidEnv = (): boolean =>
   /android/i.test(navigator.userAgent);
 
 // ─── Construcción dinámica de URLs (NUNCA hardcodeadas) ──────────────────────
-// Cuando se lance v1.1.5, v1.2.0, etc., Supabase actualiza current_latest_version
-// y estas URLs se generan automáticamente sin tocar el código.
 
 function buildApkUrl(version: string): string {
-  const v = version.trim();
+  const v = (version || '1.1.4').trim();
   return `https://github.com/amijares-hub/GalaxyDust-Juego-FrontEnd-/releases/download/v${v}/GalaxyDust_${v}.apk`;
 }
 
 function buildExeUrl(version: string): string {
-  const v = version.trim();
+  const v = (version || '1.1.4').trim();
   return `https://github.com/amijares-hub/GalaxyDust-Juego-FrontEnd-/releases/download/v${v}/GalaxyDust_${v}_x64-setup.exe`;
 }
 
@@ -45,7 +43,7 @@ type UpdateStatus =
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({ latestVersion }) => {
-  const displayVersion = latestVersion || '—';
+  const displayVersion = latestVersion || '1.1.4';
   const [status, setStatus] = useState<UpdateStatus>('idle');
   const [progress, setProgress] = useState<number>(0);
   const [errorMsg, setErrorMsg] = useState<string>('');
@@ -54,20 +52,15 @@ export const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({ latestVersio
   const isTauri = isTauriEnv();
 
   // ─── Handler Android ──────────────────────────────────────────────────────
-  // El WebView de Android intercepta la navegación a una URL de APK y la entrega
-  // al Download Manager del sistema → el usuario instala sin salir del juego.
   const handleAndroidUpdate = (): void => {
     const apkUrl = buildApkUrl(displayVersion);
     setStatus('redirecting');
     try {
-      // Navegar al APK: Android WebView delega al Download Manager del SO
       window.location.href = apkUrl;
     } catch (e) {
       console.error('[ForceUpdateModal/Android] Error:', e);
-      // Fallback: intentar abrir como nueva pestaña (algunos WebViews lo manejan)
       window.open(apkUrl, '_blank');
     }
-    // Después de un breve delay, resetear estado por si el usuario vuelve
     setTimeout(() => setStatus('idle'), 3000);
   };
 
@@ -110,9 +103,8 @@ export const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({ latestVersio
         setStatus('relaunching');
         await relaunch();
       } else {
-        // Sin paquete OTA disponible → ofrecer descarga manual
         setStatus('error');
-        setErrorMsg('No se encontró paquete OTA disponible. Usa el enlace manual de abajo.');
+        setErrorMsg('No se detectó un paquete OTA firmado para esta compilación. Descarga el instalador oficial manualmente.');
       }
     } catch (e: unknown) {
       console.error('[ForceUpdateModal/Windows] Error en update:', e);
@@ -139,7 +131,6 @@ export const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({ latestVersio
     window.location.replace(window.location.origin + '/?update=' + Date.now());
   };
 
-  // ─── Despacho principal ───────────────────────────────────────────────────
   const handleUpdate = (): void => {
     if (isAndroid) {
       handleAndroidUpdate();
@@ -150,7 +141,6 @@ export const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({ latestVersio
     }
   };
 
-  // ─── Texto dinámico del botón ─────────────────────────────────────────────
   const buttonLabel = (): string => {
     switch (status) {
       case 'checking':    return 'VERIFICANDO ACTUALIZACIÓN...';
@@ -164,7 +154,6 @@ export const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({ latestVersio
 
   const isBusy = status !== 'idle' && status !== 'error';
 
-  // ─── Nota técnica por plataforma ─────────────────────────────────────────
   const platformNote = (): string => {
     if (isAndroid) {
       return 'Se iniciará la descarga del nuevo APK directamente desde el juego.';
@@ -174,12 +163,11 @@ export const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({ latestVersio
     return 'La aplicación limpiará la caché y recargará el nuevo bundle.';
   };
 
-  // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-md">
       {/* Scanlines decorativos */}
       <div
-        className="absolute inset-0 pointer-events-none opacity-10"
+        className="absolute inset-0 pointer-events-none opacity-15"
         style={{
           backgroundImage:
             'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,255,0.08) 2px, rgba(0,255,255,0.08) 4px)',
@@ -187,10 +175,10 @@ export const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({ latestVersio
       />
 
       <motion.div
-        initial={{ opacity: 0, scale: 0.88, y: 24 }}
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-full max-w-md mx-4 border border-cyan-500/60 bg-[#0C0D0E] shadow-[0_0_60px_rgba(0,255,255,0.18)] overflow-hidden"
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+        className="relative w-full max-w-md mx-4 border border-cyan-500/60 bg-[#0C0D0E] shadow-[0_0_60px_rgba(0,255,255,0.2)] overflow-hidden"
       >
         {/* Borde superior */}
         <div className="h-1 w-full bg-gradient-to-r from-transparent via-cyan-500 to-transparent" />
@@ -216,59 +204,42 @@ export const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({ latestVersio
 
         {/* Cuerpo */}
         <div className="px-6 py-5 space-y-4">
-          {/* Estado de versión */}
           <div className="flex items-center gap-2 font-mono text-[10px] tracking-widest">
             <span className="text-red-400/80 uppercase">VERSIÓN TERMINAL:</span>
             <span className="text-red-300 font-bold">OBSOLETA</span>
             <span className="ml-auto text-cyan-500/50">[ ERR_VERSION_MISMATCH ]</span>
           </div>
 
-          {/* Mensaje principal */}
           <p className="text-[11px] leading-relaxed font-mono text-cyan-100/70 tracking-wide">
-            Tu terminal de mando se encuentra en una versión obsoleta.
-            Se requiere sincronización obligatoria con el clúster central
-            para continuar.
+            Tu terminal de mando se encuentra en una versión desactualizada.
+            Se requiere sincronización obligatoria con el clúster central para continuar jugando.
           </p>
 
-          {/* Barra de progreso — solo visible en Windows durante descarga OTA */}
+          {/* Barra de progreso OTA Windows */}
           {status === 'downloading' && (
             <div className="space-y-1">
               <div className="flex justify-between font-mono text-[9px] text-cyan-500/60">
                 <span>DESCARGANDO PARCHE</span>
                 <span>{progress}%</span>
               </div>
-              <div className="h-1 w-full bg-cyan-500/10 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-cyan-400 rounded-full"
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.3 }}
+              <div className="h-1.5 w-full bg-cyan-950 rounded-full overflow-hidden border border-cyan-500/30">
+                <div
+                  className="h-full bg-cyan-400 transition-all duration-200"
+                  style={{ width: `${progress}%` }}
                 />
               </div>
             </div>
           )}
 
-          {/* Panel de error + enlace de descarga manual como fallback */}
+          {/* Panel de error / fallback */}
           {status === 'error' && (
-            <div className="space-y-2 p-3 border border-red-500/30 bg-red-500/5">
-              <p className="font-mono text-[9px] text-red-400 tracking-wider leading-relaxed">
-                ⚠ {errorMsg || 'Error en la descarga automática.'}
+            <div className="space-y-2 p-3 border border-red-500/30 bg-red-500/10">
+              <p className="font-mono text-[9px] text-red-300 tracking-wider leading-relaxed">
+                ⚠ {errorMsg || 'No se pudo completar la actualización automática.'}
               </p>
-              {/* Enlace manual Windows */}
-              {isTauri && !isAndroid && (
-                <a
-                  href={buildExeUrl(displayVersion)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 font-mono text-[9px] text-cyan-400/80 hover:text-cyan-300 tracking-wider underline underline-offset-2"
-                >
-                  <ExternalLink className="w-3 h-3" />
-                  DESCARGA MANUAL DEL INSTALADOR v{displayVersion}
-                </a>
-              )}
             </div>
           )}
 
-          {/* Separador decorativo */}
           <div className="flex items-center gap-2 text-cyan-500/30 text-[9px] font-mono tracking-widest uppercase">
             <div className="flex-1 h-px bg-cyan-500/20" />
             SINCRONIZACIÓN REQUERIDA
@@ -276,42 +247,55 @@ export const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({ latestVersio
           </div>
 
           {/* Botón principal */}
-          <motion.button
+          <button
             onClick={handleUpdate}
             disabled={isBusy}
-            whileHover={!isBusy ? { scale: 1.02, boxShadow: '0 0 32px rgba(0,255,255,0.35)' } : {}}
-            whileTap={!isBusy ? { scale: 0.97 } : {}}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-3 border font-mono text-[11px] tracking-[0.3em] uppercase font-bold transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/50
+            className={`w-full flex items-center justify-center gap-2 px-4 py-3 border font-mono text-[11px] tracking-[0.3em] uppercase font-bold transition-all duration-200
               ${isBusy
                 ? 'border-cyan-500/30 bg-cyan-500/5 text-cyan-500/40 cursor-not-allowed'
-                : 'border-cyan-500 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 hover:text-cyan-100 cursor-pointer'
+                : 'border-cyan-500 bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25 hover:text-cyan-100 active:scale-[0.98] cursor-pointer shadow-[0_0_20px_rgba(0,255,255,0.15)]'
               }`}
           >
-            {isBusy
-              ? <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
-                  <RefreshCw className="w-4 h-4" />
-                </motion.div>
-              : isAndroid
-                ? <Download className="w-4 h-4" />
-                : <RefreshCw className="w-4 h-4" />
-            }
+            {isBusy ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : isAndroid ? (
+              <Download className="w-4 h-4" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
             {buttonLabel()}
-          </motion.button>
+          </button>
 
-          {/* Nota técnica por plataforma */}
-          <p className="text-center text-[9px] font-mono text-cyan-500/30 tracking-wider">
+          {/* Enlaces de descarga manual directa permanente */}
+          <div className="pt-2 border-t border-cyan-500/20 flex flex-col gap-1.5 text-center">
+            {isAndroid ? (
+              <a
+                href={buildApkUrl(displayVersion)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-1.5 font-mono text-[9px] text-cyan-400 hover:text-cyan-300 tracking-wider underline underline-offset-2"
+              >
+                <ExternalLink className="w-3 h-3" />
+                DESCARGAR GalaxyDust_{displayVersion}.apk
+              </a>
+            ) : (
+              <a
+                href={buildExeUrl(displayVersion)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-1.5 font-mono text-[9px] text-cyan-400 hover:text-cyan-300 tracking-wider underline underline-offset-2"
+              >
+                <ExternalLink className="w-3 h-3" />
+                DESCARGAR INSTALADOR WINDOWS (v{displayVersion})
+              </a>
+            )}
+          </div>
+
+          <p className="text-center text-[9px] font-mono text-cyan-500/40 tracking-wider">
             {platformNote()}
           </p>
-
-          {/* En Android: mostrar URL del APK como referencia visual */}
-          {isAndroid && (
-            <p className="text-center text-[9px] font-mono text-cyan-500/20 tracking-wider break-all leading-relaxed">
-              {buildApkUrl(displayVersion)}
-            </p>
-          )}
         </div>
 
-        {/* Borde inferior */}
         <div className="h-px w-full bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent" />
       </motion.div>
     </div>

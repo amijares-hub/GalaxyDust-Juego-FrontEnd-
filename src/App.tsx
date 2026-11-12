@@ -9,20 +9,21 @@ import { useUpdater } from './hooks/useUpdater';
 import { useAudioEngine } from './hooks/useAudioEngine';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { ForceUpdateModal } from './components/ForceUpdateModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function AppContent() {
-  // Activa el motor de audio y registra los listeners de música de fondo (gd_play_bg_music)
+  // 1. Motor de audio global
   useAudioEngine();
+
+  // 2. Auto-updater silencioso en background (siempre activo en Tauri Desktop)
+  useUpdater();
 
   const { user, logout, isInitializing, screen, showNewPasswordModal } = useAuth();
 
-  // Verificación de versión contra Supabase (app_system_config)
+  // 3. Verificación de versión del cliente contra Supabase (app_system_config)
   const { showUpdateModal, latestVersion } = useVersionCheck();
   const [isPreloaderFinished, setIsPreloaderFinished] = useState(false);
   const [initTimeout, setInitTimeout] = useState(false);
-
-  // Verifica actualizaciones al arrancar (solo en Tauri Desktop)
-  useUpdater();
 
   // TIMEOUT DE SEGURIDAD: Máximo 2 segundos en inicialización; si no responde, desbloquea la pantalla
   useEffect(() => {
@@ -32,9 +33,13 @@ function AppContent() {
     return () => clearTimeout(timer);
   }, []);
 
-  // 0. PRIORIDAD MÁXIMA: Versión obsoleta — bloquear TODO el juego
+  // 0. PRIORIDAD MÁXIMA: Versión obsoleta — bloquear TODO el juego y mostrar modal
   if (showUpdateModal) {
-    return <ForceUpdateModal latestVersion={latestVersion} />;
+    return (
+      <ErrorBoundary>
+        <ForceUpdateModal latestVersion={latestVersion} />
+      </ErrorBoundary>
+    );
   }
 
   // 1. PRIORIDAD ABSOLUTA: SI ES RECUPERACIÓN DE CONTRASEÑA, RENDERIZAR AuthView DE INMEDIATO
@@ -80,12 +85,12 @@ function AppContent() {
     }
   }, [user, user?.mustResetPassword, showNewPasswordModal, screen, isRecoveryMode, isPreloaderFinished]);
 
-  // 1. SI ES RECUPERACIÓN DE CONTRASEÑA: Renderizar AuthView de inmediato
+  // Si es recuperación de contraseña
   if (isRecoveryMode) {
     return <AuthView initialScreen="reset_password" />;
   }
 
-  // 2. Pantalla de carga: solo mientras isInitializing sea true Y no haya saltado el timeout
+  // Pantalla de carga mientras se sincroniza la sesión
   if (isInitializing && !initTimeout) {
     return (
       <div className="w-screen h-screen bg-[#0C0D0E] flex flex-col items-center justify-center text-cyan-500 font-mono space-y-4 select-none">
@@ -97,23 +102,24 @@ function AppContent() {
     );
   }
 
-  // 3. USUARIO CONECTADO:
+  // Usuario conectado
   if (user) {
     if (!isPreloaderFinished) {
       return <GamePreloader onComplete={() => setIsPreloaderFinished(true)} />;
     }
-
     return <Homepage user={user as any} onLogout={logout} />;
   }
 
-  // 4. USUARIO NO CONECTADO:
+  // Usuario no conectado
   return <AuthView />;
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
