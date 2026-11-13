@@ -78,12 +78,12 @@ function AppContent() {
     };
   }, []);
 
-  // Activar música ambiental cuando el usuario esté conectado y termine el preloader
+  // Activar música ambiental en pantalla de inicio / sesión activa
   useEffect(() => {
-    if (user && !user.mustResetPassword && !showNewPasswordModal && screen !== 'reset_password' && !isRecoveryMode && isPreloaderFinished) {
+    if (!showNewPasswordModal && screen !== 'reset_password' && !isRecoveryMode) {
       window.dispatchEvent(new CustomEvent('gd_play_bg_music'));
     }
-  }, [user, user?.mustResetPassword, showNewPasswordModal, screen, isRecoveryMode, isPreloaderFinished]);
+  }, [user, showNewPasswordModal, screen, isRecoveryMode, isPreloaderFinished]);
 
   // Si es recuperación de contraseña
   if (isRecoveryMode) {

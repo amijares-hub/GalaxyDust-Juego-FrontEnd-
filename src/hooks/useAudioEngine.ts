@@ -1,10 +1,92 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 const AUDIO_MUTED_KEY = 'gd_audio_muted';
 const AUDIO_VOLUME_KEY = 'gd_audio_volume';
 
-// 🎵 URL oficial de la música de fondo de GalaxyDust
-export const DEFAULT_BGM_URL = 'https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20music/GD%20MainMenu%201.0.mp3';
+// 🎵 URL oficial de la música de fondo de GalaxyDust (alojada en Supabase Storage)
+export const DEFAULT_BGM_URL =
+  'https://qldjeysusithpblfrmtq.supabase.co/storage/v1/object/public/Assets%20para%20la%20Pagina%20Web/Background%20music/GD%20MainMenu%201.0.mp3';
+
+// ── SINGLETON GLOBAL DE AUDIO (COMPARTIDO POR TODA LA APP) ──
+let globalAudioCtx: AudioContext | null = null;
+let globalBgAudio: HTMLAudioElement | null = null;
+let isAudioUnlocked = false;
+
+function getAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  if (!globalAudioCtx) {
+    const AudioClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioClass) {
+      globalAudioCtx = new AudioClass();
+    }
+  }
+  return globalAudioCtx;
+}
+
+function getBgAudio(url: string = DEFAULT_BGM_URL): HTMLAudioElement | null {
+  if (typeof window === 'undefined') return null;
+  if (!globalBgAudio) {
+    globalBgAudio = new Audio(url);
+    globalBgAudio.loop = true;
+    globalBgAudio.preload = 'auto';
+
+    // Diagnóstico de carga de audio
+    globalBgAudio.addEventListener('error', (e) => {
+      console.error('[GD_AUDIO_ENGINE] Error al cargar BGM:', e, globalBgAudio?.error);
+    });
+
+    globalBgAudio.addEventListener('canplay', () => {
+      console.log('[GD_AUDIO_ENGINE] BGM listo para reproducción');
+    });
+  }
+  return globalBgAudio;
+}
+
+// ── DESBLOQUEADOR GLOBAL DE AUTOPLAY (POINTERDOWN / KEYDOWN / CLICK) ──
+if (typeof window !== 'undefined') {
+  const unlockAudio = () => {
+    isAudioUnlocked = true;
+
+    // 1. Resumir AudioContext si estaba suspendido
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().then(() => {
+        console.log('[GD_AUDIO_ENGINE] AudioContext desbloqueado con éxito');
+      }).catch((err) => {
+        console.warn('[GD_AUDIO_ENGINE] No se pudo resumir AudioContext:', err);
+      });
+    }
+
+    // 2. Intentar reproducir música si no está silenciada
+    let muted = false;
+    let vol = 0.8;
+    try {
+      muted = localStorage.getItem(AUDIO_MUTED_KEY) === 'true';
+      const savedVol = localStorage.getItem(AUDIO_VOLUME_KEY);
+      if (savedVol !== null) vol = parseFloat(savedVol);
+    } catch {}
+
+    const bg = getBgAudio();
+    if (bg && !muted && vol > 0 && bg.paused) {
+      bg.muted = false;
+      bg.volume = vol * 0.5;
+      bg.play().then(() => {
+        console.log('[GD_AUDIO_ENGINE] BGM iniciado por interacción del usuario');
+      }).catch((err) => {
+        console.warn('[GD_AUDIO_ENGINE] BGM play diferido:', err);
+      });
+    }
+
+    // Remover listeners una vez desbloqueado con éxito
+    window.removeEventListener('pointerdown', unlockAudio);
+    window.removeEventListener('keydown', unlockAudio);
+    window.removeEventListener('click', unlockAudio);
+  };
+
+  window.addEventListener('pointerdown', unlockAudio, { passive: true });
+  window.addEventListener('keydown', unlockAudio, { passive: true });
+  window.addEventListener('click', unlockAudio, { passive: true });
+}
 
 export const useAudioEngine = (defaultBgmUrl: string = DEFAULT_BGM_URL) => {
   const [isMuted, setIsMuted] = useState<boolean>(() => {
@@ -24,73 +106,52 @@ export const useAudioEngine = (defaultBgmUrl: string = DEFAULT_BGM_URL) => {
     }
   });
 
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const bgMusicRef = useRef<HTMLAudioElement | null>(null);
-
-  // 1. INICIALIZAR BGM CON AUTOSTART AL PRIMER CLIC (BYPASS AUTOPLAY)
+  // 1. SINCRONIZAR BGM ELEMENT
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    const bg = getBgAudio(defaultBgmUrl);
+    if (!bg) return;
 
-    if (!bgMusicRef.current) {
-      const bgAudio = new Audio(defaultBgmUrl);
-      bgAudio.loop = true;
-      bgAudio.preload = 'auto';
-      bgAudio.volume = isMuted ? 0 : volume * 0.5;
-      bgMusicRef.current = bgAudio;
+    bg.muted = isMuted;
+    bg.volume = isMuted ? 0 : volume * 0.5;
+
+    // Si ya hubo interacción previa y no está silenciado, intentar play
+    if (isAudioUnlocked && !isMuted && volume > 0 && bg.paused) {
+      bg.play().catch(() => {});
     }
-
-    const audio = bgMusicRef.current;
-
-    const startAudio = () => {
-      if (!isMuted && audio.paused) {
-        audio.play().catch(() => {});
-      }
-    };
-
-    // Intento directo
-    startAudio();
-
-    // Desbloqueo universal al primer clic o pulsación del jugador
-    const unlockListener = () => {
-      startAudio();
-      window.removeEventListener('pointerdown', unlockListener);
-      window.removeEventListener('keydown', unlockListener);
-    };
-
-    window.addEventListener('pointerdown', unlockListener);
-    window.addEventListener('keydown', unlockListener);
-
-    return () => {
-      window.removeEventListener('pointerdown', unlockListener);
-      window.removeEventListener('keydown', unlockListener);
-    };
   }, [defaultBgmUrl, isMuted, volume]);
 
-  // 2. SINCRONIZAR VOLUMEN EN VIVO
-  useEffect(() => {
-    if (bgMusicRef.current) {
-      bgMusicRef.current.muted = isMuted;
-      bgMusicRef.current.volume = isMuted ? 0 : volume * 0.5;
-    }
-  }, [isMuted, volume]);
-
   const playBgMusic = useCallback((customUrl?: string) => {
-    if (!bgMusicRef.current) return;
-    if (customUrl && bgMusicRef.current.src !== customUrl) {
-      bgMusicRef.current.src = customUrl;
+    const bg = getBgAudio(customUrl || defaultBgmUrl);
+    if (!bg) return;
+
+    if (customUrl && bg.src !== customUrl) {
+      bg.src = customUrl;
     }
-    bgMusicRef.current.muted = isMuted;
-    bgMusicRef.current.volume = isMuted ? 0 : volume * 0.5;
-    bgMusicRef.current.play().catch(() => {});
-  }, [isMuted, volume]);
+
+    bg.muted = isMuted;
+    bg.volume = isMuted ? 0 : volume * 0.5;
+
+    // Resumir AudioContext paralelamente
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
+    if (!isMuted && volume > 0) {
+      bg.play().catch((err) => {
+        console.warn('[GD_AUDIO_ENGINE] Autoplay pendiente de interacción:', err);
+      });
+    }
+  }, [defaultBgmUrl, isMuted, volume]);
 
   const stopBgMusic = useCallback(() => {
-    if (bgMusicRef.current) {
-      bgMusicRef.current.pause();
+    const bg = getBgAudio();
+    if (bg) {
+      bg.pause();
     }
   }, []);
 
-  // 3. LISTENERS GLOBALES
+  // 2. LISTENERS GLOBALES ENTRE VENTANAS / COMPONENTES
   useEffect(() => {
     const handlePlayMusic = (e: Event) => {
       const customEvent = e as CustomEvent<{ url?: string }>;
@@ -102,8 +163,16 @@ export const useAudioEngine = (defaultBgmUrl: string = DEFAULT_BGM_URL) => {
     const handleAudioEvent = (e: Event) => {
       const customEvent = e as CustomEvent<{ isMuted?: boolean; volume?: number }>;
       if (customEvent.detail) {
-        if (typeof customEvent.detail.isMuted === 'boolean') setIsMuted(customEvent.detail.isMuted);
-        if (typeof customEvent.detail.volume === 'number') setVolumeState(customEvent.detail.volume);
+        if (typeof customEvent.detail.isMuted === 'boolean') {
+          setIsMuted(customEvent.detail.isMuted);
+          const bg = getBgAudio();
+          if (bg) bg.muted = customEvent.detail.isMuted;
+        }
+        if (typeof customEvent.detail.volume === 'number') {
+          setVolumeState(customEvent.detail.volume);
+          const bg = getBgAudio();
+          if (bg) bg.volume = customEvent.detail.volume * 0.5;
+        }
       }
     };
 
@@ -122,6 +191,13 @@ export const useAudioEngine = (defaultBgmUrl: string = DEFAULT_BGM_URL) => {
     setIsMuted((prev) => {
       const next = !prev;
       try { localStorage.setItem(AUDIO_MUTED_KEY, String(next)); } catch {}
+      const bg = getBgAudio();
+      if (bg) {
+        bg.muted = next;
+        if (!next && bg.paused && volume > 0) {
+          bg.play().catch(() => {});
+        }
+      }
       window.dispatchEvent(new CustomEvent('gd_audio_settings_changed', { detail: { isMuted: next, volume } }));
       return next;
     });
@@ -130,6 +206,13 @@ export const useAudioEngine = (defaultBgmUrl: string = DEFAULT_BGM_URL) => {
   const setMuted = useCallback((muted: boolean) => {
     setIsMuted(muted);
     try { localStorage.setItem(AUDIO_MUTED_KEY, String(muted)); } catch {}
+    const bg = getBgAudio();
+    if (bg) {
+      bg.muted = muted;
+      if (!muted && bg.paused && volume > 0) {
+        bg.play().catch(() => {});
+      }
+    }
     window.dispatchEvent(new CustomEvent('gd_audio_settings_changed', { detail: { isMuted: muted, volume } }));
   }, [volume]);
 
@@ -137,21 +220,28 @@ export const useAudioEngine = (defaultBgmUrl: string = DEFAULT_BGM_URL) => {
     const clamped = Math.max(0, Math.min(1, newVol));
     setVolumeState(clamped);
     try { localStorage.setItem(AUDIO_VOLUME_KEY, String(clamped)); } catch {}
+    const bg = getBgAudio();
+    if (bg) {
+      bg.volume = clamped * 0.5;
+      if (!isMuted && clamped > 0 && bg.paused) {
+        bg.play().catch(() => {});
+      }
+    }
     window.dispatchEvent(new CustomEvent('gd_audio_settings_changed', { detail: { isMuted, volume: clamped } }));
   }, [isMuted]);
 
-  // SFX sintetizados
+  // 3. SINTETIZADOR DE SFX (FRECUENCIA DIRECTA O NOMBRE CLAVE)
   const playSfx = useCallback((soundOrFreq?: number | string) => {
     if (isMuted || volume <= 0 || soundOrFreq === undefined || soundOrFreq === null) return;
-    try {
-      if (!audioCtxRef.current) {
-        const AudioClass = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioClass) audioCtxRef.current = new AudioClass();
-      }
-      const ctx = audioCtxRef.current;
-      if (!ctx) return;
-      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+
+      // Si es un número (frecuencia en Hz)
       if (typeof soundOrFreq === 'number') {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -163,17 +253,72 @@ export const useAudioEngine = (defaultBgmUrl: string = DEFAULT_BGM_URL) => {
         gain.connect(ctx.destination);
         osc.start();
         osc.stop(ctx.currentTime + 0.14);
-      } else if (typeof soundOrFreq === 'string') {
-        if (soundOrFreq.startsWith('http') || soundOrFreq.startsWith('/')) {
+        return;
+      }
+
+      // Si es una cadena
+      if (typeof soundOrFreq === 'string') {
+        if (soundOrFreq.startsWith('http') || soundOrFreq.startsWith('/') || soundOrFreq.startsWith('./')) {
           const a = new Audio(soundOrFreq);
           a.volume = volume;
           a.play().catch(() => {});
+          return;
+        }
+
+        // Sintetizador procedural para SFX con nombre
+        const sfxName = soundOrFreq.toLowerCase();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        if (sfxName.includes('success') || sfxName.includes('confirm')) {
+          // Tono ascendente dual
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(587, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
+          gain.gain.setValueAtTime(volume * 0.15, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.16);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.16);
+        } else if (sfxName.includes('fail') || sfxName.includes('error')) {
+          // Tono descendente grave
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(320, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + 0.2);
+          gain.gain.setValueAtTime(volume * 0.2, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.22);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.22);
+        } else {
+          // Click suave / genérico
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(660, ctx.currentTime);
+          gain.gain.setValueAtTime(volume * 0.08, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.06);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.06);
         }
       }
-    } catch {}
+    } catch (err) {
+      console.warn('[GD_AUDIO_ENGINE] Error al generar SFX:', err);
+    }
   }, [isMuted, volume]);
 
-  return { isMuted, volume, toggleMute, setMuted, setVolume, playSfx, playBgMusic, stopBgMusic };
+  return {
+    isMuted,
+    volume,
+    toggleMute,
+    setMuted,
+    setVolume,
+    playSfx,
+    playBgMusic,
+    stopBgMusic,
+  };
 };
 
 export default useAudioEngine;

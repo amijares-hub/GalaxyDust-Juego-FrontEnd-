@@ -2222,7 +2222,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               <div className="h-[48%] min-h-0 flex flex-col bg-[#03060a]/80 border border-cyan-900/50 rounded-lg p-2 overflow-hidden">
                 <div className="shrink-0 flex items-center justify-between pb-1.5 mb-1.5 border-b border-cyan-950">
                   <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider truncate">
-                    {t('expedition.available_ships', `DISPONIBLES: ${currentLeftCategory.toUpperCase()}`)} ({currentLeftCategory === 'Fleets' ? userFleets.length : stackedInventory.length})
+                    {t('expedition.available_ships', `DISPONIBLES: ${currentLeftCategory.toUpperCase()}`)} ({currentLeftCategory === 'Fleets' ? fleets.length : stackedInventory.length})
                   </span>
                   {currentLeftCategory !== 'Fleets' && (
                     <div className="relative w-44">
