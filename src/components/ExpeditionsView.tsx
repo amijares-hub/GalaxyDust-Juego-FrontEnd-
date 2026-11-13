@@ -8,6 +8,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAudioEngine } from '../hooks/useAudioEngine';
 import { GalaxyFrame } from './CanView';
+import { stackAssets, StackedAsset } from '../utils/assetStacker';
 
 export interface Asset {
   id: string;
@@ -316,13 +317,15 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     return { busyToolIds: toolIds, busyShipIds: shipIds, busyAssetIds: allIds };
   }, [activeExpeditions, fleets]);
 
-  // Grupos 50/50 para la bandeja inferior
+  // Grupos 50/50 para la bandeja inferior apilados visualmente
   const selectedLeftGroup = useMemo(() => {
-    return selectedAssets.filter(a => isShipAsset(a.type) || String(a.type || '').toLowerCase().includes('astrobot'));
+    const rawLeft = selectedAssets.filter(a => isShipAsset(a.type) || String(a.type || '').toLowerCase().includes('astrobot'));
+    return stackAssets(rawLeft);
   }, [selectedAssets]);
 
   const selectedRightGroup = useMemo(() => {
-    return selectedAssets.filter(a => isToolAsset(a.type) || isLicenseAsset(a.type) || String(a.type || '').toLowerCase().includes('consum'));
+    const rawRight = selectedAssets.filter(a => isToolAsset(a.type) || isLicenseAsset(a.type) || String(a.type || '').toLowerCase().includes('consum'));
+    return stackAssets(rawRight);
   }, [selectedAssets]);
 
   const activeGcObject = useMemo(() => {
@@ -1395,6 +1398,10 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
     });
   }, [inventoryAssets, currentLeftCategory, assetSearchQuery]);
 
+  const stackedInventory = useMemo(() => {
+    return stackAssets(filteredInventory);
+  }, [filteredInventory]);
+
   const getCategoryIcon = (category: LeftMenuCategory) => {
     switch (category) {
       case 'Naves': return <Rocket className="w-3.5 h-3.5 text-cyan-400" />;
@@ -2215,7 +2222,7 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
               <div className="h-[48%] min-h-0 flex flex-col bg-[#03060a]/80 border border-cyan-900/50 rounded-lg p-2 overflow-hidden">
                 <div className="shrink-0 flex items-center justify-between pb-1.5 mb-1.5 border-b border-cyan-950">
                   <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider truncate">
-                    {t('expedition.available_ships', `DISPONIBLES: ${currentLeftCategory.toUpperCase()}`)} ({filteredInventory.length})
+                    {t('expedition.available_ships', `DISPONIBLES: ${currentLeftCategory.toUpperCase()}`)} ({currentLeftCategory === 'Fleets' ? userFleets.length : stackedInventory.length})
                   </span>
                   {currentLeftCategory !== 'Fleets' && (
                     <div className="relative w-44">
@@ -2262,46 +2269,73 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                         );
                       })
                     )
-                  ) : filteredInventory.length === 0 ? (
+                  ) : stackedInventory.length === 0 ? (
                     <div className="col-span-full p-4 text-center text-zinc-600 text-[8.5px] uppercase tracking-widest font-mono">
                       {assetSearchQuery ? `SIN COINCIDENCIAS PARA "${assetSearchQuery.toUpperCase()}"` : `SIN ACTIVOS EN [${currentLeftCategory.toUpperCase()}]`}
                     </div>
                   ) : (
-                    filteredInventory.map(asset => {
-                      const isSelected = selectedAssets.some(a => a.id === asset.id);
+                    stackedInventory.map(stack => {
+                      const asset = stack.representative;
+                      const selectedRowIds = new Set(selectedAssets.map(a => a.id));
                       
                       const isShip = isShipAsset(asset.type);
                       const isTool = isToolAsset(asset.type);
-                      const isInFlight = busyAssetIds.has(asset.id) || 
-                        (asset.seed_id && (
-                          (isShip && busyShipIds.has(asset.seed_id)) || 
-                          (isTool && busyToolIds.has(asset.seed_id))
-                        ));
+
+                      // Instancias no bloqueadas en vuelo
+                      const operableInstances = stack.instances.filter(inst => {
+                        const inFlight = busyAssetIds.has(inst.rowId) ||
+                          (inst.raw.seed_id && (
+                            (isShip && busyShipIds.has(inst.raw.seed_id)) ||
+                            (isTool && busyToolIds.has(inst.raw.seed_id))
+                          ));
+                        return !inFlight;
+                      });
+
+                      // Instancias libres para ser añadidas a la selección
+                      const availableInstances = operableInstances.filter(inst => !selectedRowIds.has(inst.rowId));
+                      const availableCount = availableInstances.reduce((acc, inst) => acc + (inst.quantity || 1), 0);
+                      const totalSelectedInStack = stack.instances.filter(inst => selectedRowIds.has(inst.rowId)).length;
+                      const isFullySelected = operableInstances.length > 0 && availableCount === 0;
+                      const allInFlight = operableInstances.length === 0 && stack.instances.length > 0;
 
                       const effectVal = asset.effect || 0;
 
                       return (
                         <div
-                          key={asset.id}
+                          key={stack.stackKey}
                           onClick={() => {
-                            if (!isInFlight) toggleAssetSelection(asset);
+                            if (allInFlight) {
+                              playSfx(300);
+                              if (triggerNotification) triggerNotification("⛔ TODAS LAS UNIDADES DE ESTE ACTIVO ESTÁN EN VUELO");
+                              return;
+                            }
+                            if (availableInstances.length > 0) {
+                              const nextInstance = availableInstances[0].raw;
+                              toggleAssetSelection(nextInstance);
+                            } else if (totalSelectedInStack > 0) {
+                              // Si ya están todas seleccionadas, clic remueve la última seleccionada
+                              const selectedInst = stack.instances.filter(inst => selectedRowIds.has(inst.rowId));
+                              if (selectedInst.length > 0) {
+                                toggleAssetSelection(selectedInst[selectedInst.length - 1].raw);
+                              }
+                            }
                           }}
                           className={`p-1.5 rounded-lg border flex items-center gap-2 transition-all relative ${
-                            isInFlight 
-                              ? 'bg-red-950/20 border-red-900/60 opacity-50 pointer-events-none' 
-                              : isSelected 
-                              ? 'bg-cyan-950/80 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.3)] cursor-pointer' 
+                            allInFlight
+                              ? 'bg-red-950/20 border-red-900/60 opacity-50 pointer-events-none'
+                              : isFullySelected
+                              ? 'bg-cyan-950/80 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.3)] cursor-pointer'
                               : 'bg-[#050910] border-cyan-950 hover:border-cyan-800 cursor-pointer'
                           }`}
                         >
                           <div className="w-8 h-8 rounded bg-black border border-cyan-950 shrink-0 overflow-hidden relative">
-                            <img src={asset.image_url} className={`w-full h-full object-cover ${isInFlight ? 'grayscale' : ''}`} alt={asset.name} />
-                            {isSelected && !isInFlight && (
+                            <img src={asset.image_url} className={`w-full h-full object-cover ${allInFlight ? 'grayscale' : ''}`} alt={asset.name} />
+                            {totalSelectedInStack > 0 && !allInFlight && (
                               <div className="absolute inset-0 bg-cyan-500/30 flex items-center justify-center">
                                 <Check className="w-3.5 h-3.5 text-cyan-300 stroke-[3]" />
                               </div>
                             )}
-                            {isInFlight && (
+                            {allInFlight && (
                               <div className="absolute inset-0 bg-red-900/40 flex items-center justify-center backdrop-blur-[1px]">
                                 <span className="text-[5px] text-white font-black uppercase text-center leading-tight shadow-black drop-shadow-md">
                                   EN MISIÓN
@@ -2310,8 +2344,13 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                             )}
                           </div>
                           <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
-                            <span className="text-[8px] font-black text-white truncate">{asset.name}</span>
-                            {isInFlight ? (
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-[8px] font-black text-white truncate">{asset.name}</span>
+                              <span className="text-[7.5px] font-mono font-black text-amber-300 bg-amber-500/20 border border-amber-400/50 rounded px-1 shrink-0">
+                                x{availableCount}
+                              </span>
+                            </div>
+                            {allInFlight ? (
                               <span className="text-[6.5px] text-red-400 font-mono font-black uppercase">{t('expeditions.in_flight')}</span>
                             ) : effectVal !== 0 ? (
                               <span className={`text-[6.5px] font-mono font-bold ${effectVal > 0 ? 'text-cyan-400' : 'text-red-400'}`}>
@@ -2384,24 +2423,38 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                             </div>
                           )}
 
-                          {selectedLeftGroup.map(asset => (
-                            <div
-                              key={`selected-left-${asset.id}`}
-                              onClick={() => toggleAssetSelection(asset)}
-                              className="w-[115px] shrink-0 h-full max-h-[68px] bg-[#05080c] border border-cyan-500/50 rounded p-1 flex items-center gap-1.5 relative group cursor-pointer hover:border-cyan-300 transition-all"
-                            >
-                              <div className="w-7 h-7 rounded bg-black border border-cyan-900 shrink-0 overflow-hidden">
-                                <img src={asset.image_url} className="w-full h-full object-cover" alt={asset.name} />
+                          {selectedLeftGroup.map(stack => {
+                            const asset = stack.representative;
+                            return (
+                              <div
+                                key={`selected-left-${stack.stackKey}`}
+                                onClick={() => {
+                                  // Quitar 1 instancia
+                                  if (stack.instances.length > 0) {
+                                    const lastInstance = stack.instances[stack.instances.length - 1].raw;
+                                    toggleAssetSelection(lastInstance);
+                                  }
+                                }}
+                                className="w-[115px] shrink-0 h-full max-h-[68px] bg-[#05080c] border border-cyan-500/50 rounded p-1 flex items-center gap-1.5 relative group cursor-pointer hover:border-cyan-300 transition-all"
+                              >
+                                <div className="w-7 h-7 rounded bg-black border border-cyan-900 shrink-0 overflow-hidden relative">
+                                  <img src={asset.image_url} className="w-full h-full object-cover" alt={asset.name} />
+                                </div>
+                                <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="text-[7.5px] font-black text-white truncate">{asset.name}</span>
+                                    <span className="text-[6.5px] font-mono font-black text-cyan-300 bg-cyan-950/80 border border-cyan-500/50 rounded px-0.5 shrink-0">
+                                      x{stack.totalQuantity}
+                                    </span>
+                                  </div>
+                                  <span className="text-[6px] text-cyan-400/80 font-mono uppercase">{asset.type}</span>
+                                </div>
+                                <div className="absolute -top-1 -right-1 bg-red-950 border border-red-500 text-red-300 rounded-full w-3.5 h-3.5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <X className="w-2 h-2" />
+                                </div>
                               </div>
-                              <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
-                                <span className="text-[7.5px] font-black text-white truncate">{asset.name}</span>
-                                <span className="text-[6px] text-cyan-400/80 font-mono uppercase">{asset.type}</span>
-                              </div>
-                              <div className="absolute -top-1 -right-1 bg-red-950 border border-red-500 text-red-300 rounded-full w-3.5 h-3.5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <X className="w-2 h-2" />
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </>
                       )}
                     </div>
@@ -2419,24 +2472,38 @@ export const ExpeditionView: React.FC<ExpeditionViewProps> = ({
                           SIN TOOLS NI LICENCIAS
                         </div>
                       ) : (
-                        selectedRightGroup.map(asset => (
-                          <div
-                            key={`selected-right-${asset.id}`}
-                            onClick={() => toggleAssetSelection(asset)}
-                            className="w-[115px] shrink-0 h-full max-h-[68px] bg-[#05080c] border border-amber-500/50 rounded p-1 flex items-center gap-1.5 relative group cursor-pointer hover:border-amber-300 transition-all"
-                          >
-                            <div className="w-7 h-7 rounded bg-black border border-amber-900 shrink-0 overflow-hidden">
-                              <img src={asset.image_url} className="w-full h-full object-cover" alt={asset.name} />
+                        selectedRightGroup.map(stack => {
+                          const asset = stack.representative;
+                          return (
+                            <div
+                              key={`selected-right-${stack.stackKey}`}
+                              onClick={() => {
+                                // Quitar 1 instancia
+                                if (stack.instances.length > 0) {
+                                  const lastInstance = stack.instances[stack.instances.length - 1].raw;
+                                  toggleAssetSelection(lastInstance);
+                                }
+                              }}
+                              className="w-[115px] shrink-0 h-full max-h-[68px] bg-[#05080c] border border-amber-500/50 rounded p-1 flex items-center gap-1.5 relative group cursor-pointer hover:border-amber-300 transition-all"
+                            >
+                              <div className="w-7 h-7 rounded bg-black border border-amber-900 shrink-0 overflow-hidden relative">
+                                <img src={asset.image_url} className="w-full h-full object-cover" alt={asset.name} />
+                              </div>
+                              <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="text-[7.5px] font-black text-white truncate">{asset.name}</span>
+                                  <span className="text-[6.5px] font-mono font-black text-amber-300 bg-amber-950/80 border border-amber-500/50 rounded px-0.5 shrink-0">
+                                    x{stack.totalQuantity}
+                                  </span>
+                                </div>
+                                <span className="text-[6px] text-amber-400/80 font-mono uppercase">{asset.type}</span>
+                              </div>
+                              <div className="absolute -top-1 -right-1 bg-red-950 border border-red-500 text-red-300 rounded-full w-3.5 h-3.5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <X className="w-2 h-2" />
+                              </div>
                             </div>
-                            <div className="flex flex-col text-left overflow-hidden flex-1 leading-tight">
-                              <span className="text-[7.5px] font-black text-white truncate">{asset.name}</span>
-                              <span className="text-[6px] text-amber-400/80 font-mono uppercase">{asset.type}</span>
-                            </div>
-                            <div className="absolute -top-1 -right-1 bg-red-950 border border-red-500 text-red-300 rounded-full w-3.5 h-3.5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <X className="w-2 h-2" />
-                            </div>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>

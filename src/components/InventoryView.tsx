@@ -21,6 +21,7 @@ import {
   type InventoryItem
 } from "../hooks/useInventory";
 import { useAudioEngine } from "../hooks/useAudioEngine";
+import { stackAssets, StackedAsset } from "../utils/assetStacker";
 
 export type { InventoryItem } from "../hooks/useInventory";
 
@@ -411,11 +412,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     [getFilteredCharacters]
   );
 
-  const totalPages = Math.ceil(getFilteredCharacters.length / ITEMS_PER_PAGE) || 1;
+  const stackedCharacters = useMemo(() => {
+    return stackAssets(getFilteredCharacters, getItemCategory);
+  }, [getFilteredCharacters]);
+
+  const totalPages = Math.ceil(stackedCharacters.length / ITEMS_PER_PAGE) || 1;
   const paginatedCharacters = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return getFilteredCharacters.slice(start, start + ITEMS_PER_PAGE);
-  }, [getFilteredCharacters, currentPage]);
+    return stackedCharacters.slice(start, start + ITEMS_PER_PAGE);
+  }, [stackedCharacters, currentPage]);
 
   const handleToggleFavorite = (char: InventoryItem, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -593,21 +598,23 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   )}
                 </div>
               ) : (
-                paginatedCharacters.map((char, idx) => {
-                  const uniqueKey = `${char.category || 'asset'}-${char.seed_id || char.id}-${idx}`;
+                paginatedCharacters.map((stack) => {
+                  const char = stack.representative;
+                  const uniqueKey = stack.stackKey;
                   const isSelected = selectedChar?.id === char.id;
                   const power = (char as any).power || char.power_score || (char as any).combat_power || (char as any).galactic_power || undefined;
+                  const charWithTotal = { ...char, quantity: stack.totalQuantity };
                   return (
                     <AssetCard
                       key={uniqueKey}
                       isSelected={isSelected}
-                      onClick={() => { playSfx(char.sound); setSelectedChar(char); }}
+                      onClick={() => { playSfx(char.sound); setSelectedChar(charWithTotal); }}
                       asset={{
                         id: char.id,
                         name: char.name,
                         image: resolveImageUrl(char.avatar_url || (char as any).image_url),
                         rarity: (char.rarity?.toUpperCase() || 'COMMON') as any,
-                        quantity: char.quantity || 1,
+                        quantity: stack.totalQuantity,
                         category: getItemCategory(char),
                         power,
                         isInFlight: char.is_in_flight,
@@ -625,7 +632,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             {totalPages > 1 && (
               <div className="shrink-0 flex items-center justify-between pt-2 pb-1 border-t border-cyan-500/20 text-[9px] sm:text-[10px] text-cyan-400 font-mono">
                 <span>
-                  {t('inventory.showing', 'MOSTRANDO')} {(currentPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, getFilteredCharacters.length)} / {getFilteredCharacters.length}
+                  {t('inventory.showing', 'MOSTRANDO')} {(currentPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, stackedCharacters.length)} / {stackedCharacters.length}
                 </span>
                 <div className="flex items-center gap-2">
                   <button
