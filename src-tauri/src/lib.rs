@@ -15,30 +15,19 @@ pub fn run() {
         security::process_monitor::start_process_monitor();
     }
 
-    // Verificación de integridad condicional para Desktop (omitida en mobile)
+    // Verificación de integridad en background sin bloquear el hilo principal ni cerrar el juego
     #[cfg(not(mobile))]
     {
-        if let Ok(hash) = security::integrity::calculate_exe_hash() {
-            eprintln!("[SECURITY] Executable Fingerprint (SHA-256): {}", hash);
-
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .expect("[SECURITY] No se pudo inicializar runtime de verificación");
-
-            rt.block_on(async {
+        tauri::async_runtime::spawn(async move {
+            if let Ok(hash) = security::integrity::calculate_exe_hash() {
+                eprintln!("[SECURITY] Executable Fingerprint (SHA-256): {}", hash);
                 match security::integrity::verify_with_supabase(&hash).await {
-                    Ok(true) => eprintln!("[SECURITY] Binario verificado correctamente."),
-                    Ok(false) => {
-                        eprintln!("[SECURITY] ALERTA: Binario no registrado en Supabase.");
-                        #[cfg(not(debug_assertions))]
-                        std::process::exit(1);
-                    }
-                    Err(e) => eprintln!("[SECURITY] Advertencia al verificar hash: {}", e),
+                    Ok(true) => eprintln!("[SECURITY] Binario verificado correctamente con Supabase."),
+                    Ok(false) => eprintln!("[SECURITY] Advertencia: Hash de binario no registrado en Supabase."),
+                    Err(e) => eprintln!("[SECURITY] Advertencia al conectar con verificación de hash: {}", e),
                 }
-            });
-            // rt se destruye aquí antes de que Tauri cree su runtime
-        }
+            }
+        });
     }
 
     let mut builder = tauri::Builder::default()
